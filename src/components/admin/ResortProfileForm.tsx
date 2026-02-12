@@ -5,6 +5,7 @@ import { useResortProfile } from '@/hooks/useResortProfile';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Slider } from '@/components/ui/slider';
 import { toast } from 'sonner';
 import { Upload, Facebook, Instagram, Globe, MapPin } from 'lucide-react';
 
@@ -30,6 +31,7 @@ const ResortProfileForm = () => {
     tiktok_url: '',
     website_url: '',
     logo_url: '',
+    logo_size: 128,
   });
 
   useEffect(() => {
@@ -49,6 +51,7 @@ const ResortProfileForm = () => {
         tiktok_url: profile.tiktok_url || '',
         website_url: profile.website_url || '',
         logo_url: profile.logo_url || '',
+        logo_size: profile.logo_size || 128,
       });
     }
   }, [profile]);
@@ -113,6 +116,19 @@ const ResortProfileForm = () => {
         <input ref={fileRef} type="file" accept="image/png,image/svg+xml,image/webp" className="hidden" onChange={handleLogoUpload} />
         <p className="font-body text-[10px] text-cream-dim">PNG or SVG with transparent background recommended</p>
         {uploading && <p className="font-body text-xs text-cream-dim">Uploading...</p>}
+      </div>
+
+      {/* Logo size slider */}
+      <div>
+        <label className="font-body text-xs text-cream-dim">Logo Size: {form.logo_size}px</label>
+        <Slider
+          value={[form.logo_size]}
+          onValueChange={([v]) => setForm(f => ({ ...f, logo_size: v }))}
+          min={64}
+          max={256}
+          step={8}
+          className="mt-2"
+        />
       </div>
 
       {/* Name & tagline */}

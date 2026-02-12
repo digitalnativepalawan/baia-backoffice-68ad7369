@@ -121,6 +121,7 @@ export type Database = {
           google_map_url: string | null
           id: string
           instagram_url: string | null
+          logo_size: number | null
           logo_url: string | null
           phone: string | null
           resort_name: string
@@ -139,6 +140,7 @@ export type Database = {
           google_map_url?: string | null
           id?: string
           instagram_url?: string | null
+          logo_size?: number | null
           logo_url?: string | null
           phone?: string | null
           resort_name?: string
@@ -157,6 +159,7 @@ export type Database = {
           google_map_url?: string | null
           id?: string
           instagram_url?: string | null
+          logo_size?: number | null
           logo_url?: string | null
           phone?: string | null
           resort_name?: string

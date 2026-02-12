@@ -17,6 +17,7 @@ export interface ResortProfile {
   instagram_url: string;
   tiktok_url: string;
   website_url: string;
+  logo_size: number | null;
   created_at: string;
 }
 

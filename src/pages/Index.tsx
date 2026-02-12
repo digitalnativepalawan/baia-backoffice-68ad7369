@@ -24,10 +24,7 @@ const Index = () => {
     }
   };
 
-  const resortName = profile?.resort_name || 'BAIA PALAWAN';
-  const nameParts = resortName.split(' ');
-  const firstPart = nameParts[0] || '';
-  const restParts = nameParts.slice(1).join(' ');
+  const logoSize = profile?.logo_size || 128;
 
   return (
     <div className="min-h-screen bg-navy-texture flex flex-col items-center justify-center px-6">
@@ -35,19 +32,17 @@ const Index = () => {
       <div className="w-16 h-px bg-gold mb-8 opacity-60" />
 
       {/* Logo */}
-      {profile?.logo_url && (
-        <img src={profile.logo_url} alt={resortName} className="w-28 h-28 object-contain mb-4" />
+      {profile?.logo_url ? (
+        <img
+          src={profile.logo_url}
+          alt={profile.resort_name || 'Resort'}
+          className="object-contain mb-4"
+          style={{ width: logoSize, height: logoSize }}
+        />
+      ) : (
+        <p className="font-body text-sm text-cream-dim/50 mb-4">Upload logo in Admin → Setup</p>
       )}
 
-      {/* Brand */}
-      <h1 className="font-display text-4xl md:text-5xl tracking-[0.2em] text-foreground text-center mb-2">
-        {firstPart}
-      </h1>
-      {restParts && (
-        <p className="font-display text-lg md:text-xl tracking-[0.35em] text-cream-dim mb-1">
-          {restParts}
-        </p>
-      )}
       {profile?.tagline && (
         <p className="font-body text-sm text-cream-dim/70 tracking-wider mb-1">{profile.tagline}</p>
       )}
