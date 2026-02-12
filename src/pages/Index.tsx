@@ -34,9 +34,7 @@ const Index = () => {
       <p className="font-display text-lg md:text-xl tracking-[0.35em] text-cream-dim mb-1">
         PALAWAN
       </p>
-      <p className="font-body text-sm tracking-[0.15em] text-cream-dim mb-12 uppercase">
-        Micro Resort
-      </p>
+      <div className="mb-12" />
 
       <div className="w-16 h-px bg-gold mb-12 opacity-40" />
 
