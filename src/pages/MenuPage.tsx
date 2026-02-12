@@ -66,7 +66,7 @@ const MenuPage = () => {
       {/* Header */}
       <header className="sticky top-0 z-30 bg-navy-deep/95 backdrop-blur-sm border-b border-border">
         <div className="max-w-2xl mx-auto px-4 pt-4 pb-2 flex items-center justify-between">
-          <button onClick={() => navigate(-1)} className="font-body text-sm text-cream-dim hover:text-foreground transition-colors">
+          <button onClick={() => navigate('/order-type')} className="font-body text-sm text-cream-dim hover:text-foreground transition-colors">
             ← Back
           </button>
           <h1 className="font-display text-lg tracking-[0.15em] text-foreground">BAIA PALAWAN</h1>
