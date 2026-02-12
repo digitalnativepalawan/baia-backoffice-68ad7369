@@ -15,7 +15,7 @@ export default {
     extend: {
       fontFamily: {
         display: ['"Playfair Display"', 'serif'],
-        body: ['"Cormorant Garamond"', 'serif'],
+        body: ['"Lato"', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",

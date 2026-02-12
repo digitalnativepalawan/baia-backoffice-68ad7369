@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -8,8 +8,10 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Plus, Trash2, ArrowLeft } from 'lucide-react';
+import { Plus, ArrowLeft } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import EditableRow from '@/components/admin/EditableRow';
+import TimePicker from '@/components/admin/TimePicker';
 
 const AdminPage = () => {
   const navigate = useNavigate();
@@ -172,16 +174,16 @@ const AdminPage = () => {
                     className="bg-secondary border-border text-foreground font-body mt-1" placeholder="639171234567" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="font-body text-xs text-cream-dim">Breakfast Start</label>
-                    <Input type="time" value={brkStart || settings?.breakfast_start_time || '07:00'} onChange={e => setBrkStart(e.target.value)}
-                      className="bg-secondary border-border text-foreground font-body mt-1" />
-                  </div>
-                  <div>
-                    <label className="font-body text-xs text-cream-dim">Breakfast End</label>
-                    <Input type="time" value={brkEnd || settings?.breakfast_end_time || '11:00'} onChange={e => setBrkEnd(e.target.value)}
-                      className="bg-secondary border-border text-foreground font-body mt-1" />
-                  </div>
+                  <TimePicker
+                    label="Breakfast Start"
+                    value={brkStart || settings?.breakfast_start_time || '07:00'}
+                    onChange={setBrkStart}
+                  />
+                  <TimePicker
+                    label="Breakfast End"
+                    value={brkEnd || settings?.breakfast_end_time || '11:00'}
+                    onChange={setBrkEnd}
+                  />
                 </div>
                 <Button onClick={saveSettings} className="font-display tracking-wider w-full">Save Settings</Button>
               </div>
@@ -190,18 +192,28 @@ const AdminPage = () => {
             {/* Units */}
             <section>
               <h3 className="font-display text-sm tracking-wider text-foreground mb-4">Units / Rooms</h3>
-              <div className="space-y-2">
+              <div className="space-y-0">
                 {units.map(u => (
-                  <div key={u.id} className="flex items-center justify-between py-2 border-b border-border">
-                    <span className="font-body text-sm text-foreground">{u.unit_name}</span>
-                    <Switch
-                      checked={u.active}
-                      onCheckedChange={async (checked) => {
-                        await supabase.from('units').update({ active: checked }).eq('id', u.id);
-                        qc.invalidateQueries({ queryKey: ['units-admin'] });
-                      }}
-                    />
-                  </div>
+                  <EditableRow
+                    key={u.id}
+                    id={u.id}
+                    name={u.unit_name}
+                    active={u.active}
+                    onRename={async (id, newName) => {
+                      await supabase.from('units').update({ unit_name: newName }).eq('id', id);
+                      qc.invalidateQueries({ queryKey: ['units-admin'] });
+                      toast.success('Unit renamed');
+                    }}
+                    onDelete={async (id) => {
+                      await supabase.from('units').delete().eq('id', id);
+                      qc.invalidateQueries({ queryKey: ['units-admin'] });
+                      toast.success('Unit deleted');
+                    }}
+                    onToggle={async (id, checked) => {
+                      await supabase.from('units').update({ active: checked }).eq('id', id);
+                      qc.invalidateQueries({ queryKey: ['units-admin'] });
+                    }}
+                  />
                 ))}
                 <div className="flex gap-2 mt-3">
                   <Input value={newUnit} onChange={e => setNewUnit(e.target.value)} placeholder="New unit name"
@@ -214,18 +226,28 @@ const AdminPage = () => {
             {/* Tables */}
             <section>
               <h3 className="font-display text-sm tracking-wider text-foreground mb-4">Dine-In Tables</h3>
-              <div className="space-y-2">
+              <div className="space-y-0">
                 {tables.map(t => (
-                  <div key={t.id} className="flex items-center justify-between py-2 border-b border-border">
-                    <span className="font-body text-sm text-foreground">{t.table_name}</span>
-                    <Switch
-                      checked={t.active}
-                      onCheckedChange={async (checked) => {
-                        await supabase.from('resort_tables').update({ active: checked }).eq('id', t.id);
-                        qc.invalidateQueries({ queryKey: ['tables-admin'] });
-                      }}
-                    />
-                  </div>
+                  <EditableRow
+                    key={t.id}
+                    id={t.id}
+                    name={t.table_name}
+                    active={t.active}
+                    onRename={async (id, newName) => {
+                      await supabase.from('resort_tables').update({ table_name: newName }).eq('id', id);
+                      qc.invalidateQueries({ queryKey: ['tables-admin'] });
+                      toast.success('Table renamed');
+                    }}
+                    onDelete={async (id) => {
+                      await supabase.from('resort_tables').delete().eq('id', id);
+                      qc.invalidateQueries({ queryKey: ['tables-admin'] });
+                      toast.success('Table deleted');
+                    }}
+                    onToggle={async (id, checked) => {
+                      await supabase.from('resort_tables').update({ active: checked }).eq('id', id);
+                      qc.invalidateQueries({ queryKey: ['tables-admin'] });
+                    }}
+                  />
                 ))}
                 <div className="flex gap-2 mt-3">
                   <Input value={newTable} onChange={e => setNewTable(e.target.value)} placeholder="New table name"
