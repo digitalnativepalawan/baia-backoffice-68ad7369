@@ -18,7 +18,11 @@ interface MenuItem {
   sort_order: number;
 }
 
-const CATEGORIES = ['Breakfast', 'Starters', 'Main Courses'];
+const CATEGORIES = [
+  'Breakfast', 'Breakfast Drinks', 'Starters', 'Pasta', 'Main Courses', 'Dessert',
+  'Cocktails', 'Wine', 'Soft Drinks & Beer',
+  'Coffee (Hot)', 'Coffee (Iced)', 'Fruit Smoothies',
+];
 
 const MenuPage = () => {
   const [searchParams] = useSearchParams();

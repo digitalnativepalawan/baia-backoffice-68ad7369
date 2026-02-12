@@ -369,10 +369,10 @@ const AdminPage = () => {
               placeholder="Name" className="bg-secondary border-border text-foreground font-body" />
             <Select value={itemForm.category} onValueChange={v => setItemForm(f => ({ ...f, category: v }))}>
               <SelectTrigger className="bg-secondary border-border text-foreground font-body"><SelectValue /></SelectTrigger>
-              <SelectContent className="bg-card border-border">
-                <SelectItem value="Breakfast" className="font-body text-foreground">Breakfast</SelectItem>
-                <SelectItem value="Starters" className="font-body text-foreground">Starters</SelectItem>
-                <SelectItem value="Main Courses" className="font-body text-foreground">Main Courses</SelectItem>
+              <SelectContent className="bg-card border-border max-h-60">
+                {['Breakfast', 'Breakfast Drinks', 'Starters', 'Pasta', 'Main Courses', 'Dessert', 'Cocktails', 'Wine', 'Soft Drinks & Beer', 'Coffee (Hot)', 'Coffee (Iced)', 'Fruit Smoothies'].map(cat => (
+                  <SelectItem key={cat} value={cat} className="font-body text-foreground">{cat}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Input value={itemForm.description} onChange={e => setItemForm(f => ({ ...f, description: e.target.value }))}
