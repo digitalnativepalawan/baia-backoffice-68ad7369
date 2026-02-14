@@ -31,17 +31,13 @@ const Index = () => {
       {/* Decorative line */}
       <div className="w-16 h-px bg-gold mb-8 opacity-60" />
 
-      {/* Logo */}
-      {profile?.logo_url ? (
-        <img
-          src={profile.logo_url}
-          alt={profile.resort_name || 'Resort'}
-          className="object-contain mb-4"
-          style={{ width: logoSize, height: logoSize }}
-        />
-      ) : (
-        <p className="font-body text-sm text-cream-dim/50 mb-4">Upload logo in Admin → Setup</p>
-      )}
+      {/* Brand */}
+      <h1 className="font-display text-4xl md:text-5xl tracking-[0.2em] text-foreground text-center mb-2">
+        NATIVO
+      </h1>
+      <p className="font-display text-lg md:text-xl tracking-[0.35em] text-cream-dim mb-1">
+        D' KUBO
+      </p>
 
       {profile?.tagline && (
         <p className="font-body text-sm text-cream-dim/70 tracking-wider mb-1">{profile.tagline}</p>
