@@ -1,51 +1,56 @@
 
 
-# Remove Title Text from Landing Page + Add Logo Size Setting
+## Make Menu Categories Dynamic and Manageable
 
-## What Changes
+### Problem
+The menu category tabs shown to guests/staff and the category dropdown in the admin menu editor are both hardcoded with old categories (Breakfast, Starters, Pasta, etc.) that don't match the actual items in the database (Beer, Cocktails, Food Menu, Fruit Shakes, Non-Alcoholic, Spirits, Wine).
 
-### 1. Landing Page (Index.tsx) -- Remove resort name text, show only logo
-- Remove the `<h1>` element displaying `firstPart` (e.g., "BAIA")
-- Remove the `<p>` element displaying `restParts` (e.g., "PALAWAN")
-- Keep the logo image and tagline
-- If no logo is uploaded yet, show a placeholder prompt like "Upload logo in Admin Settings"
+### Solution
+Create a new `menu_categories` database table so resort owners can add, edit, delete, and reorder categories from the Setup tab. Both the guest menu page and the admin menu editor will pull categories dynamically from this table.
 
-### 2. Database -- Add `logo_size` column to `resort_profile`
-- Add a new column `logo_size` (integer, default 128, nullable) to store the logo display size in pixels
-- This controls how large the logo appears on the landing page
+### Steps
 
-### 3. ResortProfileForm.tsx -- Add logo size slider
-- Add a slider control below the logo upload area
-- Range: 64px to 256px, step 8px
-- Shows a live preview of the size value (e.g., "Logo size: 128px")
-- Saved alongside all other profile fields
+**1. Create `menu_categories` table**
+- Columns: `id`, `name` (text), `sort_order` (integer), `active` (boolean), `created_at`
+- RLS policies for public read/insert/update/delete (matching existing pattern)
+- Seed with the 7 current categories: Food Menu, Non-Alcoholic, Fruit Shakes, Cocktails, Wine, Spirits, Beer
 
-### 4. Index.tsx -- Use dynamic logo size
-- Read `logo_size` from the resort profile (default 128px / ~7rem)
-- Apply it to the logo `<img>` width and height
+**2. Add "Menu Categories" management section in Admin Setup tab**
+- Place it in the Setup tab (between Order Types and Kitchen Settings, or after Order Types)
+- Reuse the existing `EditableRow` component for rename, delete, and active toggle
+- Add input + button to create new categories
+- Same pattern as Units, Tables, and Order Types management
 
-## Technical Details
+**3. Update MenuPage.tsx - Guest/Staff menu**
+- Remove the hardcoded `CATEGORIES` array
+- Fetch active categories from `menu_categories` table, ordered by `sort_order`
+- Default the active tab to the first category returned
+- Category tabs render dynamically from database results
 
-**Migration SQL:**
-```sql
-ALTER TABLE resort_profile ADD COLUMN logo_size integer DEFAULT 128;
+**4. Update AdminPage.tsx - Menu item editor**
+- Remove the hardcoded category list in the Select dropdown (line 515)
+- Use the fetched `menu_categories` data to populate the category dropdown
+- Default new item category to the first available category
+
+### Technical Details
+
+```text
+Database table: menu_categories
++------------+---------+-----------+--------+
+| id (uuid)  | name    | sort_order| active |
++------------+---------+-----------+--------+
+| ...        | Food Menu    | 1    | true   |
+| ...        | Non-Alcoholic| 2    | true   |
+| ...        | Fruit Shakes | 3    | true   |
+| ...        | Cocktails    | 4    | true   |
+| ...        | Wine         | 5    | true   |
+| ...        | Spirits      | 6    | true   |
+| ...        | Beer         | 7    | true   |
++------------+---------+-----------+--------+
 ```
 
-**Index.tsx changes:**
-- Remove lines rendering `firstPart` and `restParts`
-- Update logo `<img>` to use `style={{ width: profile.logo_size, height: profile.logo_size }}`
-
-**ResortProfileForm.tsx changes:**
-- Add `logo_size` to the form state (default 128)
-- Add a Slider component from the UI library between the logo upload and the "Resort Name" input
-- Include `logo_size` in the save payload
-
-**Files changed:**
-| File | Change |
-|------|--------|
-| Migration SQL | Add `logo_size` column to `resort_profile` |
-| `src/pages/Index.tsx` | Remove resort name `<h1>` and `<p>`, use dynamic logo size |
-| `src/components/admin/ResortProfileForm.tsx` | Add logo size slider to form |
-| `src/hooks/useResortProfile.ts` | Add `logo_size` to interface |
-| `src/integrations/supabase/types.ts` | Auto-updated after migration |
+Files to modify:
+- New migration SQL for `menu_categories` table + seed data
+- `src/pages/AdminPage.tsx` - add category management section + update menu item editor dropdown
+- `src/pages/MenuPage.tsx` - replace hardcoded categories with dynamic query
 
