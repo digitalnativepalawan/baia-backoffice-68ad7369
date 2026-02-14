@@ -1,56 +1,52 @@
 
 
-## Make Menu Categories Dynamic and Manageable
+## Fix Mobile Experience for All Pages
 
-### Problem
-The menu category tabs shown to guests/staff and the category dropdown in the admin menu editor are both hardcoded with old categories (Breakfast, Starters, Pasta, etc.) that don't match the actual items in the database (Beer, Cocktails, Food Menu, Fruit Shakes, Non-Alcoholic, Spirits, Wine).
+### Current State
+After thorough testing on a 390x844 mobile viewport, all core features ARE functioning (menu categories load, items display, cart works, order type selection works, admin page works). However, there are several mobile UX issues that need fixing:
 
-### Solution
-Create a new `menu_categories` database table so resort owners can add, edit, delete, and reorder categories from the Setup tab. Both the guest menu page and the admin menu editor will pull categories dynamically from this table.
+### Issues Found
 
-### Steps
+**1. Visible scrollbar on menu category tabs**
+The horizontal category tab bar on the MenuPage shows an ugly native scrollbar. On mobile, this should be hidden with smooth touch-scroll instead.
 
-**1. Create `menu_categories` table**
-- Columns: `id`, `name` (text), `sort_order` (integer), `active` (boolean), `created_at`
-- RLS policies for public read/insert/update/delete (matching existing pattern)
-- Seed with the 7 current categories: Food Menu, Non-Alcoholic, Fruit Shakes, Cocktails, Wine, Spirits, Beer
+**2. Category tabs lack scroll hint**
+With 7 categories (Food Menu, Non-Alcoholic, Fruit Shakes, Cocktails, Wine, Spirits, Beer), users can't see that more tabs exist off-screen. No visual indicator that scrolling is possible.
 
-**2. Add "Menu Categories" management section in Admin Setup tab**
-- Place it in the Setup tab (between Order Types and Kitchen Settings, or after Order Types)
-- Reuse the existing `EditableRow` component for rename, delete, and active toggle
-- Add input + button to create new categories
-- Same pattern as Units, Tables, and Order Types management
+**3. Cart drawer item row is cramped on mobile**
+The cart item row tries to fit Item name, -/qty/+, unit price, total, and delete icon all in one line. On small screens this gets very tight and truncated.
 
-**3. Update MenuPage.tsx - Guest/Staff menu**
-- Remove the hardcoded `CATEGORIES` array
-- Fetch active categories from `menu_categories` table, ordered by `sort_order`
-- Default the active tab to the first category returned
-- Category tabs render dynamically from database results
+**4. Dialog/modal sizing on small screens**
+The item detail dialog uses `max-w-xs` which is fine, but could benefit from better mobile padding.
 
-**4. Update AdminPage.tsx - Menu item editor**
-- Remove the hardcoded category list in the Select dropdown (line 515)
-- Use the fetched `menu_categories` data to populate the category dropdown
-- Default new item category to the first available category
+### Plan
+
+**Step 1: Hide scrollbar on category tabs (MenuPage.tsx)**
+- Add CSS class to hide the scrollbar while keeping horizontal scroll functionality
+- Add `scrollbar-hide` utility class in index.css using `-webkit-scrollbar` and `scrollbar-width: none`
+- Add a subtle fade/gradient on the right edge to hint that more categories exist
+
+**Step 2: Improve cart drawer layout for mobile (CartDrawer.tsx)**
+- Stack the item info more vertically on small screens
+- Give the item name more room, move price/total to a second line on narrow screens
+- Increase touch target sizes for the +/- and delete buttons (currently 3-3.5px icons which are too small for fingers)
+
+**Step 3: Ensure touch-friendly tap targets across all pages**
+- Increase minimum touch target sizes to 44x44px for interactive elements
+- Menu items on MenuPage already have good tap targets
+- Cart quantity +/- buttons need larger hit areas
+- Admin page tabs need adequate spacing
+
+**Step 4: Fix any z-index or overlay issues**
+- Ensure Select dropdowns on OrderType page have proper z-index and background on mobile
+- Confirm Dialog overlays work correctly (already tested and working)
 
 ### Technical Details
 
-```text
-Database table: menu_categories
-+------------+---------+-----------+--------+
-| id (uuid)  | name    | sort_order| active |
-+------------+---------+-----------+--------+
-| ...        | Food Menu    | 1    | true   |
-| ...        | Non-Alcoholic| 2    | true   |
-| ...        | Fruit Shakes | 3    | true   |
-| ...        | Cocktails    | 4    | true   |
-| ...        | Wine         | 5    | true   |
-| ...        | Spirits      | 6    | true   |
-| ...        | Beer         | 7    | true   |
-+------------+---------+-----------+--------+
-```
-
 Files to modify:
-- New migration SQL for `menu_categories` table + seed data
-- `src/pages/AdminPage.tsx` - add category management section + update menu item editor dropdown
-- `src/pages/MenuPage.tsx` - replace hardcoded categories with dynamic query
+- `src/index.css` - Add scrollbar-hide utility class
+- `src/pages/MenuPage.tsx` - Apply scrollbar-hide to category tabs, add scroll fade indicator
+- `src/components/CartDrawer.tsx` - Improve mobile layout for cart items, increase touch targets
+- `src/pages/OrderType.tsx` - Minor touch target improvements
+- `src/pages/AdminPage.tsx` - Ensure admin tabs scroll properly on mobile
 
