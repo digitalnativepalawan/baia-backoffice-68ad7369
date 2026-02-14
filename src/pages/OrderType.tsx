@@ -5,11 +5,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import StaffOrdersView from '@/components/staff/StaffOrdersView';
 
 const OrderType = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const mode = searchParams.get('mode') || 'guest';
+  const isStaff = mode === 'staff';
 
   const [selectedType, setSelectedType] = useState('');
   const [locationDetail, setLocationDetail] = useState('');
@@ -54,65 +56,78 @@ const OrderType = () => {
   };
 
   return (
-    <div className="min-h-screen bg-navy-texture flex flex-col items-center justify-center px-6">
-      <button onClick={() => navigate('/')} className="absolute top-6 left-6 font-body text-sm text-cream-dim hover:text-foreground transition-colors">
-        ← Back
-      </button>
+    <div className="min-h-screen bg-navy-texture flex flex-col">
+      {/* Order Type Selection */}
+      <div className="flex flex-col items-center justify-center px-6 py-12 relative">
+        <button onClick={() => navigate('/')} className="absolute top-6 left-6 font-body text-sm text-cream-dim hover:text-foreground transition-colors">
+          ← Back
+        </button>
 
-      <h2 className="font-display text-2xl tracking-wider text-foreground mb-2">Order Type</h2>
-      <p className="font-body text-sm text-cream-dim mb-10">Where would you like your order?</p>
+        <h2 className="font-display text-2xl tracking-wider text-foreground mb-2">Order Type</h2>
+        <p className="font-body text-sm text-cream-dim mb-10">Where would you like your order?</p>
 
-      <div className="w-full max-w-xs flex flex-col gap-6">
-        {/* Order type buttons */}
-        <div className="grid grid-cols-2 gap-3">
-          {orderTypes.map(ot => (
-            <button
-              key={ot.id}
-              onClick={() => { setSelectedType(ot.type_key); setLocationDetail(''); }}
-              className={`min-h-[48px] py-3 border font-display text-sm tracking-wider transition-colors ${
-                selectedType === ot.type_key
-                  ? 'border-gold text-foreground bg-foreground/5'
-                  : 'border-border text-cream-dim hover:border-foreground/30'
-              }`}
-            >
-              {ot.label}
-            </button>
-          ))}
+        <div className="w-full max-w-xs flex flex-col gap-6">
+          {/* Order type buttons */}
+          <div className="grid grid-cols-2 gap-3">
+            {orderTypes.map(ot => (
+              <button
+                key={ot.id}
+                onClick={() => { setSelectedType(ot.type_key); setLocationDetail(''); }}
+                className={`min-h-[48px] py-3 border font-display text-sm tracking-wider transition-colors ${
+                  selectedType === ot.type_key
+                    ? 'border-gold text-foreground bg-foreground/5'
+                    : 'border-border text-cream-dim hover:border-foreground/30'
+                }`}
+              >
+                {ot.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Location detail */}
+          {activeOrderType && activeOrderType.input_mode === 'select' && activeOrderType.source_table && (
+            <Select onValueChange={setLocationDetail} value={locationDetail}>
+              <SelectTrigger className="bg-secondary border-border text-foreground font-body">
+                <SelectValue placeholder={activeOrderType.placeholder || 'Select'} />
+              </SelectTrigger>
+              <SelectContent className="bg-card border-border">
+                {getSelectOptions(activeOrderType.source_table).map(item => (
+                  <SelectItem key={item.id} value={item.name} className="text-foreground font-body">
+                    {item.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {activeOrderType && activeOrderType.input_mode === 'text' && (
+            <Input
+              placeholder={activeOrderType.placeholder || 'Enter details'}
+              value={locationDetail}
+              onChange={(e) => setLocationDetail(e.target.value)}
+              className="bg-secondary border-border text-foreground font-body"
+            />
+          )}
+
+          <Button
+            onClick={handleProceed}
+            disabled={!canProceed}
+            className="font-display tracking-wider py-6 mt-2"
+          >
+            View Menu
+          </Button>
         </div>
-
-        {/* Location detail */}
-        {activeOrderType && activeOrderType.input_mode === 'select' && activeOrderType.source_table && (
-          <Select onValueChange={setLocationDetail} value={locationDetail}>
-            <SelectTrigger className="bg-secondary border-border text-foreground font-body">
-              <SelectValue placeholder={activeOrderType.placeholder || 'Select'} />
-            </SelectTrigger>
-            <SelectContent className="bg-card border-border">
-              {getSelectOptions(activeOrderType.source_table).map(item => (
-                <SelectItem key={item.id} value={item.name} className="text-foreground font-body">
-                  {item.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-
-        {activeOrderType && activeOrderType.input_mode === 'text' && (
-          <Input
-            placeholder={activeOrderType.placeholder || 'Enter details'}
-            value={locationDetail}
-            onChange={(e) => setLocationDetail(e.target.value)}
-            className="bg-secondary border-border text-foreground font-body"
-          />
-        )}
-
-        <Button
-          onClick={handleProceed}
-          disabled={!canProceed}
-          className="font-display tracking-wider py-6 mt-2"
-        >
-          View Menu
-        </Button>
       </div>
+
+      {/* Real-time orders pipeline for staff */}
+      {isStaff && (
+        <div className="flex-1 border-t border-border">
+          <div className="max-w-2xl mx-auto px-4 py-3">
+            <h3 className="font-display text-lg tracking-wider text-foreground text-center mb-1">Today's Orders</h3>
+          </div>
+          <StaffOrdersView />
+        </div>
+      )}
     </div>
   );
 };
