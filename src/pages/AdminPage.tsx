@@ -93,13 +93,13 @@ const AdminPage = () => {
   const [brkStart, setBrkStart] = useState('');
   const [brkEnd, setBrkEnd] = useState('');
 
-  useState(() => {
+  useEffect(() => {
     if (settings) {
       setWhatsapp(settings.kitchen_whatsapp_number || '');
       setBrkStart(settings.breakfast_start_time || '07:00');
       setBrkEnd(settings.breakfast_end_time || '11:00');
     }
-  });
+  }, [settings]);
 
   const saveSettings = async () => {
     if (!settings) return;
