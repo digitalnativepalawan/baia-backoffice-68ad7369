@@ -226,8 +226,12 @@ const MenuPage = () => {
         /* Orders view for staff */
         <div className="flex-1 flex flex-col">
           <div className="sticky top-0 z-30 bg-navy-deep/95 backdrop-blur-sm border-b border-border">
-            <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-center">
+            <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+              <button onClick={() => navigate('/')} className="text-cream-dim hover:text-foreground transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center">
+                <Home className="w-5 h-5" />
+              </button>
               <h1 className="font-display text-lg tracking-[0.15em] text-foreground">ORDERS</h1>
+              <div className="w-[44px]" />
             </div>
           </div>
           <StaffOrdersView />
