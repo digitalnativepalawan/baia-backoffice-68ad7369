@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ChefHat, Truck, CreditCard, CheckCircle2, AlertTriangle, Download, MessageCircle } from 'lucide-react';
+import { ChefHat, Truck, CreditCard, CheckCircle2, AlertTriangle, Download, MessageCircle, PlusCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ResortProfile } from '@/hooks/useResortProfile';
 import { generateInvoicePdf, buildInvoiceWhatsAppText } from '@/lib/generateInvoicePdf';
@@ -25,9 +25,10 @@ interface OrderCardProps {
   order: any;
   onAdvance: (orderId: string, nextStatus: string) => void;
   resortProfile?: ResortProfile | null;
+  onAddItems?: (order: any) => void;
 }
 
-const OrderCard = ({ order, onAdvance, resortProfile }: OrderCardProps) => {
+const OrderCard = ({ order, onAdvance, resortProfile, onAddItems }: OrderCardProps) => {
   const canInvoice = order.status === 'Served' || order.status === 'Paid';
 
   const handleDownloadPdf = async () => {
@@ -96,6 +97,17 @@ const OrderCard = ({ order, onAdvance, resortProfile }: OrderCardProps) => {
           )}
         </div>
         <div className="flex items-center gap-1.5">
+          {order.status === 'Served' && onAddItems && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onAddItems(order)}
+              className="font-body text-xs gap-1 border-gold/40 text-gold hover:bg-gold/10"
+            >
+              <PlusCircle className="w-4 h-4" />
+              Add Items
+            </Button>
+          )}
           {canInvoice && (
             <>
               <Button

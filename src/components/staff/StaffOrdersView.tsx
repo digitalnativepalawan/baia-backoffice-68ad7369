@@ -4,6 +4,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import OrderCard from '@/components/admin/OrderCard';
 import { useResortProfile } from '@/hooks/useResortProfile';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Plus, Minus } from 'lucide-react';
 
 const STATUSES = ['New', 'Preparing', 'Served', 'Paid'];
 
@@ -106,6 +109,62 @@ const StaffOrdersView = () => {
 
   const filtered = useMemo(() => orders.filter(o => o.status === activeStatus), [orders, activeStatus]);
 
+  // --- Add Items to Served Order ---
+  const [addingToOrder, setAddingToOrder] = useState<any>(null);
+  const [addCart, setAddCart] = useState<Record<string, { name: string; price: number; qty: number }>>({});
+
+  const { data: menuItems = [] } = useQuery({
+    queryKey: ['menu_items_staff'],
+    queryFn: async () => {
+      const { data } = await supabase.from('menu_items').select('*').eq('available', true).order('sort_order');
+      return data || [];
+    },
+  });
+
+  const { data: menuCategories = [] } = useQuery({
+    queryKey: ['menu_categories_staff'],
+    queryFn: async () => {
+      const { data } = await supabase.from('menu_categories').select('*').eq('active', true).order('sort_order');
+      return data || [];
+    },
+  });
+
+  const [addCat, setAddCat] = useState('');
+  const activeCat = addCat || (menuCategories.length > 0 ? menuCategories[0].name : '');
+  const catItems = menuItems.filter((i: any) => i.category === activeCat);
+
+  const addCartTotal = Object.values(addCart).reduce((s, c) => s + c.price * c.qty, 0);
+
+  const handleOpenAddItems = (order: any) => {
+    setAddingToOrder(order);
+    setAddCart({});
+    setAddCat('');
+  };
+
+  const handleSubmitAddItems = async () => {
+    if (!addingToOrder || addCartTotal === 0) return;
+    const newItems = Object.entries(addCart).map(([, c]) => ({ name: c.name, price: c.price, qty: c.qty }));
+    const existingItems = (addingToOrder.items as any[]) || [];
+    // Merge items
+    const merged = [...existingItems];
+    newItems.forEach(ni => {
+      const existing = merged.find(m => m.name === ni.name);
+      if (existing) existing.qty += ni.qty;
+      else merged.push(ni);
+    });
+    const newTotal = merged.reduce((s, i) => s + i.price * i.qty, 0);
+    const newServiceCharge = Math.round(newTotal * 0.1);
+    await supabase.from('orders').update({
+      items: merged,
+      total: newTotal,
+      service_charge: newServiceCharge,
+      status: 'New', // reset to New so kitchen sees it
+    }).eq('id', addingToOrder.id);
+    qc.invalidateQueries({ queryKey: ['orders-staff'] });
+    setAddingToOrder(null);
+    toast.success('Items added — order sent back to kitchen');
+  };
+
   const advanceOrder = async (orderId: string, nextStatus: string) => {
     const updateData: any = { status: nextStatus };
     if (nextStatus === 'Closed') updateData.closed_at = new Date().toISOString();
@@ -146,9 +205,94 @@ const StaffOrdersView = () => {
           <p className="font-body text-sm text-cream-dim text-center py-12">No {activeStatus.toLowerCase()} orders</p>
         )}
         {filtered.map(order => (
-          <OrderCard key={order.id} order={order} onAdvance={advanceOrder} resortProfile={resortProfile} />
+          <OrderCard
+            key={order.id}
+            order={order}
+            onAdvance={advanceOrder}
+            resortProfile={resortProfile}
+            onAddItems={handleOpenAddItems}
+          />
         ))}
       </div>
+
+      {/* Add Items Dialog */}
+      <Dialog open={!!addingToOrder} onOpenChange={() => setAddingToOrder(null)}>
+        <DialogContent className="bg-card border-border max-w-md max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="font-display text-foreground tracking-wider text-center">
+              Add Items to Order
+            </DialogTitle>
+          </DialogHeader>
+
+          {/* Category tabs */}
+          <div className="flex flex-wrap gap-1 pb-2">
+            {menuCategories.map((cat: any) => (
+              <button
+                key={cat.id}
+                onClick={() => setAddCat(cat.name)}
+                className={`font-display text-xs tracking-wider px-3 py-1.5 rounded-full transition-colors ${
+                  activeCat === cat.name
+                    ? 'bg-gold/20 text-gold border border-gold/40'
+                    : 'text-cream-dim border border-transparent hover:text-foreground'
+                }`}
+              >
+                {cat.name}
+              </button>
+            ))}
+          </div>
+
+          {/* Items list */}
+          <div className="flex-1 overflow-y-auto space-y-1 min-h-0">
+            {catItems.map((item: any) => {
+              const inCart = addCart[item.id];
+              return (
+                <div key={item.id} className="flex items-center justify-between py-2 px-1">
+                  <div className="flex-1 min-w-0">
+                    <span className="font-display text-sm text-foreground block">{item.name}</span>
+                    <span className="font-display text-xs text-gold">₱{item.price.toLocaleString()}</span>
+                  </div>
+                  {inCart ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          const q = inCart.qty - 1;
+                          if (q <= 0) {
+                            const c = { ...addCart }; delete c[item.id]; setAddCart(c);
+                          } else setAddCart({ ...addCart, [item.id]: { ...inCart, qty: q } });
+                        }}
+                        className="w-8 h-8 rounded-full border border-border flex items-center justify-center text-foreground"
+                      >
+                        <Minus className="w-3 h-3" />
+                      </button>
+                      <span className="font-display text-sm text-foreground w-5 text-center">{inCart.qty}</span>
+                      <button
+                        onClick={() => setAddCart({ ...addCart, [item.id]: { ...inCart, qty: inCart.qty + 1 } })}
+                        className="w-8 h-8 rounded-full border border-border flex items-center justify-center text-foreground"
+                      >
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setAddCart({ ...addCart, [item.id]: { name: item.name, price: item.price, qty: 1 } })}
+                      className="w-8 h-8 rounded-full border border-gold/40 flex items-center justify-center text-gold"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Submit */}
+          {addCartTotal > 0 && (
+            <Button onClick={handleSubmitAddItems} className="w-full font-display tracking-wider py-5">
+              Add ₱{addCartTotal.toLocaleString()} to Order
+            </Button>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
