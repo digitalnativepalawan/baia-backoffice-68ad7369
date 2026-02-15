@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCart } from '@/lib/cart';
 import { useResortProfile } from '@/hooks/useResortProfile';
+import { formatWhatsAppMessage, buildWhatsAppUrl } from '@/lib/order';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -48,6 +49,14 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
     queryFn: async () => {
       const { data } = await supabase.from('order_types').select('*').eq('active', true).order('sort_order');
       return data || [];
+    },
+  });
+
+  const { data: kitchenSettings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: async () => {
+      const { data } = await supabase.from('settings').select('*').limit(1).maybeSingle();
+      return data;
     },
   });
 
@@ -131,10 +140,27 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
         tab_id: tabId,
       });
 
-      setOrderSummary({ itemCount: cart.count(), grandTotal });
+      // Capture cart items before clearing for WhatsApp fallback
+      const cartSnapshot = cart.items.map(i => ({ ...i }));
+      const itemCount = cart.count();
+      setOrderSummary({ itemCount, grandTotal });
       cart.clearCart();
       setSubmitted(true);
       toast.success('Order sent to kitchen!');
+
+      // WhatsApp fallback: send order to kitchen number if configured
+      const kitchenPhone = kitchenSettings?.kitchen_whatsapp_number;
+      if (kitchenPhone) {
+        const orderInfo = {
+          orderType: selectedOrderType as 'Room' | 'DineIn' | 'Beach' | 'WalkIn',
+          locationDetail: selectedLocation,
+          isStaff,
+          paymentType: isStaff ? paymentType : undefined,
+        };
+        const msg = formatWhatsAppMessage(orderInfo, cartSnapshot, grandTotal);
+        const url = buildWhatsAppUrl(kitchenPhone, msg);
+        window.open(url, '_blank');
+      }
     } catch {
       toast.error('Failed to place order');
     } finally {

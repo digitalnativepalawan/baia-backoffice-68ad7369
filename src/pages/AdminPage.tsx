@@ -49,7 +49,7 @@ const AdminPage = () => {
   const { data: settings } = useQuery({
     queryKey: ['settings'],
     queryFn: async () => {
-      const { data } = await supabase.from('settings').select('*').limit(1).single();
+      const { data } = await supabase.from('settings').select('*').limit(1).maybeSingle();
       return data;
     },
   });
@@ -124,12 +124,16 @@ const AdminPage = () => {
   }, [settings]);
 
   const saveSettings = async () => {
-    if (!settings) return;
-    await supabase.from('settings').update({
+    const payload = {
       kitchen_whatsapp_number: whatsapp,
       breakfast_start_time: brkStart,
       breakfast_end_time: brkEnd,
-    }).eq('id', settings.id);
+    };
+    if (settings?.id) {
+      await supabase.from('settings').update(payload).eq('id', settings.id);
+    } else {
+      await supabase.from('settings').insert(payload);
+    }
     qc.invalidateQueries({ queryKey: ['settings'] });
     toast.success('Settings saved');
   };
