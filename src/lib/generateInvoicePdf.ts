@@ -58,11 +58,7 @@ export async function generateInvoicePdf(order: InvoiceOrder, profile: ResortPro
     y += logoH + 3;
   }
 
-  // --- Resort Header ---
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
-  doc.text(profile?.resort_name || 'Resort', pageWidth / 2, y, { align: 'center' });
-  y += 5;
+  // --- Resort Header (logo only, no text) ---
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
@@ -140,8 +136,9 @@ export async function generateInvoicePdf(order: InvoiceOrder, profile: ResortPro
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
+  const grandTotal = subtotal + order.service_charge;
   doc.text('TOTAL', 12, y);
-  doc.text(formatCurrency(order.total), pageWidth - 12, y, { align: 'right' });
+  doc.text(formatCurrency(grandTotal), pageWidth - 12, y, { align: 'right' });
   y += 7;
 
   // --- Payment ---
