@@ -172,8 +172,9 @@ const ReportsDashboard = () => {
     const totalFoodCost = itemBreakdown.reduce((s, i) => s + i.foodCost, 0);
     const totalProfit = revenue - totalFoodCost;
     const marginPct = revenue > 0 ? (totalProfit / revenue) * 100 : 0;
+    const totalServiceCharge = orders.reduce((s, o) => s + (o.service_charge || 0), 0);
 
-    return { revenue, count, avg, byType, itemBreakdown, totalFoodCost, totalProfit, marginPct };
+    return { revenue, count, avg, byType, itemBreakdown, totalFoodCost, totalProfit, marginPct, totalServiceCharge };
   }, [orders, costMap]);
 
   const ranges: { key: DateRange; label: string }[] = [
@@ -198,6 +199,7 @@ const ReportsDashboard = () => {
     csv += `Total Food Cost,${stats.totalFoodCost.toFixed(2)}\n`;
     csv += `Total Profit,${stats.totalProfit.toFixed(2)}\n`;
     csv += `Margin %,${stats.marginPct.toFixed(1)}%\n`;
+    csv += `Total Service Charge,${stats.totalServiceCharge.toFixed(2)}\n`;
     csv += `Total Orders,${stats.count}\n`;
     csv += '\n';
 
@@ -311,6 +313,15 @@ const ReportsDashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Service Charge card */}
+      <Card className="bg-card/50 border-border">
+        <CardContent className="p-3 text-center">
+          <Receipt className="w-4 h-4 text-gold mx-auto mb-1" />
+          <p className="font-display text-lg text-foreground">₱{stats.totalServiceCharge.toLocaleString()}</p>
+          <p className="font-body text-xs text-cream-dim">Service Charge (Payroll)</p>
+        </CardContent>
+      </Card>
 
       {/* Orders count & avg */}
       <div className="grid grid-cols-2 gap-3">
