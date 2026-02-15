@@ -12,9 +12,12 @@ interface InvoiceOrder {
   created_at: string;
 }
 
+// Use "P" for peso in PDF since jsPDF doesn't support the ₱ unicode glyph
 function formatCurrency(amount: number): string {
-  return `₱${amount.toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  return `P${amount.toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
+
+const INVOICE_LOGO_PATH = '/invoice-logo.png';
 
 async function loadImageAsBase64(url: string): Promise<string | null> {
   try {
@@ -26,11 +29,14 @@ async function loadImageAsBase64(url: string): Promise<string | null> {
       img.src = url;
     });
     const canvas = document.createElement('canvas');
-    canvas.width = img.width;
-    canvas.height = img.height;
+    // Use higher resolution for crisp output
+    const scale = 3;
+    canvas.width = img.width * scale;
+    canvas.height = img.height * scale;
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
-    ctx.drawImage(img, 0, 0);
+    ctx.scale(scale, scale);
+    ctx.drawImage(img, 0, 0, img.width, img.height);
     return canvas.toDataURL('image/png');
   } catch {
     return null;
@@ -42,14 +48,14 @@ export async function generateInvoicePdf(order: InvoiceOrder, profile: ResortPro
   const pageWidth = doc.internal.pageSize.getWidth();
   let y = 12;
 
-  // --- Logo ---
-  if (profile?.logo_url) {
-    const logoData = await loadImageAsBase64(profile.logo_url);
-    if (logoData) {
-      const logoSize = 18;
-      doc.addImage(logoData, 'PNG', (pageWidth - logoSize) / 2, y, logoSize, logoSize);
-      y += logoSize + 3;
-    }
+  // --- Hardcoded Logo ---
+  const logoData = await loadImageAsBase64(INVOICE_LOGO_PATH);
+  if (logoData) {
+    // Logo is wide (landscape), use width-based sizing
+    const logoW = 50;
+    const logoH = 18;
+    doc.addImage(logoData, 'PNG', (pageWidth - logoW) / 2, y, logoW, logoH);
+    y += logoH + 3;
   }
 
   // --- Resort Header ---
@@ -98,7 +104,7 @@ export async function generateInvoicePdf(order: InvoiceOrder, profile: ResortPro
     Room: 'Room Delivery', DineIn: 'Dine In', Beach: 'Beach Delivery', WalkIn: 'Walk-In',
   };
   const typeLabel = typeLabels[order.order_type] || order.order_type;
-  doc.text(`Type: ${typeLabel}${order.location_detail ? ` — ${order.location_detail}` : ''}`, 12, y);
+  doc.text(`Type: ${typeLabel}${order.location_detail ? ` - ${order.location_detail}` : ''}`, 12, y);
   y += 6;
 
   // --- Divider ---
@@ -109,8 +115,9 @@ export async function generateInvoicePdf(order: InvoiceOrder, profile: ResortPro
   doc.setFontSize(9);
   const items = order.items || [];
   items.forEach((item: any) => {
-    const name = `${item.qty || item.quantity}× ${item.name}`;
-    const price = formatCurrency((item.price) * (item.qty || item.quantity));
+    const qty = item.qty || item.quantity;
+    const name = `${qty}x ${item.name}`;
+    const price = formatCurrency(item.price * qty);
     doc.setFont('helvetica', 'normal');
     doc.text(name, 12, y);
     doc.text(price, pageWidth - 12, y, { align: 'right' });
@@ -170,17 +177,17 @@ export function buildInvoiceWhatsAppText(order: InvoiceOrder, profile: ResortPro
   const subtotal = items.reduce((sum: number, i: any) => sum + (i.price * (i.qty || i.quantity)), 0);
 
   const lines = [
-    `📄 *INVOICE — ${profile?.resort_name || 'Resort'}*`,
+    `*INVOICE - ${profile?.resort_name || 'Resort'}*`,
     '',
     `Date: ${new Date(order.created_at).toLocaleString('en-PH')}`,
-    `Type: ${typeLabels[order.order_type] || order.order_type}${order.location_detail ? ` — ${order.location_detail}` : ''}`,
+    `Type: ${typeLabels[order.order_type] || order.order_type}${order.location_detail ? ` - ${order.location_detail}` : ''}`,
     '',
     '*Items:*',
-    ...items.map((i: any) => `${i.qty || i.quantity}× ${i.name} — ₱${((i.price) * (i.qty || i.quantity)).toLocaleString()}`),
+    ...items.map((i: any) => `${i.qty || i.quantity}x ${i.name} - P${((i.price) * (i.qty || i.quantity)).toLocaleString()}`),
     '',
-    `Subtotal: ₱${subtotal.toLocaleString()}`,
-    `Service Charge (10%): ₱${order.service_charge.toLocaleString()}`,
-    `*Total: ₱${order.total.toLocaleString()}*`,
+    `Subtotal: P${subtotal.toLocaleString()}`,
+    `Service Charge (10%): P${order.service_charge.toLocaleString()}`,
+    `*Total: P${order.total.toLocaleString()}*`,
   ];
 
   if (order.payment_type) lines.push(`Payment: ${order.payment_type}`);
