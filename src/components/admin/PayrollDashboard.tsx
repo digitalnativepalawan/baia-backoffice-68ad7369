@@ -6,11 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Check, X, DollarSign, Clock, Users, Download } from 'lucide-react';
-import { format, startOfDay, endOfDay, subDays, startOfWeek, startOfMonth } from 'date-fns';
+import { Plus, Pencil, Trash2, Check, X, DollarSign, Clock, Users, Download, Banknote } from 'lucide-react';
+import { format, startOfDay, endOfDay, subDays, startOfWeek, startOfMonth, previousSunday, nextSaturday, isSunday } from 'date-fns';
 
 type DateFilter = 'today' | 'yesterday' | 'week' | 'month' | 'all';
-type SubView = 'employees' | 'shifts' | 'summary';
+type SubView = 'employees' | 'shifts' | 'summary' | 'payments';
 
 const PayrollDashboard = () => {
   const qc = useQueryClient();
@@ -50,6 +50,25 @@ const PayrollDashboard = () => {
       return data || [];
     },
   });
+
+  // Payment history
+  const { data: payments = [] } = useQuery({
+    queryKey: ['payroll-payments'],
+    queryFn: async () => {
+      const { data } = await supabase.from('payroll_payments').select('*').order('paid_at', { ascending: false }).limit(200);
+      return data || [];
+    },
+  });
+
+  // Payment form state
+  const [payEmployee, setPayEmployee] = useState('');
+  const [payAmount, setPayAmount] = useState('');
+  const [payType, setPayType] = useState<'regular' | 'advance'>('regular');
+  const [payNotes, setPayNotes] = useState('');
+  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
+  const [editPayAmount, setEditPayAmount] = useState('');
+  const [editPayNotes, setEditPayNotes] = useState('');
+  const [confirmDeletePayment, setConfirmDeletePayment] = useState<string | null>(null);
 
   // Date-filtered shifts
   const filteredShifts = useMemo(() => {
@@ -282,6 +301,68 @@ const PayrollDashboard = () => {
     toast.success('CSV downloaded');
   };
 
+  // Payment CRUD
+  const recordPayment = async () => {
+    if (!payEmployee || !payAmount) return;
+    const now = new Date();
+    // Default period: Sunday to Saturday of current week
+    const periodStart = isSunday(now) ? now : previousSunday(now);
+    const periodEnd = nextSaturday(now);
+    await supabase.from('payroll_payments').insert({
+      employee_id: payEmployee,
+      amount: parseFloat(payAmount) || 0,
+      payment_type: payType,
+      period_start: format(periodStart, 'yyyy-MM-dd'),
+      period_end: format(periodEnd, 'yyyy-MM-dd'),
+      notes: payNotes.trim(),
+      paid_at: new Date().toISOString(),
+    });
+    setPayEmployee(''); setPayAmount(''); setPayNotes(''); setPayType('regular');
+    qc.invalidateQueries({ queryKey: ['payroll-payments'] });
+    toast.success(payType === 'advance' ? 'Advance recorded' : 'Payment recorded');
+  };
+
+  const updatePayment = async (id: string) => {
+    await supabase.from('payroll_payments').update({
+      amount: parseFloat(editPayAmount) || 0,
+      notes: editPayNotes.trim(),
+    }).eq('id', id);
+    setEditingPaymentId(null);
+    qc.invalidateQueries({ queryKey: ['payroll-payments'] });
+    toast.success('Payment updated');
+  };
+
+  const deletePayment = async (id: string) => {
+    if (confirmDeletePayment !== id) {
+      setConfirmDeletePayment(id);
+      setTimeout(() => setConfirmDeletePayment(null), 3000);
+      return;
+    }
+    await supabase.from('payroll_payments').delete().eq('id', id);
+    setConfirmDeletePayment(null);
+    qc.invalidateQueries({ queryKey: ['payroll-payments'] });
+    toast.success('Payment deleted');
+  };
+
+  // Per-employee payment totals
+  const employeePaymentTotals = useMemo(() => {
+    const map: Record<string, { total: number; advances: number; regular: number }> = {};
+    payments.forEach(p => {
+      if (!map[p.employee_id]) map[p.employee_id] = { total: 0, advances: 0, regular: 0 };
+      map[p.employee_id].total += Number(p.amount);
+      if (p.payment_type === 'advance') map[p.employee_id].advances += Number(p.amount);
+      else map[p.employee_id].regular += Number(p.amount);
+    });
+    return map;
+  }, [payments]);
+
+  // Filter payments by selected employee
+  const [payFilterEmployee, setPayFilterEmployee] = useState('all');
+  const filteredPayments = useMemo(() => {
+    if (payFilterEmployee === 'all') return payments;
+    return payments.filter(p => p.employee_id === payFilterEmployee);
+  }, [payments, payFilterEmployee]);
+
   const dateFilters: { key: DateFilter; label: string }[] = [
     { key: 'today', label: 'Today' },
     { key: 'yesterday', label: 'Yesterday' },
@@ -298,6 +379,7 @@ const PayrollDashboard = () => {
           { key: 'employees' as SubView, label: 'Employees', icon: Users },
           { key: 'shifts' as SubView, label: 'Shift Log', icon: Clock },
           { key: 'summary' as SubView, label: 'Payroll', icon: DollarSign },
+          { key: 'payments' as SubView, label: 'Payments', icon: Banknote },
         ]).map(({ key, label, icon: Icon }) => (
           <Button key={key} size="sm" variant={subView === key ? 'default' : 'outline'}
             onClick={() => setSubView(key)} className="font-display text-xs tracking-wider flex-1 gap-1">
@@ -578,6 +660,103 @@ const PayrollDashboard = () => {
                   className="font-display text-xs tracking-wider w-full">
                   Mark All Paid — ₱{emp.outstanding.toFixed(0)}
                 </Button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* PAYMENTS SUB-VIEW */}
+      {subView === 'payments' && (
+        <div className="space-y-4">
+          {/* Record payment form */}
+          <div className="border border-primary/30 rounded-lg p-4 space-y-3">
+            <p className="font-display text-sm tracking-wider text-foreground">Record Payment</p>
+            <select value={payEmployee} onChange={e => setPayEmployee(e.target.value)}
+              className="w-full bg-secondary border border-border text-foreground font-body text-sm rounded-md px-3 py-2">
+              <option value="">Select employee</option>
+              {employees.filter(e => e.active).map(e => (
+                <option key={e.id} value={e.id}>{e.name}</option>
+              ))}
+            </select>
+            <div className="grid grid-cols-2 gap-2">
+              <Input value={payAmount} onChange={e => setPayAmount(e.target.value)} type="number"
+                placeholder="Amount (₱)" className="bg-secondary border-border text-foreground font-body text-sm" />
+              <select value={payType} onChange={e => setPayType(e.target.value as 'regular' | 'advance')}
+                className="bg-secondary border border-border text-foreground font-body text-sm rounded-md px-3 py-2">
+                <option value="regular">Regular Pay</option>
+                <option value="advance">Advance</option>
+              </select>
+            </div>
+            <Input value={payNotes} onChange={e => setPayNotes(e.target.value)} placeholder="Notes (optional)"
+              className="bg-secondary border-border text-foreground font-body text-sm" />
+            <Button onClick={recordPayment} className="font-display text-xs tracking-wider w-full gap-1" disabled={!payEmployee || !payAmount}>
+              <Banknote className="w-3.5 h-3.5" /> Record Payment
+            </Button>
+          </div>
+
+          {/* Employee filter */}
+          <select value={payFilterEmployee} onChange={e => setPayFilterEmployee(e.target.value)}
+            className="w-full bg-secondary border border-border text-foreground font-body text-sm rounded-md px-3 py-2">
+            <option value="all">All Employees</option>
+            {employees.map(e => (
+              <option key={e.id} value={e.id}>{e.name} — ₱{(employeePaymentTotals[e.id]?.total || 0).toFixed(0)} total</option>
+            ))}
+          </select>
+
+          {/* Payment history */}
+          {filteredPayments.length === 0 && (
+            <p className="font-body text-muted-foreground text-center py-8">No payments recorded yet</p>
+          )}
+          {filteredPayments.map(payment => (
+            <div key={payment.id} className="border border-border rounded-lg p-3 space-y-2">
+              {editingPaymentId === payment.id ? (
+                <div className="space-y-2">
+                  <Input value={editPayAmount} onChange={e => setEditPayAmount(e.target.value)} type="number"
+                    placeholder="Amount" className="bg-secondary border-border text-foreground font-body text-sm" />
+                  <Input value={editPayNotes} onChange={e => setEditPayNotes(e.target.value)} placeholder="Notes"
+                    className="bg-secondary border-border text-foreground font-body text-sm" />
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={() => updatePayment(payment.id)} className="font-display text-xs tracking-wider flex-1">Save</Button>
+                    <Button size="sm" variant="outline" onClick={() => setEditingPaymentId(null)} className="font-display text-xs tracking-wider flex-1">Cancel</Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-display text-sm text-foreground">{getEmployeeName(payment.employee_id)}</p>
+                      <p className="font-body text-xs text-muted-foreground">
+                        {format(new Date(payment.paid_at), 'MMM d, yyyy · h:mm a')}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-display text-sm text-foreground">₱{Number(payment.amount).toFixed(0)}</p>
+                      <Badge variant={payment.payment_type === 'advance' ? 'destructive' : 'default'} className="font-body text-xs">
+                        {payment.payment_type === 'advance' ? 'Advance' : 'Regular'}
+                      </Badge>
+                    </div>
+                  </div>
+                  {payment.period_start && (
+                    <p className="font-body text-xs text-muted-foreground">
+                      Period: {format(new Date(payment.period_start + 'T00:00:00'), 'MMM d')} – {format(new Date(payment.period_end + 'T00:00:00'), 'MMM d')}
+                    </p>
+                  )}
+                  {payment.notes && (
+                    <p className="font-body text-xs text-muted-foreground italic">{payment.notes}</p>
+                  )}
+                  <div className="flex gap-1 justify-end">
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                      onClick={() => { setEditingPaymentId(payment.id); setEditPayAmount(String(payment.amount)); setEditPayNotes(payment.notes || ''); }}>
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button size="icon" variant="ghost"
+                      className={`h-7 w-7 ${confirmDeletePayment === payment.id ? 'text-destructive animate-pulse' : 'text-muted-foreground hover:text-destructive'}`}
+                      onClick={() => deletePayment(payment.id)}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </>
               )}
             </div>
           ))}
