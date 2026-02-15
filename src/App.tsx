@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import OrderType from "./pages/OrderType";
 import MenuPage from "./pages/MenuPage";
 import AdminPage from "./pages/AdminPage";
+import EmployeePage from "./pages/EmployeePage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,6 +23,7 @@ const App = () => (
           <Route path="/order-type" element={<OrderType />} />
           <Route path="/menu" element={<MenuPage />} />
           <Route path="/admin" element={<AdminPage />} />
+          <Route path="/employee" element={<EmployeePage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

@@ -8,13 +8,14 @@ import { useResortProfile } from '@/hooks/useResortProfile';
 const Index = () => {
   const navigate = useNavigate();
   const { data: profile } = useResortProfile();
-  const [passkeyMode, setPasskeyMode] = useState<'staff' | 'admin' | null>(null);
+  const [passkeyMode, setPasskeyMode] = useState<'staff' | 'admin' | 'employee' | null>(null);
   const [passkey, setPasskey] = useState('');
   const [error, setError] = useState('');
 
   const handlePasskey = () => {
     if (passkey === '5309') {
       if (passkeyMode === 'staff') navigate('/order-type?mode=staff');
+      else if (passkeyMode === 'employee') navigate('/employee');
       else navigate('/admin');
       setPasskeyMode(null);
       setPasskey('');
@@ -70,6 +71,12 @@ const Index = () => {
         >
           Admin
         </button>
+        <button
+          onClick={() => setPasskeyMode('employee')}
+          className="font-body text-sm tracking-wider py-3 text-cream-dim/60 hover:text-cream-dim transition-colors"
+        >
+          Employee
+        </button>
       </div>
 
       {/* Passkey dialog */}
@@ -77,7 +84,7 @@ const Index = () => {
         <DialogContent className="bg-card border-border max-w-xs">
           <DialogHeader>
             <DialogTitle className="font-display text-foreground tracking-wider text-center">
-              {passkeyMode === 'staff' ? 'Staff Access' : 'Admin Access'}
+              {passkeyMode === 'staff' ? 'Staff Access' : passkeyMode === 'employee' ? 'Employee Access' : 'Admin Access'}
             </DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-4 pt-2">

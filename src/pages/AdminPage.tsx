@@ -15,6 +15,7 @@ import EditableRow from '@/components/admin/EditableRow';
 import TimePicker from '@/components/admin/TimePicker';
 import OrderCard from '@/components/admin/OrderCard';
 import ReportsDashboard from '@/components/admin/ReportsDashboard';
+import PayrollDashboard from '@/components/admin/PayrollDashboard';
 import TabInvoice from '@/components/admin/TabInvoice';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -289,6 +290,7 @@ const AdminPage = () => {
             <TabsTrigger value="menu" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Menu</TabsTrigger>
             <TabsTrigger value="orders" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Orders</TabsTrigger>
             <TabsTrigger value="reports" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Reports</TabsTrigger>
+            <TabsTrigger value="payroll" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Payroll</TabsTrigger>
           </TabsList>
 
           {/* SETTINGS TAB */}
@@ -579,6 +581,11 @@ const AdminPage = () => {
           {/* REPORTS TAB */}
           <TabsContent value="reports">
             <ReportsDashboard />
+          </TabsContent>
+
+          {/* PAYROLL TAB */}
+          <TabsContent value="payroll">
+            <PayrollDashboard />
           </TabsContent>
         </Tabs>
       </div>

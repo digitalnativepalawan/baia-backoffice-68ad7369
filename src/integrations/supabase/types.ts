@@ -14,6 +14,74 @@ export type Database = {
   }
   public: {
     Tables: {
+      employee_shifts: {
+        Row: {
+          clock_in: string
+          clock_out: string | null
+          created_at: string
+          employee_id: string
+          hours_worked: number | null
+          id: string
+          is_paid: boolean
+          paid_at: string | null
+          total_pay: number | null
+        }
+        Insert: {
+          clock_in?: string
+          clock_out?: string | null
+          created_at?: string
+          employee_id: string
+          hours_worked?: number | null
+          id?: string
+          is_paid?: boolean
+          paid_at?: string | null
+          total_pay?: number | null
+        }
+        Update: {
+          clock_in?: string
+          clock_out?: string | null
+          created_at?: string
+          employee_id?: string
+          hours_worked?: number | null
+          id?: string
+          is_paid?: boolean
+          paid_at?: string | null
+          total_pay?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_shifts_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employees: {
+        Row: {
+          active: boolean
+          created_at: string
+          hourly_rate: number
+          id: string
+          name: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          hourly_rate?: number
+          id?: string
+          name: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          hourly_rate?: number
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       menu_categories: {
         Row: {
           active: boolean
