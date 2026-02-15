@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Plus, Minus } from 'lucide-react';
 import TabInvoice from '@/components/admin/TabInvoice';
+import { deductInventoryForOrder } from '@/lib/inventoryDeduction';
 
 const STATUSES = ['New', 'Preparing', 'Served', 'Paid'];
 
@@ -168,6 +169,16 @@ const StaffOrdersView = () => {
     const updateData: any = { status: nextStatus };
     if (nextStatus === 'Closed') updateData.closed_at = new Date().toISOString();
     await supabase.from('orders').update(updateData).eq('id', orderId);
+
+    // Deduct inventory when moving to Preparing
+    if (nextStatus === 'Preparing') {
+      const order = orders.find(o => o.id === orderId);
+      if (order) {
+        const items = (order.items as any[]) || [];
+        await deductInventoryForOrder(orderId, items);
+      }
+    }
+
     qc.invalidateQueries({ queryKey: ['orders-staff'] });
     toast.success(`Order → ${nextStatus}`);
   };

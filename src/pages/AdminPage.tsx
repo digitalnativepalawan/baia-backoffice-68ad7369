@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Plus, ArrowLeft, Home, Eye, EyeOff, Receipt, Search, Download } from 'lucide-react';
+import { Plus, ArrowLeft, Home, Eye, EyeOff, Receipt, Search, Download, Package } from 'lucide-react';
 import ResortProfileForm from '@/components/admin/ResortProfileForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import EditableRow from '@/components/admin/EditableRow';
@@ -17,6 +17,9 @@ import OrderCard from '@/components/admin/OrderCard';
 import ReportsDashboard from '@/components/admin/ReportsDashboard';
 import PayrollDashboard from '@/components/admin/PayrollDashboard';
 import TabInvoice from '@/components/admin/TabInvoice';
+import RecipeEditor from '@/components/admin/RecipeEditor';
+import InventoryDashboard from '@/components/admin/InventoryDashboard';
+import { deductInventoryForOrder } from '@/lib/inventoryDeduction';
 import { formatDistanceToNow } from 'date-fns';
 
 type DateFilter = 'today' | 'yesterday' | 'all';
@@ -265,6 +268,17 @@ const AdminPage = () => {
       updateData.closed_at = new Date().toISOString();
     }
     await supabase.from('orders').update(updateData).eq('id', orderId);
+
+    // Deduct inventory when moving to Preparing
+    if (nextStatus === 'Preparing') {
+      const order = orders.find(o => o.id === orderId);
+      if (order) {
+        const items = (order.items as any[]) || [];
+        await deductInventoryForOrder(orderId, items);
+        qc.invalidateQueries({ queryKey: ['ingredients'] });
+      }
+    }
+
     qc.invalidateQueries({ queryKey: ['orders-admin'] });
     toast.success(`Order → ${nextStatus}`);
   };
@@ -290,6 +304,7 @@ const AdminPage = () => {
             <TabsTrigger value="menu" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Menu</TabsTrigger>
             <TabsTrigger value="orders" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Orders</TabsTrigger>
             <TabsTrigger value="reports" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Reports</TabsTrigger>
+            <TabsTrigger value="inventory" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Inventory</TabsTrigger>
             <TabsTrigger value="payroll" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Payroll</TabsTrigger>
           </TabsList>
 
@@ -604,6 +619,11 @@ const AdminPage = () => {
             <ReportsDashboard />
           </TabsContent>
 
+          {/* INVENTORY TAB */}
+          <TabsContent value="inventory">
+            <InventoryDashboard />
+          </TabsContent>
+
           {/* PAYROLL TAB */}
           <TabsContent value="payroll">
             <PayrollDashboard />
@@ -639,7 +659,7 @@ const AdminPage = () => {
                   type="number" className="bg-secondary border-border text-foreground font-body mt-1" />
               </div>
               <div>
-                <label className="font-body text-xs text-cream-dim">Food Cost (₱)</label>
+                <label className="font-body text-xs text-cream-dim">Food Cost (₱) — override</label>
                 <Input value={itemForm.food_cost} onChange={e => setItemForm(f => ({ ...f, food_cost: e.target.value }))}
                   type="number" className="bg-secondary border-border text-foreground font-body mt-1" />
               </div>
@@ -649,6 +669,17 @@ const AdminPage = () => {
               <Input value={itemForm.sort_order} onChange={e => setItemForm(f => ({ ...f, sort_order: e.target.value }))}
                 type="number" className="bg-secondary border-border text-foreground font-body mt-1" />
             </div>
+            {/* Recipe editor — only for existing items */}
+            {editItem && editItem !== 'new' && (
+              <div className="pt-3 border-t border-border">
+                <RecipeEditor
+                  menuItemId={editItem.id}
+                  onFoodCostUpdate={(cost) => {
+                    if (cost > 0) setItemForm(f => ({ ...f, food_cost: cost.toFixed(2) }));
+                  }}
+                />
+              </div>
+            )}
             {editItem && editItem !== 'new' && (
               <div className="flex items-center justify-between pt-2 border-t border-border">
                 <span className="font-body text-sm text-foreground">Available</span>
