@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCart } from '@/lib/cart';
 import { useResortProfile } from '@/hooks/useResortProfile';
-import { ShoppingBag, Plus, Minus, UtensilsCrossed, ClipboardList, Search, X } from 'lucide-react';
+import { ShoppingBag, Plus, Minus, UtensilsCrossed, ClipboardList, Search, X, Home } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -109,10 +109,10 @@ const MenuPage = () => {
           <header className="sticky top-0 z-30 bg-navy-deep/95 backdrop-blur-sm border-b border-border">
             <div className="max-w-2xl mx-auto px-4 pt-4 pb-2 flex items-center justify-between">
               <button
-                onClick={() => navigate(isStaff ? '/order-type?mode=staff' : '/')}
-                className="font-body text-sm text-cream-dim hover:text-foreground transition-colors min-w-[44px] min-h-[44px] flex items-center"
+                onClick={() => navigate('/')}
+                className="text-cream-dim hover:text-foreground transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
               >
-                ← Back
+                <Home className="w-5 h-5" />
               </button>
 
               {/* Logo + brand */}

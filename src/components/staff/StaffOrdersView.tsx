@@ -68,13 +68,12 @@ const StaffOrdersView = () => {
   const { data: orders = [] } = useQuery({
     queryKey: ['orders-staff'],
     queryFn: async () => {
-      const start = new Date();
-      start.setHours(0, 0, 0, 0);
       const { data } = await supabase
         .from('orders')
         .select('*')
-        .gte('created_at', start.toISOString())
-        .order('created_at', { ascending: false });
+        .in('status', ['New', 'Preparing', 'Served', 'Paid'])
+        .order('created_at', { ascending: false })
+        .limit(200);
       return data || [];
     },
   });

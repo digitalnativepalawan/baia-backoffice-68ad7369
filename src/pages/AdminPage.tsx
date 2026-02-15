@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Plus, ArrowLeft, Eye, EyeOff, Receipt } from 'lucide-react';
+import { Plus, ArrowLeft, Home, Eye, EyeOff, Receipt } from 'lucide-react';
 import ResortProfileForm from '@/components/admin/ResortProfileForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import EditableRow from '@/components/admin/EditableRow';
@@ -276,8 +276,8 @@ const AdminPage = () => {
       <div className="max-w-2xl mx-auto px-4 py-6">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
-          <button onClick={() => navigate('/')} className="text-cream-dim hover:text-foreground">
-            <ArrowLeft className="w-5 h-5" />
+          <button onClick={() => navigate('/')} className="text-cream-dim hover:text-foreground min-w-[44px] min-h-[44px] flex items-center justify-center">
+            <Home className="w-5 h-5" />
           </button>
           <h1 className="font-display text-xl tracking-wider text-foreground">Admin Dashboard</h1>
         </div>
