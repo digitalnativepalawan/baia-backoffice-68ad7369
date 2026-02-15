@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -33,6 +33,28 @@ const EmployeePage = () => {
       return data || [];
     },
   });
+
+  // All-time paid-out totals per employee
+  const { data: allShifts = [] } = useQuery({
+    queryKey: ['employee-shifts-paid-totals'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('employee_shifts')
+        .select('employee_id, total_pay, is_paid')
+        .eq('is_paid', true);
+      return data || [];
+    },
+  });
+
+  const allTimePaid = useMemo(() => {
+    const map: Record<string, number> = {};
+    allShifts.forEach(s => {
+      if (s.total_pay) {
+        map[s.employee_id] = (map[s.employee_id] || 0) + Number(s.total_pay);
+      }
+    });
+    return map;
+  }, [allShifts]);
 
   // Realtime subscription
   useEffect(() => {
@@ -123,7 +145,10 @@ const EmployeePage = () => {
                 )}
 
                 <div className="flex items-center justify-between">
-                  <span className="font-body text-xs text-cream-dim">Today: {todayHours.toFixed(1)}h</span>
+                  <div>
+                    <span className="font-body text-xs text-muted-foreground">Today: {todayHours.toFixed(1)}h</span>
+                    <span className="font-body text-xs text-primary ml-3">Paid out: ₱{(allTimePaid[emp.id] || 0).toFixed(0)}</span>
+                  </div>
                   {isClockedIn ? (
                     <Button size="sm" variant="destructive" onClick={() => clockOut(emp.id)} className="font-display text-xs tracking-wider gap-1">
                       <LogOut className="w-3.5 h-3.5" /> Clock Out
