@@ -89,14 +89,17 @@ const OrderCard = ({ order, onAdvance, resortProfile, onAddItems }: OrderCardPro
       </div>
 
       {/* Footer */}
-      <div className="flex justify-between items-center pt-3 border-t border-border">
-        <div>
-          <span className="font-display text-sm text-gold">₱{order.total}</span>
+      <div className="pt-3 border-t border-border space-y-2">
+        {/* Total + payment */}
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <span className="font-display text-sm text-gold">₱{order.total.toLocaleString()}</span>
           {order.payment_type && (
-            <span className="font-body text-xs text-cream-dim ml-2">({order.payment_type})</span>
+            <span className="font-body text-xs text-cream-dim">({order.payment_type})</span>
           )}
         </div>
-        <div className="flex items-center gap-1.5">
+
+        {/* Action buttons - wrapped */}
+        <div className="flex flex-wrap items-center gap-1.5">
           {order.status === 'Served' && onAddItems && (
             <Button
               size="sm"
@@ -114,7 +117,7 @@ const OrderCard = ({ order, onAdvance, resortProfile, onAddItems }: OrderCardPro
                 size="icon"
                 variant="ghost"
                 onClick={handleDownloadPdf}
-                className="min-w-[44px] min-h-[44px] text-cream-dim hover:text-gold"
+                className="w-9 h-9 text-cream-dim hover:text-gold"
                 title="Download Invoice"
               >
                 <Download className="w-4 h-4" />
@@ -123,7 +126,7 @@ const OrderCard = ({ order, onAdvance, resortProfile, onAddItems }: OrderCardPro
                 size="icon"
                 variant="ghost"
                 onClick={handleShareWhatsApp}
-                className="min-w-[44px] min-h-[44px] text-cream-dim hover:text-emerald-400"
+                className="w-9 h-9 text-cream-dim hover:text-emerald-400"
                 title="Share on WhatsApp"
               >
                 <MessageCircle className="w-4 h-4" />
