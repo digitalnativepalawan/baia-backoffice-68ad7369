@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Plus, ArrowLeft, Home, Eye, EyeOff, Receipt } from 'lucide-react';
+import { Plus, ArrowLeft, Home, Eye, EyeOff, Receipt, Search } from 'lucide-react';
 import ResortProfileForm from '@/components/admin/ResortProfileForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import EditableRow from '@/components/admin/EditableRow';
@@ -173,6 +173,7 @@ const AdminPage = () => {
   };
 
   // Menu item editor
+  const [menuSearch, setMenuSearch] = useState('');
   const [editItem, setEditItem] = useState<any>(null);
   const defaultCategory = menuCategories.length > 0 ? menuCategories[0].name : '';
   const [itemForm, setItemForm] = useState({
@@ -417,10 +418,25 @@ const AdminPage = () => {
 
           {/* MENU TAB */}
           <TabsContent value="menu" className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-cream-dim" />
+              <Input
+                value={menuSearch}
+                onChange={e => setMenuSearch(e.target.value)}
+                placeholder="Search menu items..."
+                className="bg-secondary border-border text-foreground font-body pl-9"
+              />
+            </div>
             <Button onClick={openNewItem} className="font-display tracking-wider w-full" variant="outline">
               <Plus className="w-4 h-4 mr-2" /> Add Menu Item
             </Button>
-            {menuItems.map(item => (
+            {menuItems
+              .filter(item => {
+                if (!menuSearch.trim()) return true;
+                const q = menuSearch.toLowerCase();
+                return item.name.toLowerCase().includes(q) || item.category.toLowerCase().includes(q);
+              })
+              .map(item => (
               <button key={item.id} onClick={() => openEditItem(item)}
                 className="w-full text-left p-3 border border-border hover:border-gold/50 transition-colors">
                 <div className="flex justify-between items-start">
