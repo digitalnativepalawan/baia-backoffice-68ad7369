@@ -28,9 +28,6 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-navy-texture flex flex-col items-center justify-center px-6">
-      {/* Decorative line */}
-      <div className="w-16 h-px bg-gold mb-8 opacity-60" />
-
       {/* Logo */}
       {profile?.logo_url && (
         <img
@@ -52,8 +49,6 @@ const Index = () => {
         <p className="font-body text-sm text-cream-dim/70 tracking-wider mb-1">{profile.tagline}</p>
       )}
       <div className="mb-12" />
-
-      <div className="w-16 h-px bg-gold mb-12 opacity-40" />
 
       {/* Entry buttons */}
       <div className="flex flex-col gap-4 w-full max-w-xs">
