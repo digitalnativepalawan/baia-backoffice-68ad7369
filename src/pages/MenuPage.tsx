@@ -115,11 +115,7 @@ const MenuPage = () => {
                 <Home className="w-5 h-5" />
               </button>
 
-              {/* Logo + brand */}
               <div className="flex items-center gap-2">
-                {profile?.logo_url && (
-                  <img src={profile.logo_url} alt={brandName} className="w-7 h-7 object-contain" />
-                )}
                 <h1 className="font-display text-base tracking-[0.12em] text-foreground">{brandName}</h1>
               </div>
 
