@@ -177,7 +177,8 @@ const TabInvoice = ({ tabId, onClose }: TabInvoiceProps) => {
       const orderIds = orders.map(o => o.id);
       if (orderIds.length > 0) {
         await supabase.from('orders').update({
-          status: 'Closed',
+          status: 'Paid',
+          payment_type: paymentMethod,
           closed_at: new Date().toISOString(),
         }).in('id', orderIds);
       }
