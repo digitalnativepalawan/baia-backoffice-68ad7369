@@ -3,11 +3,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import OrderCard from '@/components/admin/OrderCard';
+import { useResortProfile } from '@/hooks/useResortProfile';
 
 const STATUSES = ['New', 'Preparing', 'Served', 'Paid'];
 
 const StaffOrdersView = () => {
   const qc = useQueryClient();
+  const { data: resortProfile } = useResortProfile();
   const audioCtxRef = useRef<AudioContext | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -144,7 +146,7 @@ const StaffOrdersView = () => {
           <p className="font-body text-sm text-cream-dim text-center py-12">No {activeStatus.toLowerCase()} orders</p>
         )}
         {filtered.map(order => (
-          <OrderCard key={order.id} order={order} onAdvance={advanceOrder} />
+          <OrderCard key={order.id} order={order} onAdvance={advanceOrder} resortProfile={resortProfile} />
         ))}
       </div>
     </div>

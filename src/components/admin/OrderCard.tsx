@@ -1,7 +1,10 @@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ChefHat, Truck, CreditCard, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { ChefHat, Truck, CreditCard, CheckCircle2, AlertTriangle, Download, MessageCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { ResortProfile } from '@/hooks/useResortProfile';
+import { generateInvoicePdf, buildInvoiceWhatsAppText } from '@/lib/generateInvoicePdf';
+import { toast } from 'sonner';
 
 const STATUS_FLOW: Record<string, { next: string; label: string; icon: React.ReactNode }> = {
   New: { next: 'Preparing', label: 'Start Preparing', icon: <ChefHat className="w-4 h-4" /> },
@@ -21,9 +24,25 @@ const STATUS_COLORS: Record<string, string> = {
 interface OrderCardProps {
   order: any;
   onAdvance: (orderId: string, nextStatus: string) => void;
+  resortProfile?: ResortProfile | null;
 }
 
-const OrderCard = ({ order, onAdvance }: OrderCardProps) => {
+const OrderCard = ({ order, onAdvance, resortProfile }: OrderCardProps) => {
+  const canInvoice = order.status === 'Served' || order.status === 'Paid';
+
+  const handleDownloadPdf = async () => {
+    try {
+      await generateInvoicePdf(order, resortProfile ?? null);
+      toast.success('Invoice downloaded');
+    } catch {
+      toast.error('Failed to generate invoice');
+    }
+  };
+
+  const handleShareWhatsApp = () => {
+    const text = buildInvoiceWhatsAppText(order, resortProfile ?? null);
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+  };
   const flow = STATUS_FLOW[order.status];
   const items = (order.items as any[]) || [];
   const statusColor = STATUS_COLORS[order.status] || STATUS_COLORS.Closed;
@@ -76,19 +95,43 @@ const OrderCard = ({ order, onAdvance }: OrderCardProps) => {
             <span className="font-body text-xs text-cream-dim ml-2">({order.payment_type})</span>
           )}
         </div>
-        {flow && (
-          <Button
-            size={isNew ? 'default' : 'sm'}
-            onClick={() => onAdvance(order.id, flow.next)}
-            className={`font-body text-xs gap-1.5 relative ${isNew ? 'new-order-btn bg-gold text-primary-foreground hover:bg-gold/90 font-bold text-sm px-5' : ''}`}
-          >
-            {isNew && (
-              <span className="absolute -top-1 -left-1 w-2.5 h-2.5 rounded-full bg-destructive blink-dot" />
-            )}
-            {flow.icon}
-            {flow.label}
-          </Button>
-        )}
+        <div className="flex items-center gap-1.5">
+          {canInvoice && (
+            <>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={handleDownloadPdf}
+                className="min-w-[44px] min-h-[44px] text-cream-dim hover:text-gold"
+                title="Download Invoice"
+              >
+                <Download className="w-4 h-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={handleShareWhatsApp}
+                className="min-w-[44px] min-h-[44px] text-cream-dim hover:text-emerald-400"
+                title="Share on WhatsApp"
+              >
+                <MessageCircle className="w-4 h-4" />
+              </Button>
+            </>
+          )}
+          {flow && (
+            <Button
+              size={isNew ? 'default' : 'sm'}
+              onClick={() => onAdvance(order.id, flow.next)}
+              className={`font-body text-xs gap-1.5 relative ${isNew ? 'new-order-btn bg-gold text-primary-foreground hover:bg-gold/90 font-bold text-sm px-5' : ''}`}
+            >
+              {isNew && (
+                <span className="absolute -top-1 -left-1 w-2.5 h-2.5 rounded-full bg-destructive blink-dot" />
+              )}
+              {flow.icon}
+              {flow.label}
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
