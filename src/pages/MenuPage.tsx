@@ -3,9 +3,11 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCart } from '@/lib/cart';
-import { ShoppingBag, Plus, Minus, UtensilsCrossed, ClipboardList } from 'lucide-react';
+import { useResortProfile } from '@/hooks/useResortProfile';
+import { ShoppingBag, Plus, Minus, UtensilsCrossed, ClipboardList, Search, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import CartDrawer from '@/components/CartDrawer';
 import StaffOrdersView from '@/components/staff/StaffOrdersView';
 
@@ -23,12 +25,17 @@ const MenuPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const mode = searchParams.get('mode') || 'guest';
-  const orderType = searchParams.get('orderType') || 'WalkIn';
+  const orderType = searchParams.get('orderType') || '';
   const location = searchParams.get('location') || '';
   const isStaff = mode === 'staff';
 
+  const { data: profile } = useResortProfile();
+  const brandName = profile?.resort_name || 'Menu';
+
   const [activeCategory, setActiveCategory] = useState('');
   const [staffTab, setStaffTab] = useState<'menu' | 'orders'>('menu');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const { data: categories = [] } = useQuery({
     queryKey: ['menu-categories'],
@@ -75,7 +82,13 @@ const MenuPage = () => {
     },
   });
 
-  const filteredItems = menuItems.filter(i => i.category === activeCategory);
+  // Filter items by category or search
+  const filteredItems = searchQuery.trim()
+    ? menuItems.filter(i =>
+        i.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (i.description && i.description.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+    : menuItems.filter(i => i.category === activeCategory);
 
   const handleAddToCart = () => {
     if (!selectedItem) return;
@@ -95,73 +108,121 @@ const MenuPage = () => {
           {/* Header */}
           <header className="sticky top-0 z-30 bg-navy-deep/95 backdrop-blur-sm border-b border-border">
             <div className="max-w-2xl mx-auto px-4 pt-4 pb-2 flex items-center justify-between">
-              <button onClick={() => navigate('/order-type')} className="font-body text-sm text-cream-dim hover:text-foreground transition-colors">
+              <button
+                onClick={() => navigate(isStaff ? '/order-type?mode=staff' : '/')}
+                className="font-body text-sm text-cream-dim hover:text-foreground transition-colors min-w-[44px] min-h-[44px] flex items-center"
+              >
                 ← Back
               </button>
-              <h1 className="font-display text-lg tracking-[0.15em] text-foreground">BAIA PALAWAN</h1>
-              <div className="w-12" />
+
+              {/* Logo + brand */}
+              <div className="flex items-center gap-2">
+                {profile?.logo_url && (
+                  <img src={profile.logo_url} alt={brandName} className="w-7 h-7 object-contain" />
+                )}
+                <h1 className="font-display text-base tracking-[0.12em] text-foreground">{brandName}</h1>
+              </div>
+
+              <button
+                onClick={() => { setSearchOpen(!searchOpen); setSearchQuery(''); }}
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center text-cream-dim hover:text-foreground transition-colors"
+              >
+                {searchOpen ? <X className="w-5 h-5" /> : <Search className="w-5 h-5" />}
+              </button>
             </div>
 
-            {/* Category tabs */}
-            <div className="relative max-w-2xl mx-auto">
-              <div className="px-4 pb-3 flex gap-6 overflow-x-auto scrollbar-hide">
-                {categories.map((cat: any) => (
-                  <button
-                    key={cat.id}
-                    onClick={() => setActiveCategory(cat.name)}
-                    className={`font-display text-sm tracking-wider whitespace-nowrap pb-1 transition-colors border-b-2 min-h-[44px] ${
-                      activeCategory === cat.name
-                        ? 'border-gold text-foreground'
-                        : 'border-transparent text-cream-dim hover:text-foreground'
-                    }`}
-                  >
-                    {cat.name}
-                  </button>
-                ))}
+            {/* Search bar */}
+            {searchOpen && (
+              <div className="max-w-2xl mx-auto px-4 pb-3">
+                <Input
+                  placeholder="Search menu..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  autoFocus
+                  className="bg-secondary border-border text-foreground font-body h-10"
+                />
               </div>
-              <div className="absolute right-0 top-0 bottom-0 w-8 pointer-events-none bg-gradient-to-l from-[hsl(var(--navy-deep))] to-transparent" />
-            </div>
+            )}
+
+            {/* Category tabs - hidden during search */}
+            {!searchOpen && (
+              <div className="relative max-w-2xl mx-auto">
+                <div className="px-4 pb-3 flex gap-1 overflow-x-auto scrollbar-hide">
+                  {categories.map((cat: any) => (
+                    <button
+                      key={cat.id}
+                      onClick={() => setActiveCategory(cat.name)}
+                      className={`font-display text-xs tracking-wider whitespace-nowrap px-3 py-2 rounded-full transition-colors min-h-[36px] ${
+                        activeCategory === cat.name
+                          ? 'bg-gold/20 text-gold border border-gold/40'
+                          : 'text-cream-dim hover:text-foreground border border-transparent'
+                      }`}
+                    >
+                      {cat.name}
+                    </button>
+                  ))}
+                </div>
+                <div className="absolute right-0 top-0 bottom-0 w-8 pointer-events-none bg-gradient-to-l from-[hsl(var(--navy-deep))] to-transparent" />
+              </div>
+            )}
           </header>
 
           {/* Menu content */}
-          <main className="flex-1 max-w-2xl mx-auto w-full px-6 py-8">
-            <h2 className="font-display text-2xl tracking-wider text-foreground mb-8">{activeCategory}</h2>
-            <div className="flex flex-col gap-6">
-              {filteredItems.map((item, idx) => (
-                <button
-                  key={item.id}
-                  onClick={() => { setSelectedItem(item); setAddQuantity(1); }}
-                  className="text-left animate-fade-in group"
-                  style={{ animationDelay: `${idx * 60}ms`, animationFillMode: 'both' }}
-                >
-                  <div className="flex items-baseline">
-                    <span className="font-display text-base md:text-lg text-foreground group-hover:text-gold transition-colors">
-                      {item.name}
-                    </span>
-                    <span className="dotted-leader" />
-                    <span className="font-display text-base text-foreground whitespace-nowrap">
-                      ₱{item.price.toLocaleString()}
-                    </span>
-                  </div>
-                  {item.description && (
-                    <p className="font-body text-sm text-cream-dim mt-1 leading-relaxed">
-                      {item.description}
-                    </p>
-                  )}
-                </button>
-              ))}
-            </div>
+          <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-6">
+            {searchQuery.trim() ? (
+              <p className="font-body text-xs text-cream-dim mb-4">
+                {filteredItems.length} result{filteredItems.length !== 1 ? 's' : ''} for "{searchQuery}"
+              </p>
+            ) : (
+              <h2 className="font-display text-xl tracking-wider text-foreground mb-6">{activeCategory}</h2>
+            )}
+
+            {filteredItems.length === 0 ? (
+              <p className="font-body text-sm text-cream-dim text-center py-12">No items found</p>
+            ) : (
+              <div className="flex flex-col gap-1">
+                {filteredItems.map((item, idx) => (
+                  <button
+                    key={item.id}
+                    onClick={() => { setSelectedItem(item); setAddQuantity(1); }}
+                    className="text-left animate-fade-in group py-3 px-3 -mx-3 rounded-lg active:bg-foreground/5 transition-colors"
+                    style={{ animationDelay: `${idx * 40}ms`, animationFillMode: 'both' }}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <span className="font-display text-sm text-foreground group-hover:text-gold transition-colors block">
+                          {item.name}
+                        </span>
+                        {item.description && (
+                          <p className="font-body text-xs text-cream-dim mt-0.5 leading-relaxed line-clamp-2">
+                            {item.description}
+                          </p>
+                        )}
+                      </div>
+                      <span className="font-display text-sm text-gold whitespace-nowrap pt-0.5">
+                        ₱{item.price.toLocaleString()}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </main>
 
           {/* Floating cart button */}
           {cart.count() > 0 && (
             <button
               onClick={() => setCartOpen(true)}
-              className={`fixed ${isStaff ? 'bottom-20' : 'bottom-6'} right-6 z-40 w-14 h-14 rounded-full bg-gold text-primary-foreground flex items-center justify-center shadow-lg hover:scale-105 transition-transform`}
+              className={`fixed ${isStaff ? 'bottom-20' : 'bottom-6'} left-4 right-4 z-40 max-w-md mx-auto h-14 rounded-xl bg-gold text-primary-foreground flex items-center justify-between px-5 shadow-lg active:scale-[0.98] transition-transform`}
             >
-              <ShoppingBag className="w-5 h-5" />
-              <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs w-5 h-5 rounded-full flex items-center justify-center font-body font-bold">
-                {cart.count()}
+              <div className="flex items-center gap-2">
+                <ShoppingBag className="w-5 h-5" />
+                <span className="font-display text-sm tracking-wider">
+                  {cart.count()} item{cart.count() !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <span className="font-display text-sm tracking-wider">
+                ₱{cart.total().toLocaleString()}
               </span>
             </button>
           )}
@@ -180,32 +241,32 @@ const MenuPage = () => {
 
       {/* Item detail modal */}
       <Dialog open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
-        <DialogContent className="bg-card border-border max-w-xs">
+        <DialogContent className="bg-card border-border max-w-xs mx-4">
           <DialogHeader>
-            <DialogTitle className="font-display text-foreground tracking-wider text-center">
+            <DialogTitle className="font-display text-foreground tracking-wider text-center text-lg">
               {selectedItem?.name}
             </DialogTitle>
           </DialogHeader>
           {selectedItem && (
-            <div className="flex flex-col items-center gap-4 pt-2">
-              <p className="font-body text-sm text-cream-dim text-center">{selectedItem.description}</p>
-              <p className="font-display text-xl text-foreground">₱{selectedItem.price.toLocaleString()}</p>
+            <div className="flex flex-col items-center gap-5 pt-2">
+              <p className="font-body text-sm text-cream-dim text-center leading-relaxed">{selectedItem.description}</p>
+              <p className="font-display text-2xl text-gold">₱{selectedItem.price.toLocaleString()}</p>
               <div className="flex items-center gap-6">
                 <button
                   onClick={() => setAddQuantity(Math.max(1, addQuantity - 1))}
-                  className="w-10 h-10 border border-border rounded-full flex items-center justify-center text-foreground hover:border-gold transition-colors"
+                  className="w-12 h-12 border border-border rounded-full flex items-center justify-center text-foreground hover:border-gold active:bg-foreground/5 transition-colors"
                 >
                   <Minus className="w-4 h-4" />
                 </button>
-                <span className="font-display text-xl text-foreground w-8 text-center">{addQuantity}</span>
+                <span className="font-display text-2xl text-foreground w-8 text-center">{addQuantity}</span>
                 <button
                   onClick={() => setAddQuantity(addQuantity + 1)}
-                  className="w-10 h-10 border border-border rounded-full flex items-center justify-center text-foreground hover:border-gold transition-colors"
+                  className="w-12 h-12 border border-border rounded-full flex items-center justify-center text-foreground hover:border-gold active:bg-foreground/5 transition-colors"
                 >
                   <Plus className="w-4 h-4" />
                 </button>
               </div>
-              <Button onClick={handleAddToCart} className="w-full font-display tracking-wider py-6">
+              <Button onClick={handleAddToCart} className="w-full font-display tracking-wider py-6 text-base">
                 Add to Order — ₱{(selectedItem.price * addQuantity).toLocaleString()}
               </Button>
             </div>
@@ -224,7 +285,7 @@ const MenuPage = () => {
 
       {/* Bottom nav bar - staff only */}
       {isStaff && (
-        <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border">
+        <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border safe-area-bottom">
           <div className="max-w-2xl mx-auto flex">
             <button
               onClick={() => setStaffTab('menu')}
