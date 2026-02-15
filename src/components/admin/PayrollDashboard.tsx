@@ -86,7 +86,11 @@ const PayrollDashboard = () => {
       const totalPay = sorted.reduce((s, sh) => s + Number(sh.total_pay || 0), 0);
       groups.push({ key, employeeId, date, shifts: sorted, totalHours, totalPay, isSplit: sorted.length > 1 });
     });
-    groups.sort((a, b) => b.date.localeCompare(a.date) || getEmployeeName(a.employeeId).localeCompare(getEmployeeName(b.employeeId)));
+    groups.sort((a, b) => {
+      const nameA = employees.find(e => e.id === a.employeeId)?.name || '';
+      const nameB = employees.find(e => e.id === b.employeeId)?.name || '';
+      return b.date.localeCompare(a.date) || nameA.localeCompare(nameB);
+    });
     return groups;
   }, [filteredShifts, employees]);
 
