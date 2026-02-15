@@ -53,7 +53,7 @@ const Index = () => {
       {/* Entry buttons */}
       <div className="flex flex-col gap-4 w-full max-w-xs">
         <button
-          onClick={() => navigate('/order-type?mode=guest')}
+          onClick={() => navigate('/menu?mode=guest')}
           className="font-display text-base tracking-wider py-4 border border-foreground/30 text-foreground hover:bg-foreground/5 transition-colors"
         >
           View Menu
