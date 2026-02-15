@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Plus, ArrowLeft, Home, Eye, EyeOff, Receipt, Search, Download, Package } from 'lucide-react';
+import { Plus, ArrowLeft, Home, Eye, EyeOff, Receipt, Search, Download, Package, Trash2 } from 'lucide-react';
 import ResortProfileForm from '@/components/admin/ResortProfileForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import EditableRow from '@/components/admin/EditableRow';
@@ -213,6 +213,23 @@ const AdminPage = () => {
     setEditItem(null);
     qc.invalidateQueries({ queryKey: ['menu-admin'] });
     toast.success('Menu item saved');
+  };
+
+  // Delete menu item
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const deleteItem = async () => {
+    if (!editItem || editItem === 'new') return;
+    if (!confirmingDelete) {
+      setConfirmingDelete(true);
+      setTimeout(() => setConfirmingDelete(false), 3000);
+      return;
+    }
+    await supabase.from('recipe_ingredients').delete().eq('menu_item_id', editItem.id);
+    await supabase.from('menu_items').delete().eq('id', editItem.id);
+    setEditItem(null);
+    setConfirmingDelete(false);
+    qc.invalidateQueries({ queryKey: ['menu-admin'] });
+    toast.success('Menu item deleted');
   };
 
   // Orders pipeline state
@@ -634,7 +651,7 @@ const AdminPage = () => {
       </div>
 
       {/* Menu item edit dialog */}
-      <Dialog open={!!editItem} onOpenChange={() => setEditItem(null)}>
+      <Dialog open={!!editItem} onOpenChange={() => { setEditItem(null); setConfirmingDelete(false); }}>
         <DialogContent className="bg-card border-border max-w-sm">
           <DialogHeader>
             <DialogTitle className="font-display text-foreground tracking-wider">
@@ -701,6 +718,16 @@ const AdminPage = () => {
               </div>
             )}
             <Button onClick={saveItem} className="font-display tracking-wider w-full">Save</Button>
+            {editItem && editItem !== 'new' && (
+              <Button
+                variant="destructive"
+                onClick={deleteItem}
+                className={`font-display tracking-wider w-full ${confirmingDelete ? 'animate-pulse' : ''}`}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                {confirmingDelete ? 'Confirm Delete?' : 'Delete Item'}
+              </Button>
+            )}
           </div>
         </DialogContent>
       </Dialog>
