@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Plus, ArrowLeft, Home, Eye, EyeOff, Receipt, Search, Download, Package, Trash2 } from 'lucide-react';
+import { Plus, ArrowLeft, Home, Eye, EyeOff, Receipt, Search, Download, Package, Trash2, Minus } from 'lucide-react';
 import ResortProfileForm from '@/components/admin/ResortProfileForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import EditableRow from '@/components/admin/EditableRow';
@@ -21,12 +21,14 @@ import RecipeEditor from '@/components/admin/RecipeEditor';
 import InventoryDashboard from '@/components/admin/InventoryDashboard';
 import { deductInventoryForOrder } from '@/lib/inventoryDeduction';
 import { formatDistanceToNow } from 'date-fns';
+import { useResortProfile } from '@/hooks/useResortProfile';
 
 type DateFilter = 'today' | 'yesterday' | 'all';
 
 const AdminPage = () => {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const { data: resortProfile } = useResortProfile();
 
   // Realtime subscription for orders and tabs
   useEffect(() => {
@@ -302,6 +304,49 @@ const AdminPage = () => {
     toast.success(`Order → ${nextStatus}`);
   };
 
+  // Delete order
+  const deleteOrder = async (orderId: string) => {
+    await supabase.from('orders').delete().eq('id', orderId);
+    qc.invalidateQueries({ queryKey: ['orders-admin'] });
+    toast.success('Order deleted');
+  };
+
+  // Add items to order (admin)
+  const [addingToOrder, setAddingToOrder] = useState<any>(null);
+  const [addCart, setAddCart] = useState<Record<string, { name: string; price: number; qty: number }>>({});
+  const [addCat, setAddCat] = useState('');
+  const activeCat = addCat || (menuCategories.length > 0 ? menuCategories[0].name : '');
+  const catItems = menuItems.filter((i: any) => i.category === activeCat && i.available);
+  const addCartTotal = Object.values(addCart).reduce((s, c) => s + c.price * c.qty, 0);
+
+  const handleOpenAddItems = (order: any) => {
+    setAddingToOrder(order);
+    setAddCart({});
+    setAddCat('');
+  };
+
+  const handleSubmitAddItems = async () => {
+    if (!addingToOrder || addCartTotal === 0) return;
+    const newItems = Object.entries(addCart).map(([, c]) => ({ name: c.name, price: c.price, qty: c.qty }));
+    const newTotal = newItems.reduce((s, i) => s + i.price * i.qty, 0);
+    const newServiceCharge = Math.round(newTotal * 0.1);
+    await supabase.from('orders').insert({
+      items: newItems,
+      total: newTotal,
+      service_charge: newServiceCharge,
+      status: 'New',
+      order_type: addingToOrder.order_type,
+      location_detail: addingToOrder.location_detail,
+      tab_id: addingToOrder.tab_id,
+    });
+    qc.invalidateQueries({ queryKey: ['orders-admin'] });
+    setAddingToOrder(null);
+    toast.success('New items sent to kitchen');
+  };
+
+  // View tab invoice
+  const [viewingTabId, setViewingTabId] = useState<string | null>(null);
+
   const statuses = showClosed
     ? ['New', 'Preparing', 'Served', 'Paid', 'Closed']
     : ['New', 'Preparing', 'Served', 'Paid'];
@@ -562,7 +607,12 @@ const AdminPage = () => {
                     <p className="font-body text-cream-dim text-center py-8">No {activeStatus.toLowerCase()} orders</p>
                   )}
                   {filteredOrders.map(order => (
-                    <OrderCard key={order.id} order={order} onAdvance={advanceOrder} />
+                    <OrderCard key={order.id} order={order} onAdvance={advanceOrder}
+                      resortProfile={resortProfile}
+                      onAddItems={handleOpenAddItems}
+                      onViewTab={(tabId) => setViewingTabId(tabId)}
+                      onDelete={deleteOrder}
+                    />
                   ))}
                 </div>
               </>
@@ -729,6 +779,77 @@ const AdminPage = () => {
               </Button>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Items Dialog (Admin) */}
+      <Dialog open={!!addingToOrder} onOpenChange={() => setAddingToOrder(null)}>
+        <DialogContent className="bg-card border-border max-w-md max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="font-display text-foreground tracking-wider text-center">
+              Add Items to Order
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-wrap gap-1 pb-2">
+            {menuCategories.filter((c: any) => c.active).map((cat: any) => (
+              <button key={cat.id} onClick={() => setAddCat(cat.name)}
+                className={`font-display text-xs tracking-wider px-3 py-1.5 rounded-full transition-colors ${
+                  activeCat === cat.name
+                    ? 'bg-gold/20 text-gold border border-gold/40'
+                    : 'text-cream-dim border border-transparent hover:text-foreground'
+                }`}>
+                {cat.name}
+              </button>
+            ))}
+          </div>
+          <div className="flex-1 overflow-y-auto space-y-1 min-h-0">
+            {catItems.map((item: any) => {
+              const inCart = addCart[item.id];
+              return (
+                <div key={item.id} className="flex items-center justify-between py-2 px-1">
+                  <div className="flex-1 min-w-0">
+                    <span className="font-display text-sm text-foreground block">{item.name}</span>
+                    <span className="font-display text-xs text-gold">₱{item.price.toLocaleString()}</span>
+                  </div>
+                  {inCart ? (
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => {
+                        const q = inCart.qty - 1;
+                        if (q <= 0) { const c = { ...addCart }; delete c[item.id]; setAddCart(c); }
+                        else setAddCart({ ...addCart, [item.id]: { ...inCart, qty: q } });
+                      }} className="w-8 h-8 rounded-full border border-border flex items-center justify-center text-foreground">
+                        <Minus className="w-3 h-3" />
+                      </button>
+                      <span className="font-display text-sm text-foreground w-5 text-center">{inCart.qty}</span>
+                      <button onClick={() => setAddCart({ ...addCart, [item.id]: { ...inCart, qty: inCart.qty + 1 } })}
+                        className="w-8 h-8 rounded-full border border-border flex items-center justify-center text-foreground">
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setAddCart({ ...addCart, [item.id]: { name: item.name, price: item.price, qty: 1 } })}
+                      className="w-8 h-8 rounded-full border border-gold/40 flex items-center justify-center text-gold">
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {addCartTotal > 0 && (
+            <Button onClick={handleSubmitAddItems} className="w-full font-display tracking-wider py-5">
+              Add ₱{addCartTotal.toLocaleString()} to Order
+            </Button>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Tab Invoice Dialog (Admin) */}
+      <Dialog open={!!viewingTabId} onOpenChange={() => setViewingTabId(null)}>
+        <DialogContent className="bg-card border-border max-w-md max-h-[90vh] overflow-y-auto">
+          {viewingTabId && (
+            <TabInvoice tabId={viewingTabId} onClose={() => setViewingTabId(null)} />
+          )}
         </DialogContent>
       </Dialog>
     </div>

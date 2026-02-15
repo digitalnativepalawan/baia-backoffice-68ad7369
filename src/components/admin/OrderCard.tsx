@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ChefHat, Truck, CreditCard, CheckCircle2, AlertTriangle, Download, MessageCircle, PlusCircle, Receipt } from 'lucide-react';
+import { ChefHat, Truck, CreditCard, CheckCircle2, AlertTriangle, Download, MessageCircle, PlusCircle, Receipt, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ResortProfile } from '@/hooks/useResortProfile';
 import { generateInvoicePdf, buildInvoiceWhatsAppText } from '@/lib/generateInvoicePdf';
@@ -27,9 +28,11 @@ interface OrderCardProps {
   resortProfile?: ResortProfile | null;
   onAddItems?: (order: any) => void;
   onViewTab?: (tabId: string) => void;
+  onDelete?: (orderId: string) => void;
 }
 
-const OrderCard = ({ order, onAdvance, resortProfile, onAddItems, onViewTab }: OrderCardProps) => {
+const OrderCard = ({ order, onAdvance, resortProfile, onAddItems, onViewTab, onDelete }: OrderCardProps) => {
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const canInvoice = order.status === 'Served' || order.status === 'Paid';
 
   const handleDownloadPdf = async () => {
@@ -151,6 +154,24 @@ const OrderCard = ({ order, onAdvance, resortProfile, onAddItems, onViewTab }: O
                 <MessageCircle className="w-4 h-4" />
               </Button>
             </>
+          )}
+          {onDelete && (
+            <Button
+              size="sm"
+              variant={confirmDelete ? 'destructive' : 'outline'}
+              onClick={() => {
+                if (!confirmDelete) {
+                  setConfirmDelete(true);
+                  setTimeout(() => setConfirmDelete(false), 3000);
+                } else {
+                  onDelete(order.id);
+                }
+              }}
+              className={`font-body text-xs gap-1 ${confirmDelete ? 'animate-pulse' : 'border-destructive/40 text-destructive hover:bg-destructive/10'}`}
+            >
+              <Trash2 className="w-4 h-4" />
+              {confirmDelete ? 'Confirm?' : 'Delete'}
+            </Button>
           )}
           {flow && (
             <Button
