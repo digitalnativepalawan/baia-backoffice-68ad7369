@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { ArrowLeft, Camera, Loader2, X, Check, Upload, ScanLine } from 'lucide-react';
 import { format, previousSunday, nextSaturday, isSunday, startOfDay } from 'date-fns';
+import CameraViewfinder from '@/components/receipts/CameraViewfinder';
 
 const CATEGORIES = ['Food & Beverage', 'Supplies', 'Maintenance', 'Utilities', 'Transport', 'Other'];
 
@@ -40,7 +41,6 @@ const ConfidenceBadge = ({ score }: { score: number }) => {
 const ReceiptsPage = () => {
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const cameraRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -49,6 +49,7 @@ const ReceiptsPage = () => {
   const [form, setForm] = useState<ReceiptForm>({ vendor: '', date: '', currency: 'PHP', total: '', category: '', notes: '' });
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [showCamera, setShowCamera] = useState(false);
 
   // History list - expenses with image_url (scanned receipts)
   const { data: receipts = [] } = useQuery({
@@ -65,18 +66,14 @@ const ReceiptsPage = () => {
     },
   });
 
-  const handleCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const processImage = async (file: Blob) => {
     setProcessing(true);
     setShowForm(false);
     setEditingId(null);
     setConfidence(null);
 
     try {
-      // Upload to receipts bucket
-      const ext = file.name.split('.').pop() || 'jpg';
+      const ext = 'jpg';
       const path = `scans/${Date.now()}.${ext}`;
       const { error: uploadErr } = await supabase.storage.from('receipts').upload(path, file);
       if (uploadErr) throw uploadErr;
@@ -85,7 +82,6 @@ const ReceiptsPage = () => {
       const publicUrl = urlData.publicUrl;
       setImageUrl(publicUrl);
 
-      // Call scan-receipt function
       const { data: fnData, error: fnError } = await supabase.functions.invoke('scan-receipt', {
         body: { imageUrl: publicUrl },
       });
@@ -110,9 +106,19 @@ const ReceiptsPage = () => {
       setImageUrl(null);
     } finally {
       setProcessing(false);
-      if (cameraRef.current) cameraRef.current.value = '';
-      if (fileRef.current) fileRef.current.value = '';
     }
+  };
+
+  const handleCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await processImage(file);
+    if (fileRef.current) fileRef.current.value = '';
+  };
+
+  const handleCameraCapture = async (blob: Blob) => {
+    setShowCamera(false);
+    await processImage(blob);
   };
 
   const handleDiscard = () => {
@@ -212,18 +218,18 @@ const ReceiptsPage = () => {
           <h1 className="font-display text-xl tracking-wider text-foreground">Receipt Scanner</h1>
         </div>
 
+        {/* Live Camera Viewfinder */}
+        {showCamera && (
+          <CameraViewfinder
+            onCapture={handleCameraCapture}
+            onClose={() => setShowCamera(false)}
+          />
+        )}
+
         {/* Capture Options */}
         {!showForm && !processing && (
           <div className="mb-8 space-y-3">
-            {/* Hidden inputs */}
-            <input
-              ref={cameraRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={handleCapture}
-            />
+            {/* Hidden file input for upload */}
             <input
               ref={fileRef}
               type="file"
@@ -234,7 +240,7 @@ const ReceiptsPage = () => {
 
             {/* Camera button - large and prominent */}
             <Button
-              onClick={() => cameraRef.current?.click()}
+              onClick={() => setShowCamera(true)}
               className="w-full h-20 text-lg font-display tracking-wider gap-4 relative overflow-hidden"
               size="lg"
             >
@@ -242,9 +248,9 @@ const ReceiptsPage = () => {
               <div className="flex flex-col items-center gap-1.5 relative z-10">
                 <div className="flex items-center gap-3">
                   <Camera className="w-7 h-7" />
-                  <span>Take Photo</span>
+                  <span>Scan Receipt</span>
                 </div>
-                <span className="text-xs font-body opacity-70 tracking-normal">Opens your camera to scan a receipt</span>
+                <span className="text-xs font-body opacity-70 tracking-normal">Opens camera to scan a receipt</span>
               </div>
             </Button>
 
