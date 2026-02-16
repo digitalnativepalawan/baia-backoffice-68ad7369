@@ -125,10 +125,12 @@ export type Database = {
       }
       expenses: {
         Row: {
+          ai_confidence: Json | null
           amount: number | null
           category: string | null
           created_at: string
           created_by: string | null
+          currency: string | null
           deleted_at: string | null
           expense_date: string | null
           id: string
@@ -146,10 +148,12 @@ export type Database = {
           vendor: string | null
         }
         Insert: {
+          ai_confidence?: Json | null
           amount?: number | null
           category?: string | null
           created_at?: string
           created_by?: string | null
+          currency?: string | null
           deleted_at?: string | null
           expense_date?: string | null
           id?: string
@@ -167,10 +171,12 @@ export type Database = {
           vendor?: string | null
         }
         Update: {
+          ai_confidence?: Json | null
           amount?: number | null
           category?: string | null
           created_at?: string
           created_by?: string | null
+          currency?: string | null
           deleted_at?: string | null
           expense_date?: string | null
           id?: string
