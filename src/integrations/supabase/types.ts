@@ -82,6 +82,113 @@ export type Database = {
         }
         Relationships: []
       }
+      expense_history: {
+        Row: {
+          action: string
+          created_at: string
+          expense_id: string
+          field: string | null
+          id: string
+          new_value: string | null
+          old_value: string | null
+          user_name: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          expense_id: string
+          field?: string | null
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          user_name?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          expense_id?: string
+          field?: string | null
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          user_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_history_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: false
+            referencedRelation: "expenses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      expenses: {
+        Row: {
+          amount: number | null
+          category: string | null
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          expense_date: string | null
+          id: string
+          image_url: string | null
+          notes: string | null
+          pay_period_end: string | null
+          pay_period_start: string | null
+          pdf_url: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          tax_amount: number | null
+          tin: string | null
+          vat_type: string | null
+          vendor: string | null
+        }
+        Insert: {
+          amount?: number | null
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          expense_date?: string | null
+          id?: string
+          image_url?: string | null
+          notes?: string | null
+          pay_period_end?: string | null
+          pay_period_start?: string | null
+          pdf_url?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          tax_amount?: number | null
+          tin?: string | null
+          vat_type?: string | null
+          vendor?: string | null
+        }
+        Update: {
+          amount?: number | null
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          expense_date?: string | null
+          id?: string
+          image_url?: string | null
+          notes?: string | null
+          pay_period_end?: string | null
+          pay_period_start?: string | null
+          pdf_url?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          tax_amount?: number | null
+          tin?: string | null
+          vat_type?: string | null
+          vendor?: string | null
+        }
+        Relationships: []
+      }
       ingredients: {
         Row: {
           cost_per_unit: number
