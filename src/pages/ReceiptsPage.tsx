@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { ArrowLeft, Camera, Loader2, X, Check } from 'lucide-react';
+import { ArrowLeft, Camera, Loader2, X, Check, Upload, ScanLine } from 'lucide-react';
 import { format, previousSunday, nextSaturday, isSunday, startOfDay } from 'date-fns';
 
 const CATEGORIES = ['Food & Beverage', 'Supplies', 'Maintenance', 'Utilities', 'Transport', 'Other'];
@@ -40,6 +40,7 @@ const ConfidenceBadge = ({ score }: { score: number }) => {
 const ReceiptsPage = () => {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const cameraRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -109,6 +110,7 @@ const ReceiptsPage = () => {
       setImageUrl(null);
     } finally {
       setProcessing(false);
+      if (cameraRef.current) cameraRef.current.value = '';
       if (fileRef.current) fileRef.current.value = '';
     }
   };
@@ -210,25 +212,58 @@ const ReceiptsPage = () => {
           <h1 className="font-display text-xl tracking-wider text-foreground">Receipt Scanner</h1>
         </div>
 
-        {/* Scan Button */}
+        {/* Capture Options */}
         {!showForm && !processing && (
-          <div className="mb-8">
+          <div className="mb-8 space-y-3">
+            {/* Hidden inputs */}
             <input
-              ref={fileRef}
+              ref={cameraRef}
               type="file"
               accept="image/*"
               capture="environment"
               className="hidden"
               onChange={handleCapture}
             />
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleCapture}
+            />
+
+            {/* Camera button - large and prominent */}
             <Button
-              onClick={() => fileRef.current?.click()}
-              className="w-full h-16 text-lg font-display tracking-wider gap-3"
+              onClick={() => cameraRef.current?.click()}
+              className="w-full h-20 text-lg font-display tracking-wider gap-4 relative overflow-hidden"
               size="lg"
             >
-              <Camera className="w-6 h-6" />
-              Scan Receipt
+              <div className="absolute inset-0 bg-gradient-to-r from-accent/20 to-transparent pointer-events-none" />
+              <div className="flex flex-col items-center gap-1.5 relative z-10">
+                <div className="flex items-center gap-3">
+                  <Camera className="w-7 h-7" />
+                  <span>Take Photo</span>
+                </div>
+                <span className="text-xs font-body opacity-70 tracking-normal">Opens your camera to scan a receipt</span>
+              </div>
             </Button>
+
+            {/* Upload button - secondary */}
+            <Button
+              onClick={() => fileRef.current?.click()}
+              variant="outline"
+              className="w-full h-14 font-display tracking-wider gap-3 border-border hover:border-accent/50"
+              size="lg"
+            >
+              <Upload className="w-5 h-5" />
+              Upload from Files
+            </Button>
+
+            {/* Helper text */}
+            <p className="text-center font-body text-xs text-muted-foreground">
+              <ScanLine className="w-3.5 h-3.5 inline-block mr-1 -mt-0.5" />
+              AI will automatically extract receipt details
+            </p>
           </div>
         )}
 
