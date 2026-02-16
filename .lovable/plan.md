@@ -1,42 +1,33 @@
 
 
-## Add Delete Capability to Menu Item Editor
+## Display Sunday-to-Saturday Pay Period in Payroll Dashboard
 
-### Current State
-- **Add**: Working via "Add Menu Item" button (opens dialog with `editItem = 'new'`)
-- **Edit**: Working via clicking any menu item in the list (opens dialog with item data)
-- **Delete**: Missing -- no delete button exists in the menu item dialog
+### Problem
+1. The "This Week" date filter uses Monday as the week start instead of Sunday
+2. There is no visible pay period indicator showing the current Sunday-to-Saturday range
+3. The payroll and shift views don't clearly communicate the pay cycle dates
 
-### Changes Required
+### Changes (single file: `src/components/admin/PayrollDashboard.tsx`)
 
-**File: `src/pages/AdminPage.tsx`**
+**1. Fix "This Week" filter to use Sunday as start**
+- Change `startOfWeek(now, { weekStartsOn: 1 })` to `startOfWeek(now, { weekStartsOn: 0 })` so the week filter matches the actual pay period (Sunday start)
 
-1. Add a `deleteItem` function that:
-   - Deletes associated `recipe_ingredients` rows first (to avoid orphaned data)
-   - Deletes the `menu_items` row
-   - Closes the dialog
-   - Invalidates the menu query cache
-   - Shows a success toast
+**2. Add a pay period banner**
+- Compute the current pay period dates (this Sunday through this Saturday) using `previousSunday`/`nextSaturday` from date-fns
+- Display a prominent banner at the top of the Shifts, Payroll, and Payments sub-views showing:
+  - "Pay Period: Sun Feb 15 - Sat Feb 21" (formatted dates)
+  - "Payday: Saturday" label
+- This gives the admin clear visibility into which pay cycle they're viewing
 
-2. Add a Delete button to the edit dialog (only shown for existing items, not for "new"):
-   - Placed below the Save button or in the dialog footer
-   - Uses a two-click confirmation pattern (first click shows "Confirm Delete?", second click actually deletes) to prevent accidental deletion
-   - Styled with destructive/red color to clearly indicate danger
-   - Includes a Trash icon for visual clarity
+**3. Add "This Pay Period" as a dedicated date filter**
+- Replace the generic "This Week" filter with "Pay Period" that explicitly filters Sunday-to-Saturday
+- Keep the other filters (Today, Yesterday, Month, All) as-is
 
 ### Technical Details
 
-```text
-deleteItem function:
-  1. await supabase.from('recipe_ingredients').delete().eq('menu_item_id', editItem.id)
-  2. await supabase.from('menu_items').delete().eq('id', editItem.id)
-  3. setEditItem(null)
-  4. qc.invalidateQueries({ queryKey: ['menu-admin'] })
-  5. toast.success('Menu item deleted')
-```
-
-The delete button will use a `confirmingDelete` state variable with a 3-second auto-reset timeout (matching the existing pattern used in `EditableRow.tsx`).
-
-### No Database Changes Needed
-RLS policies already allow DELETE on `menu_items` and `recipe_ingredients` tables.
+- The pay period start is calculated as: if today is Sunday use today, otherwise use `previousSunday(now)`
+- The pay period end is calculated as: `nextSaturday(now)` (or today if it is Saturday)
+- The banner will use `format(date, 'EEE, MMM d')` for readable dates
+- The "week" filter logic at line 81 changes from `weekStartsOn: 1` to `weekStartsOn: 0`
+- The date filter label at line 369 changes from "This Week" to "Pay Period"
 
