@@ -33,7 +33,18 @@ interface ParsedRow {
 }
 
 const TEMPLATE_HEADERS = 'Guest Name,Units,Guests,Platform,Check In,Check Out,Total Amount Projected,Paid So Far Realized,Notes';
-const TEMPLATE_EXAMPLE = 'John Doe,"G1,G2",2,Direct,2025-01-15,2025-01-18,5000,2500,First time guest';
+const TEMPLATE_EXAMPLE = 'John Doe,"G1,G2",2,Airbnb,01/15/2025,01/18/2025,5000,2500,First time guest';
+
+const VALID_UNITS = ['G1', 'G2', 'G3'];
+
+const PLATFORM_MAP: Record<string, string> = {
+  'airbnb': 'Airbnb',
+  'booking.com': 'Booking.com',
+  'front desk': 'Direct',
+  'website': 'Website',
+  'agoda': 'Agoda',
+  'direct': 'Direct',
+};
 
 function parseCSVLine(line: string): string[] {
   const fields: string[] = [];
@@ -54,19 +65,37 @@ function parseCSVLine(line: string): string[] {
   return fields;
 }
 
-function isValidDate(s: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(s));
+/** Parse mm/dd/yyyy to yyyy-mm-dd */
+function parseDateMMDDYYYY(s: string): string | null {
+  const match = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!match) return null;
+  const [, mm, dd, yyyy] = match;
+  const month = mm.padStart(2, '0');
+  const day = dd.padStart(2, '0');
+  const iso = `${yyyy}-${month}-${day}`;
+  if (isNaN(Date.parse(iso))) return null;
+  return iso;
+}
+
+function mapPlatform(raw: string): string {
+  const key = raw.toLowerCase().trim();
+  return PLATFORM_MAP[key] || raw;
 }
 
 function validateRow(row: ParsedRow): string[] {
   const errs: string[] = [];
   if (!row.guestName) errs.push('Missing guest name');
-  if (!row.checkIn) errs.push('Missing check-in date');
-  else if (!isValidDate(row.checkIn)) errs.push('Invalid check-in date format');
-  if (!row.checkOut) errs.push('Missing check-out date');
-  else if (!isValidDate(row.checkOut)) errs.push('Invalid check-out date format');
-  if (isValidDate(row.checkIn) && isValidDate(row.checkOut) && row.checkOut <= row.checkIn) errs.push('Check-out must be after check-in');
+  if (!row.checkIn) errs.push('Missing check-in date (mm/dd/yyyy)');
+  if (!row.checkOut) errs.push('Missing check-out date (mm/dd/yyyy)');
+  if (row.checkIn && row.checkOut && row.checkOut <= row.checkIn) errs.push('Check-out must be after check-in');
   if (!row.units) errs.push('Missing units');
+  else {
+    const unitNames = row.units.split(',').map(u => u.trim()).filter(Boolean);
+    const invalid = unitNames.filter(u => !VALID_UNITS.includes(u.toUpperCase()));
+    if (invalid.length > 0) errs.push(`Invalid unit(s): ${invalid.join(', ')} (must be G1, G2, or G3)`);
+  }
+  if (row.totalProjected && isNaN(parseFloat(row.totalProjected))) errs.push('Total Amount must be a number');
+  if (row.paidRealized && isNaN(parseFloat(row.paidRealized))) errs.push('Paid must be a number');
   return errs;
 }
 
@@ -97,21 +126,35 @@ const ImportReservationsModal = ({ open, onOpenChange, guests, units, onComplete
       const parsed: ParsedRow[] = [];
       for (let i = 1; i < lines.length; i++) {
         const fields = parseCSVLine(lines[i]);
+
+        // Parse dates from mm/dd/yyyy → yyyy-mm-dd
+        const rawCheckIn = fields[4] || '';
+        const rawCheckOut = fields[5] || '';
+        const checkIn = parseDateMMDDYYYY(rawCheckIn);
+        const checkOut = parseDateMMDDYYYY(rawCheckOut);
+
         const row: ParsedRow = {
           idx: i,
           guestName: fields[0] || '',
           units: fields[1] || '',
           guestCount: fields[2] || '1',
-          platform: fields[3] || '',
-          checkIn: fields[4] || '',
-          checkOut: fields[5] || '',
+          platform: mapPlatform(fields[3] || ''),
+          checkIn: checkIn || '',
+          checkOut: checkOut || '',
           totalProjected: fields[6] || '0',
           paidRealized: fields[7] || '0',
           notes: fields[8] || '',
           errors: [],
           selected: true,
         };
-        row.errors = validateRow(row);
+
+        // Add date format errors
+        if (rawCheckIn && !checkIn) row.errors.push(`Invalid check-in date "${rawCheckIn}" (use mm/dd/yyyy)`);
+        if (rawCheckOut && !checkOut) row.errors.push(`Invalid check-out date "${rawCheckOut}" (use mm/dd/yyyy)`);
+
+        row.errors = [...row.errors, ...validateRow(row)];
+        // Deduplicate date errors
+        row.errors = [...new Set(row.errors)];
         if (row.errors.length > 0) row.selected = false;
         parsed.push(row);
       }
@@ -135,14 +178,11 @@ const ImportReservationsModal = ({ open, onOpenChange, guests, units, onComplete
     const errors: string[] = [];
     const selectedRows = rows.filter(r => r.selected && r.errors.length === 0);
 
-    // Build unit name→id map (case-insensitive)
     const unitNameMap = new Map(units.map((u: any) => [u.name.toLowerCase(), u.id]));
-    // Build guest name→id map (case-insensitive)
     const guestNameMap = new Map(guests.map((g: any) => [g.full_name.toLowerCase(), g.id]));
 
     for (const row of selectedRows) {
       try {
-        // Resolve guest
         let guestId = guestNameMap.get(row.guestName.toLowerCase());
         if (!guestId) {
           const { data: newGuest, error: gErr } = await from('resort_ops_guests')
@@ -154,7 +194,6 @@ const ImportReservationsModal = ({ open, onOpenChange, guests, units, onComplete
           guestNameMap.set(row.guestName.toLowerCase(), guestId);
         }
 
-        // Split units
         const unitNames = row.units.split(',').map(u => u.trim()).filter(Boolean);
         const totalProjected = parseFloat(row.totalProjected) || 0;
         const totalPaid = parseFloat(row.paidRealized) || 0;
@@ -202,13 +241,16 @@ const ImportReservationsModal = ({ open, onOpenChange, guests, units, onComplete
   };
 
   const validSelected = rows.filter(r => r.selected && r.errors.length === 0).length;
+  // Show first 5 rows for preview
+  const previewRows = rows.slice(0, 5);
+  const extraCount = rows.length - 5;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display text-sm tracking-wider">Import Reservations</DialogTitle>
-          <DialogDescription className="font-body text-xs text-muted-foreground">Upload a CSV file to batch-create reservations.</DialogDescription>
+          <DialogDescription className="font-body text-xs text-muted-foreground">Upload a CSV file to batch-create reservations. Dates must be mm/dd/yyyy. Units: G1, G2, G3.</DialogDescription>
         </DialogHeader>
 
         {/* Result summary */}
@@ -240,6 +282,12 @@ const ImportReservationsModal = ({ open, onOpenChange, guests, units, onComplete
         {/* Upload flow */}
         {!result && (
           <div className="space-y-4">
+            {/* Platform mapping info */}
+            <div className="p-3 rounded border border-border bg-muted/30 space-y-1">
+              <p className="font-body text-xs font-medium text-foreground">Auto-mapped platforms:</p>
+              <p className="font-body text-xs text-muted-foreground">Airbnb · Booking.com · Front desk → Direct · Website · Agoda</p>
+            </div>
+
             {/* Template download */}
             <Button size="sm" variant="outline" onClick={downloadTemplate} className="w-full">
               <Download className="w-4 h-4 mr-1" /> Download CSV Template
@@ -258,11 +306,13 @@ const ImportReservationsModal = ({ open, onOpenChange, guests, units, onComplete
               />
             </label>
 
-            {/* Preview */}
+            {/* Preview (first 5 rows) */}
             {rows.length > 0 && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <p className="font-body text-xs text-muted-foreground">{rows.length} rows parsed</p>
+                  <p className="font-body text-xs text-muted-foreground">
+                    {rows.length} rows parsed · {rows.filter(r => r.errors.length > 0).length} with errors
+                  </p>
                   <Button size="sm" variant="ghost" className="text-xs h-7"
                     onClick={() => toggleAll(rows.some(r => !r.selected && r.errors.length === 0))}>
                     {rows.filter(r => r.selected).length === rows.filter(r => r.errors.length === 0).length ? 'Deselect All' : 'Select All'}
@@ -270,7 +320,7 @@ const ImportReservationsModal = ({ open, onOpenChange, guests, units, onComplete
                 </div>
 
                 <div className="space-y-2 max-h-[40vh] overflow-y-auto">
-                  {rows.map(row => (
+                  {previewRows.map(row => (
                     <div key={row.idx} className={`p-3 rounded border space-y-1 ${row.errors.length > 0 ? 'border-destructive/50 bg-destructive/5' : 'border-border'}`}>
                       <div className="flex items-start gap-2">
                         <Checkbox
@@ -280,8 +330,11 @@ const ImportReservationsModal = ({ open, onOpenChange, guests, units, onComplete
                           className="mt-0.5"
                         />
                         <div className="flex-1 min-w-0">
-                          <p className="font-body text-sm text-foreground font-medium">{row.guestName || '(no name)'}</p>
-                          <p className="font-body text-xs text-muted-foreground">Units: {row.units} · {row.guestCount} guests · {row.platform}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-body text-sm text-foreground font-medium">{row.guestName || '(no name)'}</p>
+                            {row.platform && <Badge variant="secondary" className="text-[10px] h-4">{row.platform}</Badge>}
+                          </div>
+                          <p className="font-body text-xs text-muted-foreground">Units: {row.units} · {row.guestCount} guests</p>
                           <p className="font-body text-xs text-muted-foreground">{row.checkIn} → {row.checkOut}</p>
                           <p className="font-body text-xs text-muted-foreground">Projected: ₱{row.totalProjected} · Paid: ₱{row.paidRealized}</p>
                           {row.notes && <p className="font-body text-xs text-muted-foreground italic">{row.notes}</p>}
@@ -292,6 +345,11 @@ const ImportReservationsModal = ({ open, onOpenChange, guests, units, onComplete
                       </div>
                     </div>
                   ))}
+                  {extraCount > 0 && (
+                    <p className="font-body text-xs text-muted-foreground text-center py-2">
+                      + {extraCount} more row{extraCount !== 1 ? 's' : ''} (all valid rows will be imported)
+                    </p>
+                  )}
                 </div>
 
                 <Button
