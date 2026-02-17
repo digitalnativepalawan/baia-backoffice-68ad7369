@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Plus, Trash2, AlertTriangle, Upload } from 'lucide-react';
+import { Plus, Trash2, AlertTriangle, Upload, Pencil, Check, X } from 'lucide-react';
 import ImportReservationsModal from './ImportReservationsModal';
 import { format, startOfMonth, endOfMonth, getDaysInMonth, eachDayOfInterval, isWithinInterval, parseISO, isBefore } from 'date-fns';
 
@@ -24,7 +24,6 @@ const monthLabel = (m: string) => {
   return `${names[parseInt(mo) - 1]} ${y}`;
 };
 
-// Helper to query tables not yet in generated types
 const from = (table: string) => supabase.from(table as any);
 
 const ResortOpsDashboard = () => {
@@ -71,7 +70,6 @@ const ResortOpsDashboard = () => {
     queryKey: ['resort-ops-payments'],
     queryFn: async () => { const { data } = await from('resort_ops_incoming_payments').select('*').order('expected_date'); return data || []; },
   });
-  // Food cost from existing orders
   const { data: orders = [] } = useQuery({
     queryKey: ['resort-ops-orders', selectedMonth],
     queryFn: async () => {
@@ -146,6 +144,15 @@ const ResortOpsDashboard = () => {
   const [newGuest, setNewGuest] = useState({ full_name: '', email: '', phone: '' });
   const [newBooking, setNewBooking] = useState({ guest_id: '', unit_id: '', platform: '', check_in: '', check_out: '', adults: '1', room_rate: '', addons_total: '0', paid_amount: '0', commission_applied: '0' });
   const [importOpen, setImportOpen] = useState(false);
+
+  // ── Editing states ──
+  const [editingUnit, setEditingUnit] = useState<any>(null);
+  const [editingGuest, setEditingGuest] = useState<any>(null);
+  const [editingBooking, setEditingBooking] = useState<any>(null);
+  const [editingExpense, setEditingExpense] = useState<any>(null);
+  const [editingTask, setEditingTask] = useState<any>(null);
+  const [editingAsset, setEditingAsset] = useState<any>(null);
+  const [editingPayment, setEditingPayment] = useState<any>(null);
 
   // ── CRUD helpers ──
   const invalidateAll = () => {
@@ -225,9 +232,87 @@ const ResortOpsDashboard = () => {
     toast.success('Booking added');
   };
 
+  // ── Save edit handlers ──
+  const saveUnit = async () => {
+    if (!editingUnit) return;
+    await from('resort_ops_units').update({ name: editingUnit.name, type: editingUnit.type, base_price: parseFloat(editingUnit.base_price) || 0, capacity: parseInt(editingUnit.capacity) || 2 }).eq('id', editingUnit.id);
+    setEditingUnit(null);
+    invalidateAll();
+    toast.success('Unit updated');
+  };
+
+  const saveGuest = async () => {
+    if (!editingGuest) return;
+    await from('resort_ops_guests').update({ full_name: editingGuest.full_name, email: editingGuest.email || null, phone: editingGuest.phone || null }).eq('id', editingGuest.id);
+    setEditingGuest(null);
+    invalidateAll();
+    toast.success('Guest updated');
+  };
+
+  const saveBooking = async () => {
+    if (!editingBooking) return;
+    await from('resort_ops_bookings').update({
+      guest_id: editingBooking.guest_id, unit_id: editingBooking.unit_id, platform: editingBooking.platform,
+      check_in: editingBooking.check_in, check_out: editingBooking.check_out, adults: parseInt(editingBooking.adults) || 1,
+      room_rate: parseFloat(editingBooking.room_rate) || 0, addons_total: parseFloat(editingBooking.addons_total) || 0,
+      paid_amount: parseFloat(editingBooking.paid_amount) || 0, commission_applied: parseFloat(editingBooking.commission_applied) || 0,
+    }).eq('id', editingBooking.id);
+    setEditingBooking(null);
+    invalidateAll();
+    toast.success('Booking updated');
+  };
+
+  const saveExpense = async () => {
+    if (!editingExpense) return;
+    await from('resort_ops_expenses').update({ name: editingExpense.name, category: editingExpense.category, amount: parseFloat(editingExpense.amount) || 0, expense_date: editingExpense.expense_date }).eq('id', editingExpense.id);
+    setEditingExpense(null);
+    invalidateAll();
+    toast.success('Expense updated');
+  };
+
+  const saveTask = async () => {
+    if (!editingTask) return;
+    await from('resort_ops_tasks').update({ title: editingTask.title, category: editingTask.category, due_date: editingTask.due_date, priority: editingTask.priority, description: editingTask.description || '' }).eq('id', editingTask.id);
+    setEditingTask(null);
+    invalidateAll();
+    toast.success('Task updated');
+  };
+
+  const saveAsset = async () => {
+    if (!editingAsset) return;
+    await from('resort_ops_assets').update({ name: editingAsset.name, type: editingAsset.type, balance: parseFloat(editingAsset.balance) || 0 }).eq('id', editingAsset.id);
+    setEditingAsset(null);
+    invalidateAll();
+    toast.success('Asset updated');
+  };
+
+  const savePayment = async () => {
+    if (!editingPayment) return;
+    await from('resort_ops_incoming_payments').update({ source: editingPayment.source, amount: parseFloat(editingPayment.amount) || 0, expected_date: editingPayment.expected_date }).eq('id', editingPayment.id);
+    setEditingPayment(null);
+    invalidateAll();
+    toast.success('Payment updated');
+  };
+
   const fmt = (n: number) => n.toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
   const today = format(new Date(), 'yyyy-MM-dd');
+
+  // Reusable action buttons
+  const EditBtn = ({ onClick }: { onClick: () => void }) => (
+    <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-primary flex-shrink-0" onClick={onClick}><Pencil className="w-3.5 h-3.5" /></Button>
+  );
+  const DelBtn = ({ onClick }: { onClick: () => void }) => (
+    <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive flex-shrink-0" onClick={onClick}><Trash2 className="w-3.5 h-3.5" /></Button>
+  );
+  const SaveCancelBtns = ({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) => (
+    <div className="flex gap-1">
+      <Button size="icon" variant="ghost" className="h-7 w-7 text-green-400 hover:text-green-300 flex-shrink-0" onClick={onSave}><Check className="w-3.5 h-3.5" /></Button>
+      <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive flex-shrink-0" onClick={onCancel}><X className="w-3.5 h-3.5" /></Button>
+    </div>
+  );
+
+  const inputCls = "bg-secondary border-border text-foreground font-body text-xs h-8";
 
   return (
     <div className="space-y-6">
@@ -266,13 +351,28 @@ const ResortOpsDashboard = () => {
         <CardContent className="space-y-2">
           <div className="space-y-2">
             {units.map((u: any) => (
-              <div key={u.id} className="flex items-center justify-between py-2 px-2 border-b border-border">
-                <div className="flex-1 min-w-0">
-                  <p className="font-body text-sm text-foreground font-medium">{u.name}</p>
-                  <p className="font-body text-xs text-muted-foreground">{u.type} · ₱{fmt(Number(u.base_price))}/night · {u.capacity} pax</p>
+              editingUnit?.id === u.id ? (
+                <div key={u.id} className="p-3 rounded border border-primary/50 space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input value={editingUnit.name} onChange={e => setEditingUnit((p: any) => ({...p, name: e.target.value}))} placeholder="Name" className={inputCls} />
+                    <Input value={editingUnit.type} onChange={e => setEditingUnit((p: any) => ({...p, type: e.target.value}))} placeholder="Type" className={inputCls} />
+                    <Input value={editingUnit.base_price} onChange={e => setEditingUnit((p: any) => ({...p, base_price: e.target.value}))} placeholder="Price/night" type="number" className={inputCls} />
+                    <Input value={editingUnit.capacity} onChange={e => setEditingUnit((p: any) => ({...p, capacity: e.target.value}))} placeholder="Capacity" type="number" className={inputCls} />
+                  </div>
+                  <div className="flex justify-end"><SaveCancelBtns onSave={saveUnit} onCancel={() => setEditingUnit(null)} /></div>
                 </div>
-                <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive flex-shrink-0" onClick={() => deleteRow('resort_ops_units', u.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
-              </div>
+              ) : (
+                <div key={u.id} className="flex items-center justify-between py-2 px-2 border-b border-border">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-body text-sm text-foreground font-medium">{u.name}</p>
+                    <p className="font-body text-xs text-muted-foreground">{u.type} · ₱{fmt(Number(u.base_price))}/night · {u.capacity} pax</p>
+                  </div>
+                  <div className="flex gap-0.5">
+                    <EditBtn onClick={() => setEditingUnit({ ...u, base_price: String(u.base_price), capacity: String(u.capacity) })} />
+                    <DelBtn onClick={() => deleteRow('resort_ops_units', u.id)} />
+                  </div>
+                </div>
+              )
             ))}
           </div>
           <div className="grid grid-cols-2 gap-2 pt-2">
@@ -296,11 +396,26 @@ const ResortOpsDashboard = () => {
               return aMin.localeCompare(bMin);
             }).map((g: any) => {
               const guestBookings = bookings.filter((b: any) => b.guest_id === g.id && b.check_in >= monthStartStr && b.check_in <= monthEndStr);
+              if (editingGuest?.id === g.id) {
+                return (
+                  <div key={g.id} className="p-3 rounded border border-primary/50 space-y-2">
+                    <Input value={editingGuest.full_name} onChange={e => setEditingGuest((p: any) => ({...p, full_name: e.target.value}))} placeholder="Full name" className={inputCls} />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input value={editingGuest.email || ''} onChange={e => setEditingGuest((p: any) => ({...p, email: e.target.value}))} placeholder="Email" className={inputCls} />
+                      <Input value={editingGuest.phone || ''} onChange={e => setEditingGuest((p: any) => ({...p, phone: e.target.value}))} placeholder="Phone" className={inputCls} />
+                    </div>
+                    <div className="flex justify-end"><SaveCancelBtns onSave={saveGuest} onCancel={() => setEditingGuest(null)} /></div>
+                  </div>
+                );
+              }
               return (
                 <div key={g.id} className="p-3 rounded border border-border space-y-1">
                   <div className="flex items-center justify-between">
                     <p className="font-body text-sm text-foreground font-medium">{g.full_name}</p>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive flex-shrink-0" onClick={() => deleteRow('resort_ops_guests', g.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
+                    <div className="flex gap-0.5">
+                      <EditBtn onClick={() => setEditingGuest({ ...g })} />
+                      <DelBtn onClick={() => deleteRow('resort_ops_guests', g.id)} />
+                    </div>
                   </div>
                   {guestBookings.length > 0 ? guestBookings.map((b: any) => (
                     <div key={b.id} className="font-body text-xs text-muted-foreground border-t border-border pt-1 mt-1">
@@ -336,21 +451,53 @@ const ResortOpsDashboard = () => {
         <CardContent className="space-y-2">
           <div className="space-y-3">
             {monthBookings.map((b: any) => (
-              <div key={b.id} className="p-3 rounded border border-border space-y-1">
-                <div className="flex items-center justify-between">
-                  <p className="font-body text-sm text-foreground font-medium">{guestMap.get(b.guest_id) || '—'}</p>
-                  <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive flex-shrink-0" onClick={() => deleteRow('resort_ops_bookings', b.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
+              editingBooking?.id === b.id ? (
+                <div key={b.id} className="p-3 rounded border border-primary/50 space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Select value={editingBooking.guest_id} onValueChange={v => setEditingBooking((p: any) => ({...p, guest_id: v}))}>
+                      <SelectTrigger className={inputCls}><SelectValue placeholder="Guest" /></SelectTrigger>
+                      <SelectContent>{guests.map((g: any) => <SelectItem key={g.id} value={g.id}>{g.full_name}</SelectItem>)}</SelectContent>
+                    </Select>
+                    <Select value={editingBooking.unit_id} onValueChange={v => setEditingBooking((p: any) => ({...p, unit_id: v}))}>
+                      <SelectTrigger className={inputCls}><SelectValue placeholder="Unit" /></SelectTrigger>
+                      <SelectContent>{units.map((u: any) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <Input value={editingBooking.platform} onChange={e => setEditingBooking((p: any) => ({...p, platform: e.target.value}))} placeholder="Platform" className={inputCls} />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div><label className="font-body text-xs text-muted-foreground">Check-in</label><Input type="date" value={editingBooking.check_in} onChange={e => setEditingBooking((p: any) => ({...p, check_in: e.target.value}))} className={inputCls} /></div>
+                    <div><label className="font-body text-xs text-muted-foreground">Check-out</label><Input type="date" value={editingBooking.check_out} onChange={e => setEditingBooking((p: any) => ({...p, check_out: e.target.value}))} className={inputCls} /></div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input value={editingBooking.room_rate} onChange={e => setEditingBooking((p: any) => ({...p, room_rate: e.target.value}))} placeholder="Room rate" type="number" className={inputCls} />
+                    <Input value={editingBooking.paid_amount} onChange={e => setEditingBooking((p: any) => ({...p, paid_amount: e.target.value}))} placeholder="Paid amount" type="number" className={inputCls} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input value={editingBooking.adults} onChange={e => setEditingBooking((p: any) => ({...p, adults: e.target.value}))} placeholder="Adults" type="number" className={inputCls} />
+                    <Input value={editingBooking.commission_applied} onChange={e => setEditingBooking((p: any) => ({...p, commission_applied: e.target.value}))} placeholder="Commission" type="number" className={inputCls} />
+                  </div>
+                  <div className="flex justify-end"><SaveCancelBtns onSave={saveBooking} onCancel={() => setEditingBooking(null)} /></div>
                 </div>
-                <p className="font-body text-xs text-muted-foreground">{unitMap.get(b.unit_id)?.name || '—'} · {b.platform}</p>
-                <div className="flex justify-between font-body text-xs text-muted-foreground">
-                  <span>{b.check_in} → {b.check_out}</span>
+              ) : (
+                <div key={b.id} className="p-3 rounded border border-border space-y-1">
+                  <div className="flex items-center justify-between">
+                    <p className="font-body text-sm text-foreground font-medium">{guestMap.get(b.guest_id) || '—'}</p>
+                    <div className="flex gap-0.5">
+                      <EditBtn onClick={() => setEditingBooking({ ...b, room_rate: String(b.room_rate), paid_amount: String(b.paid_amount), adults: String(b.adults), addons_total: String(b.addons_total), commission_applied: String(b.commission_applied) })} />
+                      <DelBtn onClick={() => deleteRow('resort_ops_bookings', b.id)} />
+                    </div>
+                  </div>
+                  <p className="font-body text-xs text-muted-foreground">{unitMap.get(b.unit_id)?.name || '—'} · {b.platform}</p>
+                  <div className="flex justify-between font-body text-xs text-muted-foreground">
+                    <span>{b.check_in} → {b.check_out}</span>
+                  </div>
+                  <div className="flex justify-between font-body text-sm">
+                    <span className="text-muted-foreground">Rate: <span className="text-foreground">₱{fmt(Number(b.room_rate))}</span></span>
+                    <span className="text-muted-foreground">Paid: <span className="text-foreground">₱{fmt(Number(b.paid_amount))}</span></span>
+                    <span className="text-muted-foreground">Bal: <span className="text-foreground">₱{fmt(Number(b.room_rate) - Number(b.paid_amount))}</span></span>
+                  </div>
                 </div>
-                <div className="flex justify-between font-body text-sm">
-                  <span className="text-muted-foreground">Rate: <span className="text-foreground">₱{fmt(Number(b.room_rate))}</span></span>
-                  <span className="text-muted-foreground">Paid: <span className="text-foreground">₱{fmt(Number(b.paid_amount))}</span></span>
-                  <span className="text-muted-foreground">Bal: <span className="text-foreground">₱{fmt(Number(b.room_rate) - Number(b.paid_amount))}</span></span>
-                </div>
-              </div>
+              )
             ))}
             {monthBookings.length === 0 && <p className="font-body text-sm text-muted-foreground text-center py-4">No bookings this month</p>}
           </div>
@@ -439,14 +586,29 @@ const ResortOpsDashboard = () => {
         <CardContent className="space-y-2">
           <div className="space-y-2">
             {monthExpenses.map((e: any) => (
-              <div key={e.id} className="flex items-center justify-between py-2 px-2 border-b border-border">
-                <div className="flex-1 min-w-0">
-                  <p className="font-body text-sm text-foreground font-medium">{e.name}</p>
-                  <p className="font-body text-xs text-muted-foreground">{e.category} · {e.expense_date}</p>
+              editingExpense?.id === e.id ? (
+                <div key={e.id} className="p-3 rounded border border-primary/50 space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input value={editingExpense.name} onChange={ev => setEditingExpense((p: any) => ({...p, name: ev.target.value}))} placeholder="Name" className={inputCls} />
+                    <Input value={editingExpense.category} onChange={ev => setEditingExpense((p: any) => ({...p, category: ev.target.value}))} placeholder="Category" className={inputCls} />
+                    <Input value={editingExpense.amount} onChange={ev => setEditingExpense((p: any) => ({...p, amount: ev.target.value}))} placeholder="Amount" type="number" className={inputCls} />
+                    <Input value={editingExpense.expense_date} onChange={ev => setEditingExpense((p: any) => ({...p, expense_date: ev.target.value}))} type="date" className={inputCls} />
+                  </div>
+                  <div className="flex justify-end"><SaveCancelBtns onSave={saveExpense} onCancel={() => setEditingExpense(null)} /></div>
                 </div>
-                <span className="font-body text-sm text-foreground mr-2">₱{fmt(Number(e.amount))}</span>
-                <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive flex-shrink-0" onClick={() => deleteRow('resort_ops_expenses', e.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
-              </div>
+              ) : (
+                <div key={e.id} className="flex items-center justify-between py-2 px-2 border-b border-border">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-body text-sm text-foreground font-medium">{e.name}</p>
+                    <p className="font-body text-xs text-muted-foreground">{e.category} · {e.expense_date}</p>
+                  </div>
+                  <span className="font-body text-sm text-foreground mr-2">₱{fmt(Number(e.amount))}</span>
+                  <div className="flex gap-0.5">
+                    <EditBtn onClick={() => setEditingExpense({ ...e, amount: String(e.amount) })} />
+                    <DelBtn onClick={() => deleteRow('resort_ops_expenses', e.id)} />
+                  </div>
+                </div>
+              )
             ))}
           </div>
           <div className="grid grid-cols-2 gap-2 pt-2">
@@ -467,6 +629,28 @@ const ResortOpsDashboard = () => {
             {monthTasks.map((t: any) => {
               const overdue = t.status !== 'done' && isBefore(parseISO(t.due_date), new Date());
               const isCritical = t.priority === 'critical';
+              if (editingTask?.id === t.id) {
+                return (
+                  <div key={t.id} className="p-3 rounded border border-primary/50 space-y-2">
+                    <Input value={editingTask.title} onChange={e => setEditingTask((p: any) => ({...p, title: e.target.value}))} placeholder="Title" className={inputCls} />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input value={editingTask.category} onChange={e => setEditingTask((p: any) => ({...p, category: e.target.value}))} placeholder="Category" className={inputCls} />
+                      <Input type="date" value={editingTask.due_date} onChange={e => setEditingTask((p: any) => ({...p, due_date: e.target.value}))} className={inputCls} />
+                    </div>
+                    <Select value={editingTask.priority} onValueChange={v => setEditingTask((p: any) => ({...p, priority: v}))}>
+                      <SelectTrigger className={inputCls}><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">Low</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="critical">Critical</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input value={editingTask.description || ''} onChange={e => setEditingTask((p: any) => ({...p, description: e.target.value}))} placeholder="Description" className={inputCls} />
+                    <div className="flex justify-end"><SaveCancelBtns onSave={saveTask} onCancel={() => setEditingTask(null)} /></div>
+                  </div>
+                );
+              }
               return (
                 <div key={t.id} className={`p-3 rounded border space-y-1 ${overdue ? 'border-destructive bg-destructive/10' : 'border-border'}`}>
                   <div className="flex items-center justify-between gap-2">
@@ -476,7 +660,10 @@ const ResortOpsDashboard = () => {
                         <span className={t.status === 'done' ? 'line-through text-muted-foreground' : ''}>{t.title}</span>
                       </button>
                     </div>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive flex-shrink-0" onClick={() => deleteRow('resort_ops_tasks', t.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
+                    <div className="flex gap-0.5">
+                      <EditBtn onClick={() => setEditingTask({ ...t })} />
+                      <DelBtn onClick={() => deleteRow('resort_ops_tasks', t.id)} />
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <Badge variant={t.priority === 'critical' ? 'destructive' : t.priority === 'high' ? 'default' : 'secondary'}
@@ -515,14 +702,28 @@ const ResortOpsDashboard = () => {
         <CardContent className="space-y-2">
           <div className="space-y-2">
             {assets.map((a: any) => (
-              <div key={a.id} className="flex items-center justify-between py-2 px-2 border-b border-border">
-                <div className="flex-1 min-w-0">
-                  <p className="font-body text-sm text-foreground font-medium">{a.name}</p>
-                  <p className="font-body text-xs text-muted-foreground">{a.type} · Updated: {a.last_updated ? format(new Date(a.last_updated), 'MMM d, yyyy') : '—'}</p>
+              editingAsset?.id === a.id ? (
+                <div key={a.id} className="p-3 rounded border border-primary/50 space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input value={editingAsset.name} onChange={e => setEditingAsset((p: any) => ({...p, name: e.target.value}))} placeholder="Name" className={inputCls} />
+                    <Input value={editingAsset.type} onChange={e => setEditingAsset((p: any) => ({...p, type: e.target.value}))} placeholder="Type" className={inputCls} />
+                  </div>
+                  <Input value={editingAsset.balance} onChange={e => setEditingAsset((p: any) => ({...p, balance: e.target.value}))} placeholder="Balance" type="number" className={inputCls} />
+                  <div className="flex justify-end"><SaveCancelBtns onSave={saveAsset} onCancel={() => setEditingAsset(null)} /></div>
                 </div>
-                <span className="font-body text-sm text-foreground mr-2">₱{fmt(Number(a.balance))}</span>
-                <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive flex-shrink-0" onClick={() => deleteRow('resort_ops_assets', a.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
-              </div>
+              ) : (
+                <div key={a.id} className="flex items-center justify-between py-2 px-2 border-b border-border">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-body text-sm text-foreground font-medium">{a.name}</p>
+                    <p className="font-body text-xs text-muted-foreground">{a.type} · Updated: {a.last_updated ? format(new Date(a.last_updated), 'MMM d, yyyy') : '—'}</p>
+                  </div>
+                  <span className="font-body text-sm text-foreground mr-2">₱{fmt(Number(a.balance))}</span>
+                  <div className="flex gap-0.5">
+                    <EditBtn onClick={() => setEditingAsset({ ...a, balance: String(a.balance) })} />
+                    <DelBtn onClick={() => deleteRow('resort_ops_assets', a.id)} />
+                  </div>
+                </div>
+              )
             ))}
           </div>
           <div className="grid grid-cols-2 gap-2 pt-2">
@@ -540,14 +741,28 @@ const ResortOpsDashboard = () => {
         <CardContent className="space-y-2">
           <div className="space-y-2">
             {monthPayments.map((p: any) => (
-              <div key={p.id} className="flex items-center justify-between py-2 px-2 border-b border-border">
-                <div className="flex-1 min-w-0">
-                  <p className="font-body text-sm text-foreground font-medium">{p.source}</p>
-                  <p className="font-body text-xs text-muted-foreground">Expected: {p.expected_date}</p>
+              editingPayment?.id === p.id ? (
+                <div key={p.id} className="p-3 rounded border border-primary/50 space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input value={editingPayment.source} onChange={e => setEditingPayment((prev: any) => ({...prev, source: e.target.value}))} placeholder="Source" className={inputCls} />
+                    <Input value={editingPayment.amount} onChange={e => setEditingPayment((prev: any) => ({...prev, amount: e.target.value}))} placeholder="Amount" type="number" className={inputCls} />
+                  </div>
+                  <div><label className="font-body text-xs text-muted-foreground">Expected date</label><Input type="date" value={editingPayment.expected_date} onChange={e => setEditingPayment((prev: any) => ({...prev, expected_date: e.target.value}))} className={inputCls} /></div>
+                  <div className="flex justify-end"><SaveCancelBtns onSave={savePayment} onCancel={() => setEditingPayment(null)} /></div>
                 </div>
-                <span className="font-body text-sm text-foreground mr-2">₱{fmt(Number(p.amount))}</span>
-                <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive flex-shrink-0" onClick={() => deleteRow('resort_ops_incoming_payments', p.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
-              </div>
+              ) : (
+                <div key={p.id} className="flex items-center justify-between py-2 px-2 border-b border-border">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-body text-sm text-foreground font-medium">{p.source}</p>
+                    <p className="font-body text-xs text-muted-foreground">Expected: {p.expected_date}</p>
+                  </div>
+                  <span className="font-body text-sm text-foreground mr-2">₱{fmt(Number(p.amount))}</span>
+                  <div className="flex gap-0.5">
+                    <EditBtn onClick={() => setEditingPayment({ ...p, amount: String(p.amount) })} />
+                    <DelBtn onClick={() => deleteRow('resort_ops_incoming_payments', p.id)} />
+                  </div>
+                </div>
+              )
             ))}
           </div>
           <div className="grid grid-cols-2 gap-2 pt-2">
