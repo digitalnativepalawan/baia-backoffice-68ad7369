@@ -366,6 +366,9 @@ const AdminPage = () => {
           <button onClick={() => navigate('/')} className="text-cream-dim hover:text-foreground min-w-[44px] min-h-[44px] flex items-center justify-center">
             <Home className="w-5 h-5" />
           </button>
+          <a href="https://scan.palawancollective.com/" target="_blank" rel="noopener noreferrer" className="text-cream-dim hover:text-foreground min-w-[44px] min-h-[44px] flex items-center justify-center">
+            <Receipt className="w-5 h-5" />
+          </a>
           <h1 className="font-display text-xl tracking-wider text-foreground">Admin Dashboard</h1>
         </div>
 
