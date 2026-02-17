@@ -385,60 +385,6 @@ const ResortOpsDashboard = () => {
         </CardContent>
       </Card>
 
-      {/* ── Guests ── */}
-      <Card className="bg-card border-border">
-        <CardHeader className="pb-3"><CardTitle className="font-display text-sm tracking-wider">Guests</CardTitle></CardHeader>
-        <CardContent className="space-y-2">
-          <div className="space-y-2">
-            {[...guests].filter((g: any) => bookings.some((bk: any) => bk.guest_id === g.id && bk.check_in >= monthStartStr && bk.check_in <= monthEndStr)).sort((a: any, b: any) => {
-              const aMin = bookings.filter((bk: any) => bk.guest_id === a.id && bk.check_in >= monthStartStr && bk.check_in <= monthEndStr).reduce((m: string, bk: any) => bk.check_in < m ? bk.check_in : m, '9999-12-31');
-              const bMin = bookings.filter((bk: any) => bk.guest_id === b.id && bk.check_in >= monthStartStr && bk.check_in <= monthEndStr).reduce((m: string, bk: any) => bk.check_in < m ? bk.check_in : m, '9999-12-31');
-              return aMin.localeCompare(bMin);
-            }).map((g: any) => {
-              const guestBookings = bookings.filter((b: any) => b.guest_id === g.id && b.check_in >= monthStartStr && b.check_in <= monthEndStr);
-              if (editingGuest?.id === g.id) {
-                return (
-                  <div key={g.id} className="p-3 rounded border border-primary/50 space-y-2">
-                    <Input value={editingGuest.full_name} onChange={e => setEditingGuest((p: any) => ({...p, full_name: e.target.value}))} placeholder="Full name" className={inputCls} />
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input value={editingGuest.email || ''} onChange={e => setEditingGuest((p: any) => ({...p, email: e.target.value}))} placeholder="Email" className={inputCls} />
-                      <Input value={editingGuest.phone || ''} onChange={e => setEditingGuest((p: any) => ({...p, phone: e.target.value}))} placeholder="Phone" className={inputCls} />
-                    </div>
-                    <div className="flex justify-end"><SaveCancelBtns onSave={saveGuest} onCancel={() => setEditingGuest(null)} /></div>
-                  </div>
-                );
-              }
-              return (
-                <div key={g.id} className="p-3 rounded border border-border space-y-1">
-                  <div className="flex items-center justify-between">
-                    <p className="font-body text-sm text-foreground font-medium">{g.full_name}</p>
-                    <div className="flex gap-0.5">
-                      <EditBtn onClick={() => setEditingGuest({ ...g })} />
-                      <DelBtn onClick={() => deleteRow('resort_ops_guests', g.id)} />
-                    </div>
-                  </div>
-                  {guestBookings.length > 0 ? guestBookings.map((b: any) => (
-                    <div key={b.id} className="font-body text-xs text-muted-foreground border-t border-border pt-1 mt-1">
-                      <p>{b.check_in} → {b.check_out} · {b.adults} guest{b.adults !== 1 ? 's' : ''} · {b.platform || '—'}</p>
-                      <p>{unitMap.get(b.unit_id)?.name || '—'} · ₱{fmt(Number(b.room_rate || 0))} / Paid ₱{fmt(Number(b.paid_amount || 0))}</p>
-                    </div>
-                  )) : (
-                    <p className="font-body text-xs text-muted-foreground italic">No bookings</p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          <div className="space-y-2 pt-2">
-            <Input placeholder="Full name" value={newGuest.full_name} onChange={e => setNewGuest(p => ({...p, full_name: e.target.value}))} className="bg-secondary border-border text-foreground font-body" />
-            <div className="grid grid-cols-2 gap-2">
-              <Input placeholder="Email" value={newGuest.email} onChange={e => setNewGuest(p => ({...p, email: e.target.value}))} className="bg-secondary border-border text-foreground font-body" />
-              <Input placeholder="Phone" value={newGuest.phone} onChange={e => setNewGuest(p => ({...p, phone: e.target.value}))} className="bg-secondary border-border text-foreground font-body" />
-            </div>
-          </div>
-          <Button size="sm" onClick={addGuest} className="w-full"><Plus className="w-4 h-4 mr-1" /> Add Guest</Button>
-        </CardContent>
-      </Card>
 
       {/* ── Reservations Ledger ── */}
       <Card className="bg-card border-border">
