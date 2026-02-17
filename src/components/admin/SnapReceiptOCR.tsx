@@ -15,6 +15,7 @@ type ExtractedFields = {
   vatAmount: string;
   tin: string;
   vatDetected: boolean;
+  vatType: string;
 };
 
 type Props = {
@@ -149,21 +150,30 @@ const extractVendor = (text: string): string => {
   return '';
 };
 
-const extractVAT = (text: string): { vatAmount: string; vatDetected: boolean } => {
+const detectVatType = (text: string): string => {
+  if (/vat\s*exempt/i.test(text)) return 'VAT Exempt';
+  if (/zero\s*rated|0%\s*vat/i.test(text)) return 'Zero Rated';
+  if (/vat\s*12%|vatable/i.test(text)) return 'Vatable';
+  // If a VAT amount line exists, assume vatable
+  if (/vat/i.test(text)) return 'Vatable';
+  return '';
+};
+
+const extractVAT = (text: string): { vatAmount: string; vatDetected: boolean; vatType: string } => {
+  const vatType = detectVatType(text);
   const lines = text.split('\n');
   for (let i = 0; i < lines.length; i++) {
     if (/vat/i.test(lines[i])) {
       const numMatch = lines[i].match(/([\d,]+\.?\d{0,2})/);
-      if (numMatch) return { vatAmount: numMatch[1].replace(/,/g, ''), vatDetected: true };
-      // Check next line
+      if (numMatch) return { vatAmount: numMatch[1].replace(/,/g, ''), vatDetected: true, vatType };
       if (i + 1 < lines.length) {
         const nextMatch = lines[i + 1].match(/([\d,]+\.?\d{0,2})/);
-        if (nextMatch) return { vatAmount: nextMatch[1].replace(/,/g, ''), vatDetected: true };
+        if (nextMatch) return { vatAmount: nextMatch[1].replace(/,/g, ''), vatDetected: true, vatType };
       }
-      return { vatAmount: '', vatDetected: true };
+      return { vatAmount: '', vatDetected: true, vatType };
     }
   }
-  return { vatAmount: '', vatDetected: false };
+  return { vatAmount: '', vatDetected: false, vatType };
 };
 
 const extractTIN = (text: string): string => {
@@ -209,7 +219,7 @@ const SnapReceiptOCR = ({ onExtracted }: Props) => {
       const total = extractTotal(text);
       const date = extractDate(text);
       const vendor = extractVendor(text);
-      const { vatAmount, vatDetected } = extractVAT(text);
+      const { vatAmount, vatDetected, vatType } = extractVAT(text);
       const tin = extractTIN(text);
 
       if (!total && !date && !vendor) {
@@ -219,12 +229,13 @@ const SnapReceiptOCR = ({ onExtracted }: Props) => {
         if (vendor) parts.push(`Vendor: ${vendor}`);
         if (total) parts.push(`Total: ₱${total}`);
         if (date) parts.push(`Date: ${date}`);
-        if (vatDetected) parts.push('VAT detected');
+        if (vatType) parts.push(`VAT: ${vatType}`);
+        else if (vatDetected) parts.push('VAT detected');
         if (tin) parts.push(`TIN: ${tin}`);
         toast.success(`Extracted: ${parts.join(', ')}`);
       }
 
-      onExtracted({ total, date, vendor, vatAmount, tin, vatDetected });
+      onExtracted({ total, date, vendor, vatAmount, tin, vatDetected, vatType });
     } catch (err: any) {
       console.error('OCR error:', err);
       toast.error('Failed to process image');

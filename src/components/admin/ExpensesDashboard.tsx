@@ -29,11 +29,6 @@ type HistoryEntry = {
 };
 
 const CATEGORIES = ['Food & Beverage', 'Supplies', 'Maintenance', 'Utilities', 'Transport', 'Other'];
-const VAT_TYPES = [
-  { value: 'vatable', label: 'Vatable' },
-  { value: 'vat_exempt', label: 'VAT Exempt' },
-  { value: 'zero_rated', label: 'Zero Rated' },
-];
 
 const ExpensesDashboard = () => {
   const qc = useQueryClient();
@@ -47,7 +42,7 @@ const ExpensesDashboard = () => {
   // Form state
   const [form, setForm] = useState({
     vendor: '', expense_date: format(new Date(), 'yyyy-MM-dd'), amount: '',
-    vat_type: 'vatable', tin: '', tax_amount: '', category: 'Supplies',
+    vat_type: '', tin: '', tax_amount: '', category: 'Supplies',
     notes: '', created_by: localStorage.getItem('expense_created_by') || '',
     image_url: '',
   });
@@ -101,7 +96,7 @@ const ExpensesDashboard = () => {
   const resetForm = () => {
     setForm({
       vendor: '', expense_date: format(new Date(), 'yyyy-MM-dd'), amount: '',
-      vat_type: 'vatable', tin: '', tax_amount: '', category: 'Supplies',
+      vat_type: '', tin: '', tax_amount: '', category: 'Supplies',
       notes: '', created_by: localStorage.getItem('expense_created_by') || '',
       image_url: '',
     });
@@ -115,7 +110,7 @@ const ExpensesDashboard = () => {
     setSelectedExpense(expense);
     setForm({
       vendor: expense.vendor || '', expense_date: expense.expense_date || format(new Date(), 'yyyy-MM-dd'),
-      amount: String(expense.amount || ''), vat_type: expense.vat_type || 'vatable',
+      amount: String(expense.amount || ''), vat_type: expense.vat_type || '',
       tin: expense.tin || '', tax_amount: String(expense.tax_amount || ''),
       category: expense.category || 'Supplies', notes: expense.notes || '',
       created_by: expense.created_by || localStorage.getItem('expense_created_by') || '',
@@ -444,7 +439,7 @@ const ExpensesDashboard = () => {
                   if (file) uploadReceipt(file);
                 }} />
               </label>
-              <SnapReceiptOCR onExtracted={({ total, date, vendor, vatAmount, tin, vatDetected }) => {
+              <SnapReceiptOCR onExtracted={({ total, date, vendor, vatAmount, tin, vatType }) => {
                 setForm(f => ({
                   ...f,
                   amount: total || f.amount,
@@ -452,7 +447,7 @@ const ExpensesDashboard = () => {
                   vendor: vendor || f.vendor,
                   tax_amount: vatAmount || f.tax_amount,
                   tin: tin || f.tin,
-                  vat_type: vatDetected ? 'vatable' : f.vat_type,
+                  vat_type: vatType || f.vat_type,
                 }));
               }} />
             </div>
@@ -478,14 +473,8 @@ const ExpensesDashboard = () => {
           </div>
           <div>
             <label className="font-body text-xs text-muted-foreground">VAT Type</label>
-            <Select value={form.vat_type} onValueChange={v => setForm(f => ({ ...f, vat_type: v }))}>
-              <SelectTrigger className="bg-secondary border-border text-foreground font-body mt-1">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {VAT_TYPES.map(v => <SelectItem key={v.value} value={v.value}>{v.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <Input value={form.vat_type} onChange={e => setForm(f => ({ ...f, vat_type: e.target.value }))}
+              className="bg-secondary border-border text-foreground font-body mt-1" placeholder="e.g. Vatable, VAT Exempt, Zero Rated" />
           </div>
           <div>
             <label className="font-body text-xs text-muted-foreground">TIN</label>
