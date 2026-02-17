@@ -290,12 +290,12 @@ const ResortOpsDashboard = () => {
         <CardHeader className="pb-3"><CardTitle className="font-display text-sm tracking-wider">Guests</CardTitle></CardHeader>
         <CardContent className="space-y-2">
           <div className="space-y-2">
-            {[...guests].sort((a: any, b: any) => {
-              const aMin = bookings.filter((bk: any) => bk.guest_id === a.id).reduce((m: string, bk: any) => bk.check_in < m ? bk.check_in : m, '9999-12-31');
-              const bMin = bookings.filter((bk: any) => bk.guest_id === b.id).reduce((m: string, bk: any) => bk.check_in < m ? bk.check_in : m, '9999-12-31');
+            {[...guests].filter((g: any) => bookings.some((bk: any) => bk.guest_id === g.id && bk.check_in >= monthStartStr && bk.check_in <= monthEndStr)).sort((a: any, b: any) => {
+              const aMin = bookings.filter((bk: any) => bk.guest_id === a.id && bk.check_in >= monthStartStr && bk.check_in <= monthEndStr).reduce((m: string, bk: any) => bk.check_in < m ? bk.check_in : m, '9999-12-31');
+              const bMin = bookings.filter((bk: any) => bk.guest_id === b.id && bk.check_in >= monthStartStr && bk.check_in <= monthEndStr).reduce((m: string, bk: any) => bk.check_in < m ? bk.check_in : m, '9999-12-31');
               return aMin.localeCompare(bMin);
             }).map((g: any) => {
-              const guestBookings = bookings.filter((b: any) => b.guest_id === g.id);
+              const guestBookings = bookings.filter((b: any) => b.guest_id === g.id && b.check_in >= monthStartStr && b.check_in <= monthEndStr);
               return (
                 <div key={g.id} className="p-3 rounded border border-border space-y-1">
                   <div className="flex items-center justify-between">
