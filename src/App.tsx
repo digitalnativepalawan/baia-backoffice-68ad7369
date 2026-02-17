@@ -9,7 +9,7 @@ import MenuPage from "./pages/MenuPage";
 import AdminPage from "./pages/AdminPage";
 import EmployeePage from "./pages/EmployeePage";
 import NotFound from "./pages/NotFound";
-import ReceiptsPage from "./pages/ReceiptsPage";
+
 
 const queryClient = new QueryClient();
 
@@ -25,7 +25,7 @@ const App = () => (
           <Route path="/menu" element={<MenuPage />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/employee" element={<EmployeePage />} />
-          <Route path="/receipts" element={<ReceiptsPage />} />
+          
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

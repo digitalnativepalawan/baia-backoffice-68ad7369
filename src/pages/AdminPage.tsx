@@ -19,10 +19,10 @@ import PayrollDashboard from '@/components/admin/PayrollDashboard';
 import TabInvoice from '@/components/admin/TabInvoice';
 import RecipeEditor from '@/components/admin/RecipeEditor';
 import InventoryDashboard from '@/components/admin/InventoryDashboard';
-import ExpensesDashboard from '@/components/admin/ExpensesDashboard';
+
 import { deductInventoryForOrder } from '@/lib/inventoryDeduction';
 
-const FEATURE_EXPENSES = true;
+
 import { formatDistanceToNow } from 'date-fns';
 import { useResortProfile } from '@/hooks/useResortProfile';
 
@@ -376,7 +376,7 @@ const AdminPage = () => {
             <TabsTrigger value="orders" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Orders</TabsTrigger>
             <TabsTrigger value="reports" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Reports</TabsTrigger>
             <TabsTrigger value="inventory" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Inventory</TabsTrigger>
-            {FEATURE_EXPENSES && <TabsTrigger value="expenses" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Expenses</TabsTrigger>}
+            
             <TabsTrigger value="payroll" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Payroll</TabsTrigger>
           </TabsList>
 
@@ -701,12 +701,6 @@ const AdminPage = () => {
             <InventoryDashboard />
           </TabsContent>
 
-          {/* EXPENSES TAB */}
-          {FEATURE_EXPENSES && (
-            <TabsContent value="expenses">
-              <ExpensesDashboard />
-            </TabsContent>
-          )}
 
           {/* PAYROLL TAB */}
           <TabsContent value="payroll">
