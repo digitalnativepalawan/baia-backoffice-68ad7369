@@ -290,7 +290,11 @@ const ResortOpsDashboard = () => {
         <CardHeader className="pb-3"><CardTitle className="font-display text-sm tracking-wider">Guests</CardTitle></CardHeader>
         <CardContent className="space-y-2">
           <div className="space-y-2">
-            {guests.map((g: any) => {
+            {[...guests].sort((a: any, b: any) => {
+              const aMin = bookings.filter((bk: any) => bk.guest_id === a.id).reduce((m: string, bk: any) => bk.check_in < m ? bk.check_in : m, '9999-12-31');
+              const bMin = bookings.filter((bk: any) => bk.guest_id === b.id).reduce((m: string, bk: any) => bk.check_in < m ? bk.check_in : m, '9999-12-31');
+              return aMin.localeCompare(bMin);
+            }).map((g: any) => {
               const guestBookings = bookings.filter((b: any) => b.guest_id === g.id);
               return (
                 <div key={g.id} className="p-3 rounded border border-border space-y-1">
