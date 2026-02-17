@@ -505,6 +505,228 @@ export type Database = {
           },
         ]
       }
+      resort_ops_assets: {
+        Row: {
+          balance: number
+          created_at: string
+          id: string
+          last_updated: string
+          name: string
+          type: string
+        }
+        Insert: {
+          balance?: number
+          created_at?: string
+          id?: string
+          last_updated?: string
+          name: string
+          type?: string
+        }
+        Update: {
+          balance?: number
+          created_at?: string
+          id?: string
+          last_updated?: string
+          name?: string
+          type?: string
+        }
+        Relationships: []
+      }
+      resort_ops_bookings: {
+        Row: {
+          addons_total: number
+          adults: number
+          check_in: string
+          check_out: string
+          commission_applied: number
+          created_at: string
+          guest_id: string | null
+          id: string
+          paid_amount: number
+          platform: string
+          room_rate: number
+          unit_id: string | null
+        }
+        Insert: {
+          addons_total?: number
+          adults?: number
+          check_in: string
+          check_out: string
+          commission_applied?: number
+          created_at?: string
+          guest_id?: string | null
+          id?: string
+          paid_amount?: number
+          platform?: string
+          room_rate?: number
+          unit_id?: string | null
+        }
+        Update: {
+          addons_total?: number
+          adults?: number
+          check_in?: string
+          check_out?: string
+          commission_applied?: number
+          created_at?: string
+          guest_id?: string | null
+          id?: string
+          paid_amount?: number
+          platform?: string
+          room_rate?: number
+          unit_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resort_ops_bookings_guest_id_fkey"
+            columns: ["guest_id"]
+            isOneToOne: false
+            referencedRelation: "resort_ops_guests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resort_ops_bookings_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "resort_ops_units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      resort_ops_expenses: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          expense_date: string
+          id: string
+          name: string
+        }
+        Insert: {
+          amount?: number
+          category?: string
+          created_at?: string
+          expense_date: string
+          id?: string
+          name: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          expense_date?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      resort_ops_guests: {
+        Row: {
+          created_at: string
+          email: string | null
+          full_name: string
+          id: string
+          phone: string | null
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          full_name: string
+          id?: string
+          phone?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          full_name?: string
+          id?: string
+          phone?: string | null
+        }
+        Relationships: []
+      }
+      resort_ops_incoming_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          expected_date: string
+          id: string
+          source: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          expected_date: string
+          id?: string
+          source: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          expected_date?: string
+          id?: string
+          source?: string
+        }
+        Relationships: []
+      }
+      resort_ops_tasks: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          due_date: string
+          id: string
+          priority: string
+          status: string
+          title: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          due_date: string
+          id?: string
+          priority?: string
+          status?: string
+          title: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          due_date?: string
+          id?: string
+          priority?: string
+          status?: string
+          title?: string
+        }
+        Relationships: []
+      }
+      resort_ops_units: {
+        Row: {
+          base_price: number
+          capacity: number
+          created_at: string
+          id: string
+          name: string
+          type: string
+        }
+        Insert: {
+          base_price?: number
+          capacity?: number
+          created_at?: string
+          id?: string
+          name: string
+          type?: string
+        }
+        Update: {
+          base_price?: number
+          capacity?: number
+          created_at?: string
+          id?: string
+          name?: string
+          type?: string
+        }
+        Relationships: []
+      }
       resort_profile: {
         Row: {
           address: string | null
