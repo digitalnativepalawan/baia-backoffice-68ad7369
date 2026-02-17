@@ -444,11 +444,15 @@ const ExpensesDashboard = () => {
                   if (file) uploadReceipt(file);
                 }} />
               </label>
-              <SnapReceiptOCR onExtracted={({ total, date }) => {
+              <SnapReceiptOCR onExtracted={({ total, date, vendor, vatAmount, tin, vatDetected }) => {
                 setForm(f => ({
                   ...f,
                   amount: total || f.amount,
                   expense_date: date || f.expense_date,
+                  vendor: vendor || f.vendor,
+                  tax_amount: vatAmount || f.tax_amount,
+                  tin: tin || f.tin,
+                  vat_type: vatDetected ? 'vatable' : f.vat_type,
                 }));
               }} />
             </div>
