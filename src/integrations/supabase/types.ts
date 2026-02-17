@@ -542,9 +542,11 @@ export type Database = {
           created_at: string
           guest_id: string | null
           id: string
+          notes: string | null
           paid_amount: number
           platform: string
           room_rate: number
+          sirvoy_booking_id: number | null
           unit_id: string | null
         }
         Insert: {
@@ -556,9 +558,11 @@ export type Database = {
           created_at?: string
           guest_id?: string | null
           id?: string
+          notes?: string | null
           paid_amount?: number
           platform?: string
           room_rate?: number
+          sirvoy_booking_id?: number | null
           unit_id?: string | null
         }
         Update: {
@@ -570,9 +574,11 @@ export type Database = {
           created_at?: string
           guest_id?: string | null
           id?: string
+          notes?: string | null
           paid_amount?: number
           platform?: string
           room_rate?: number
+          sirvoy_booking_id?: number | null
           unit_id?: string | null
         }
         Relationships: [
@@ -626,6 +632,7 @@ export type Database = {
           full_name: string
           id: string
           phone: string | null
+          sirvoy_guest_ref: string | null
         }
         Insert: {
           created_at?: string
@@ -633,6 +640,7 @@ export type Database = {
           full_name: string
           id?: string
           phone?: string | null
+          sirvoy_guest_ref?: string | null
         }
         Update: {
           created_at?: string
@@ -640,6 +648,7 @@ export type Database = {
           full_name?: string
           id?: string
           phone?: string | null
+          sirvoy_guest_ref?: string | null
         }
         Relationships: []
       }
