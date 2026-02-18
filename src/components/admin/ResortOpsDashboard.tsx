@@ -43,7 +43,7 @@ export const computeVatFields = (vatStatus: string, totalAmount: number) => {
       return { vatable_sale: ta - vatAmt, vat_amount: vatAmt, vat_exempt_amount: 0, zero_rated_amount: 0 };
     }
     case 'Non-VAT':
-      return { vatable_sale: ta, vat_amount: 0, vat_exempt_amount: 0, zero_rated_amount: 0 };
+      return { vatable_sale: 0, vat_amount: 0, vat_exempt_amount: 0, zero_rated_amount: 0 };
     case 'VAT-Exempt':
       return { vatable_sale: 0, vat_amount: 0, vat_exempt_amount: ta, zero_rated_amount: 0 };
     case 'Zero-Rated':
@@ -203,6 +203,7 @@ const ResortOpsDashboard = () => {
   const [expenseReportsOpen, setExpenseReportsOpen] = useState(false);
   const [expenseBulkImportOpen, setExpenseBulkImportOpen] = useState(false);
   const [expenseCategoryFilter, setExpenseCategoryFilter] = useState('all');
+  const [expenseVatFilter, setExpenseVatFilter] = useState<'all' | 'VAT' | 'Non-VAT' | 'VAT-Exempt' | 'missing-tin'>('all');
   const [showAddExpenseForm, setShowAddExpenseForm] = useState(false);
   const [scanningReceipt, setScanningReceipt] = useState(false);
   const [scannedFields, setScannedFields] = useState<Set<string>>(new Set());
@@ -939,89 +940,140 @@ const ResortOpsDashboard = () => {
 
       {/* ── Expenses Ledger (VAT-Compliant) ── */}
       <Card className="bg-card border-border">
-        <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
-          <CardTitle className="font-display text-sm tracking-wider">Expenses</CardTitle>
-          <div className="flex gap-1.5">
-            <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => setExpenseReportsOpen(true)}>
-              <BarChart3 className="w-3.5 h-3.5 mr-1" /> Reports
-            </Button>
-            <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => setExpenseBulkImportOpen(true)}>
-              <FileUp className="w-3.5 h-3.5 mr-1" /> Import
-            </Button>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="font-display text-sm tracking-wider">Expenses</CardTitle>
+            <div className="flex gap-1.5">
+              <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => setExpenseReportsOpen(true)}>
+                <BarChart3 className="w-3.5 h-3.5 mr-1" /> Reports
+              </Button>
+              <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => setExpenseBulkImportOpen(true)}>
+                <FileUp className="w-3.5 h-3.5 mr-1" /> Import
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          {/* Category Filter */}
+          {/* VAT Filter Pills */}
           <div className="flex flex-wrap gap-1.5">
-            <Select value={expenseCategoryFilter} onValueChange={setExpenseCategoryFilter}>
-              <SelectTrigger className="bg-secondary border-border text-foreground font-body text-xs h-8 w-auto min-w-[160px]">
-                <SelectValue placeholder="All Categories" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {EXPENSE_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            {(['all', 'VAT', 'Non-VAT', 'VAT-Exempt', 'missing-tin'] as const).map(f => (
+              <Button key={f} size="sm" variant={expenseVatFilter === f ? 'default' : 'outline'}
+                className="text-xs h-7 px-2.5" onClick={() => setExpenseVatFilter(f)}>
+                {f === 'all' ? 'All' : f === 'missing-tin' ? 'Missing TIN' : f}
+              </Button>
+            ))}
           </div>
+
+          {/* Category Filter */}
+          <Select value={expenseCategoryFilter} onValueChange={setExpenseCategoryFilter}>
+            <SelectTrigger className="bg-secondary border-border text-foreground font-body text-xs h-8 w-full">
+              <SelectValue placeholder="All Categories" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              {EXPENSE_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            </SelectContent>
+          </Select>
 
           {/* Summary Bar */}
           {(() => {
-            const filtered = expenseCategoryFilter === 'all' ? monthExpenses : monthExpenses.filter((e: any) => e.category === expenseCategoryFilter);
-            const total = filtered.reduce((s: number, e: any) => s + Number(e.amount || 0), 0);
-            const totalVat = filtered.reduce((s: number, e: any) => s + Number(e.vat_amount || 0), 0);
-            const cats = new Set(filtered.map((e: any) => e.category)).size;
+            let filtered = monthExpenses;
+            if (expenseCategoryFilter !== 'all') filtered = filtered.filter((e: any) => e.category === expenseCategoryFilter);
+            if (expenseVatFilter === 'VAT') filtered = filtered.filter((e: any) => e.vat_status === 'VAT');
+            else if (expenseVatFilter === 'Non-VAT') filtered = filtered.filter((e: any) => e.vat_status === 'Non-VAT');
+            else if (expenseVatFilter === 'VAT-Exempt') filtered = filtered.filter((e: any) => e.vat_status === 'VAT-Exempt');
+            else if (expenseVatFilter === 'missing-tin') filtered = filtered.filter((e: any) => e.vat_status === 'VAT' && !e.supplier_tin);
+
+            const grandTotal = filtered.reduce((s: number, e: any) => s + Number(e.amount || 0), 0);
+            const totalInputVat = filtered.reduce((s: number, e: any) => s + (e.vat_status === 'VAT' ? Number(e.vat_amount || 0) : 0), 0);
+            const totalVatable = filtered.reduce((s: number, e: any) => s + (e.vat_status === 'VAT' ? Number(e.vatable_sale || 0) : 0), 0);
+            const totalNonVat = filtered.reduce((s: number, e: any) => s + (e.vat_status === 'Non-VAT' ? Number(e.amount || 0) : 0), 0);
             return (
-              <div className="flex flex-wrap gap-3 px-2 py-2 rounded bg-secondary border border-border font-body text-xs text-muted-foreground">
-                <span>Total: <span className="text-foreground font-medium">₱{fmt(total)}</span></span>
-                <span>Input VAT: <span className="text-foreground font-medium">₱{fmtDec(totalVat)}</span></span>
-                <span>Categories: <span className="text-foreground font-medium">{cats}</span></span>
-                <span>Period: <span className="text-foreground font-medium">{monthLabel(selectedMonth)}</span></span>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="p-2 rounded bg-secondary border border-border">
+                  <p className="font-body text-[10px] text-muted-foreground">Grand Total</p>
+                  <p className="font-display text-sm text-foreground">₱{fmt(grandTotal)}</p>
+                </div>
+                <div className="p-2 rounded bg-secondary border border-border">
+                  <p className="font-body text-[10px] text-muted-foreground">Input VAT</p>
+                  <p className="font-display text-sm text-foreground">₱{fmtDec(totalInputVat)}</p>
+                </div>
+                <div className="p-2 rounded bg-secondary border border-border">
+                  <p className="font-body text-[10px] text-muted-foreground">VATable Purchases</p>
+                  <p className="font-display text-sm text-foreground">₱{fmt(totalVatable)}</p>
+                </div>
+                <div className="p-2 rounded bg-secondary border border-border">
+                  <p className="font-body text-[10px] text-muted-foreground">Non-VAT</p>
+                  <p className="font-display text-sm text-foreground">₱{fmt(totalNonVat)}</p>
+                </div>
               </div>
             );
           })()}
 
-          {/* Expense List */}
+          {/* Expense List - Mobile-first stacked cards */}
           <div className="space-y-2">
-            {(expenseCategoryFilter === 'all' ? monthExpenses : monthExpenses.filter((e: any) => e.category === expenseCategoryFilter)).map((e: any) => (
-              editingExpense?.id === e.id ? (
-                <div key={e.id} className="p-3 rounded border border-primary/50 space-y-2">
-                  <ExpenseFormFields data={editingExpense} onChange={setEditingExpense} />
-                  <div className="flex justify-end"><SaveCancelBtns onSave={saveExpense} onCancel={() => setEditingExpense(null)} /></div>
-                </div>
-              ) : (
-                <div key={e.id} className="flex items-start justify-between py-2 px-2 border-b border-border">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <p className="font-body text-sm text-foreground font-medium">{e.name}</p>
-                      <Badge variant="outline" className="font-body text-[10px]">{e.vat_status || 'Non-VAT'}</Badge>
-                      {!e.is_paid && <Badge variant="destructive" className="font-body text-[10px]">UNPAID</Badge>}
+            {(() => {
+              let filtered = monthExpenses;
+              if (expenseCategoryFilter !== 'all') filtered = filtered.filter((e: any) => e.category === expenseCategoryFilter);
+              if (expenseVatFilter === 'VAT') filtered = filtered.filter((e: any) => e.vat_status === 'VAT');
+              else if (expenseVatFilter === 'Non-VAT') filtered = filtered.filter((e: any) => e.vat_status === 'Non-VAT');
+              else if (expenseVatFilter === 'VAT-Exempt') filtered = filtered.filter((e: any) => e.vat_status === 'VAT-Exempt');
+              else if (expenseVatFilter === 'missing-tin') filtered = filtered.filter((e: any) => e.vat_status === 'VAT' && !e.supplier_tin);
+
+              return filtered.map((e: any) => (
+                editingExpense?.id === e.id ? (
+                  <div key={e.id} className="p-3 rounded border border-primary/50 space-y-2">
+                    <ExpenseFormFields data={editingExpense} onChange={setEditingExpense} />
+                    <div className="flex justify-end"><SaveCancelBtns onSave={saveExpense} onCancel={() => setEditingExpense(null)} /></div>
+                  </div>
+                ) : (
+                  <div key={e.id} className="p-3 rounded border border-border space-y-1.5">
+                    {/* Row 1: Vendor + Actions */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-body text-sm text-foreground font-medium truncate">{e.name}</p>
+                      </div>
+                      <div className="flex items-center gap-0.5 flex-shrink-0">
+                        {e.image_url && (
+                          <a href={e.image_url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary p-1">
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        )}
+                        <EditBtn onClick={() => setEditingExpense({
+                          ...e, amount: String(e.amount), withholding_tax: String(e.withholding_tax || 0),
+                          supplier_tin: e.supplier_tin || '', vat_status: e.vat_status || 'Non-VAT',
+                          invoice_number: e.invoice_number || '', official_receipt_number: e.official_receipt_number || '',
+                          description: e.description || '', payment_method: e.payment_method || 'Cash',
+                          is_paid: e.is_paid !== false, project_unit: e.project_unit || '',
+                          notes: e.notes || '', image_url: e.image_url || '',
+                        })} />
+                        <DelBtn onClick={() => deleteRow('resort_ops_expenses', e.id)} />
+                      </div>
                     </div>
-                    <p className="font-body text-xs text-muted-foreground">{e.category} · {e.expense_date}</p>
-                    {e.supplier_tin && <p className="font-body text-xs text-muted-foreground">TIN: {e.supplier_tin}</p>}
-                    {e.description && <p className="font-body text-xs text-muted-foreground truncate max-w-[250px]">{e.description}</p>}
-                    {e.notes && <p className="font-body text-xs text-muted-foreground truncate max-w-[200px] italic">{e.notes}</p>}
-                    {Number(e.vat_amount) > 0 && <p className="font-body text-xs text-muted-foreground">VAT: ₱{fmtDec(Number(e.vat_amount))}</p>}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {e.image_url && (
-                      <a href={e.image_url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary">
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </a>
+                    {/* Row 2: Description */}
+                    {e.description && <p className="font-body text-xs text-muted-foreground">{e.description}</p>}
+                    {/* Row 3: Date + Category */}
+                    <p className="font-body text-xs text-muted-foreground">{e.expense_date} · {e.category}</p>
+                    {/* Row 4: Amount + VAT info */}
+                    <div className="flex items-center justify-between">
+                      <p className="font-display text-base text-foreground">₱{fmt(Number(e.amount))}</p>
+                      <div className="flex items-center gap-1.5">
+                        <Badge variant="outline" className="font-body text-[10px]">{e.vat_status || 'Non-VAT'}</Badge>
+                        {!e.is_paid && <Badge variant="destructive" className="font-body text-[10px]">UNPAID</Badge>}
+                      </div>
+                    </div>
+                    {/* Row 5: VAT details if applicable */}
+                    {e.vat_status === 'VAT' && (
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 font-body text-xs text-muted-foreground">
+                        {e.supplier_tin && <span>TIN: {e.supplier_tin}</span>}
+                        {Number(e.vatable_sale) > 0 && <span>Subtotal: ₱{fmtDec(Number(e.vatable_sale))}</span>}
+                        {Number(e.vat_amount) > 0 && <span>VAT: ₱{fmtDec(Number(e.vat_amount))}</span>}
+                      </div>
                     )}
-                    <span className="font-body text-sm text-foreground mr-1">₱{fmt(Number(e.amount))}</span>
-                    <EditBtn onClick={() => setEditingExpense({
-                      ...e, amount: String(e.amount), withholding_tax: String(e.withholding_tax || 0),
-                      supplier_tin: e.supplier_tin || '', vat_status: e.vat_status || 'Non-VAT',
-                      invoice_number: e.invoice_number || '', official_receipt_number: e.official_receipt_number || '',
-                      description: e.description || '', payment_method: e.payment_method || 'Cash',
-                      is_paid: e.is_paid !== false, project_unit: e.project_unit || '',
-                      notes: e.notes || '', image_url: e.image_url || '',
-                    })} />
-                    <DelBtn onClick={() => deleteRow('resort_ops_expenses', e.id)} />
                   </div>
-                </div>
-              )
-            ))}
+                )
+              ));
+            })()}
           </div>
 
           {/* Add Expense Form */}
