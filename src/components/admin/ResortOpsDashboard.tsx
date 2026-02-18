@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Trash2, AlertTriangle, Upload, Pencil, Check, X, Banknote, CalendarPlus, Printer, Settings, BarChart3, FileUp, ExternalLink, Camera, Image } from 'lucide-react';
+import { Plus, Trash2, AlertTriangle, Upload, Pencil, Check, X, Banknote, CalendarPlus, Printer, Settings, BarChart3, FileUp, ExternalLink, Camera, Image, ScanLine, Loader2 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import ImportReservationsModal from './ImportReservationsModal';
 import ExpenseReportsModal from './ExpenseReportsModal';
@@ -204,6 +204,8 @@ const ResortOpsDashboard = () => {
   const [expenseBulkImportOpen, setExpenseBulkImportOpen] = useState(false);
   const [expenseCategoryFilter, setExpenseCategoryFilter] = useState('all');
   const [showAddExpenseForm, setShowAddExpenseForm] = useState(false);
+  const [scanningReceipt, setScanningReceipt] = useState(false);
+  const [scannedFields, setScannedFields] = useState<Set<string>>(new Set());
   const [ledgerFilter, setLedgerFilter] = useState<'all' | 'staying' | 'arriving' | 'departing' | 'unpaid'>('all');
   const [showWebhook, setShowWebhook] = useState(false);
 
@@ -263,6 +265,7 @@ const ResortOpsDashboard = () => {
     await from('resort_ops_expenses').insert(buildExpensePayload(newExpense) as any);
     setNewExpense({ ...EMPTY_EXPENSE });
     setShowAddExpenseForm(false);
+    setScannedFields(new Set());
     invalidateAll();
     toast.success('Expense added');
   };
@@ -416,14 +419,125 @@ const ResortOpsDashboard = () => {
     </div>
   );
 
+  // ── Scan Receipt Handler ──
+  const handleScanReceipt = async (file: File, data: typeof EMPTY_EXPENSE, onChange: (d: typeof EMPTY_EXPENSE) => void) => {
+    if (file.size > 10 * 1024 * 1024) { toast.error('Image must be under 10MB'); return; }
+    setScanningReceipt(true);
+    setScannedFields(new Set());
+
+    try {
+      // 1. Upload to storage
+      const ext = file.name.split('.').pop() || 'jpg';
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const safeName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const storagePath = `receipts/${year}/${month}/${safeName}`;
+      
+      toast.loading('Uploading & scanning receipt...', { id: 'receipt-scan' });
+      
+      const { error: uploadError } = await supabase.storage.from('receipts').upload(storagePath, file);
+      if (uploadError) { toast.error(`Upload failed: ${uploadError.message}`, { id: 'receipt-scan' }); return; }
+      const { data: urlData } = supabase.storage.from('receipts').getPublicUrl(storagePath);
+
+      // 2. Convert to base64 for AI
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      // 3. Call scan-receipt edge function
+      const { data: scanResult, error: fnError } = await supabase.functions.invoke('scan-receipt', {
+        body: { image_base64: base64 },
+      });
+
+      if (fnError) { toast.error(`Scan failed: ${fnError.message}`, { id: 'receipt-scan' }); return; }
+      if (!scanResult?.success) { toast.error(scanResult?.error || 'Could not read receipt', { id: 'receipt-scan' }); return; }
+
+      const d = scanResult.data;
+      const filledFields = new Set<string>();
+      const updated = { ...data, image_url: urlData.publicUrl };
+
+      if (d.supplier_name) { updated.name = d.supplier_name; filledFields.add('name'); }
+      if (d.supplier_tin) { updated.supplier_tin = d.supplier_tin; filledFields.add('supplier_tin'); }
+      if (d.vat_status && ['VAT', 'Non-VAT', 'VAT-Exempt', 'Zero-Rated'].includes(d.vat_status)) {
+        updated.vat_status = d.vat_status; filledFields.add('vat_status');
+      }
+      // If TIN detected, auto-set VAT
+      if (d.supplier_tin && !d.vat_status) { updated.vat_status = 'VAT'; filledFields.add('vat_status'); }
+      if (d.invoice_number) { updated.invoice_number = d.invoice_number; filledFields.add('invoice_number'); }
+      if (d.official_receipt_number) { updated.official_receipt_number = d.official_receipt_number; filledFields.add('official_receipt_number'); }
+      if (d.date) { updated.expense_date = d.date; filledFields.add('expense_date'); }
+      if (d.total_amount != null) { updated.amount = String(d.total_amount); filledFields.add('amount'); }
+      if (d.description) { updated.description = d.description; filledFields.add('description'); }
+
+      // VAT validation
+      if (updated.vat_status === 'VAT' && d.total_amount && !d.vat_amount) {
+        // Auto-calculate if missing
+        const vatAmt = d.total_amount / 1.12 * 0.12;
+        const vatSale = d.total_amount - vatAmt;
+        updated.notes = (updated.notes ? updated.notes + '\n' : '') + `Auto-computed VAT: ₱${vatAmt.toFixed(2)} from total ₱${d.total_amount}`;
+      }
+      if (updated.vat_status === 'Non-VAT') {
+        // Ensure vat_amount = 0
+      }
+
+      // Check VAT total mismatch
+      if (d.vatable_sale != null && d.vat_amount != null && d.total_amount != null) {
+        const sum = (d.vatable_sale || 0) + (d.vat_amount || 0);
+        if (Math.abs(sum - d.total_amount) > 1) {
+          toast.warning(`VAT breakdown (₱${sum.toFixed(2)}) doesn't match total (₱${d.total_amount}). Please verify.`, { duration: 6000 });
+        }
+      }
+
+      onChange(updated);
+      setScannedFields(filledFields);
+      toast.success(`Receipt scanned! ${filledFields.size} fields extracted (${d.confidence || 'unknown'} confidence). Please review before saving.`, { id: 'receipt-scan', duration: 5000 });
+    } catch (err: any) {
+      console.error('Scan error:', err);
+      toast.error('Failed to scan receipt. Try a clearer image.', { id: 'receipt-scan' });
+    } finally {
+      setScanningReceipt(false);
+    }
+  };
+
   // ── Expense Form Component (shared between Add and Edit) ──
   const ExpenseFormFields = ({ data, onChange }: { data: typeof EMPTY_EXPENSE; onChange: (d: typeof EMPTY_EXPENSE) => void }) => {
     const inputCls = "bg-secondary border-border text-foreground font-body text-sm";
+    const highlightCls = (field: string) => scannedFields.has(field) ? 'ring-2 ring-primary/50' : '';
     return (
       <div className="space-y-2">
-        <Input placeholder="Supplier Name *" value={data.name} onChange={e => onChange({...data, name: e.target.value})} className={inputCls} />
+        {/* Scan Receipt Button */}
+        <div className="flex gap-2">
+          <label className="flex-1 cursor-pointer">
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              disabled={scanningReceipt}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleScanReceipt(file, data, onChange);
+                e.target.value = '';
+              }}
+            />
+            <div className={`flex items-center justify-center gap-2 h-10 px-4 rounded-md border border-dashed border-primary/50 bg-primary/5 text-primary hover:bg-primary/10 transition-colors font-body text-sm ${scanningReceipt ? 'opacity-50 pointer-events-none' : ''}`}>
+              {scanningReceipt ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanLine className="w-4 h-4" />}
+              {scanningReceipt ? 'Scanning receipt...' : '📷 Scan Receipt (AI)'}
+            </div>
+          </label>
+        </div>
+        {scannedFields.size > 0 && (
+          <div className="px-2 py-1.5 rounded bg-primary/10 border border-primary/20 font-body text-xs text-primary">
+            ✨ AI extracted {scannedFields.size} fields (highlighted). Review and confirm before saving.
+          </div>
+        )}
+        <Input placeholder="Supplier Name *" value={data.name} onChange={e => onChange({...data, name: e.target.value})} className={`${inputCls} ${highlightCls('name')}`} />
         <div className="grid grid-cols-2 gap-2">
-          <Input placeholder="Supplier TIN" value={data.supplier_tin} onChange={e => onChange({...data, supplier_tin: e.target.value})} className={inputCls} />
+          <Input placeholder="Supplier TIN" value={data.supplier_tin} onChange={e => onChange({...data, supplier_tin: e.target.value})} className={`${inputCls} ${highlightCls('supplier_tin')}`} />
           <Select value={data.vat_status} onValueChange={v => onChange({...data, vat_status: v})}>
             <SelectTrigger className={inputCls}><SelectValue placeholder="VAT Status *" /></SelectTrigger>
             <SelectContent>{VAT_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
@@ -433,17 +547,17 @@ const ResortOpsDashboard = () => {
           <p className="font-body text-xs text-destructive">⚠ Supplier TIN required for VAT status</p>
         )}
         <div className="grid grid-cols-2 gap-2">
-          <Input placeholder="Invoice #" value={data.invoice_number} onChange={e => onChange({...data, invoice_number: e.target.value})} className={inputCls} />
-          <Input placeholder="OR #" value={data.official_receipt_number} onChange={e => onChange({...data, official_receipt_number: e.target.value})} className={inputCls} />
+          <Input placeholder="Invoice #" value={data.invoice_number} onChange={e => onChange({...data, invoice_number: e.target.value})} className={`${inputCls} ${highlightCls('invoice_number')}`} />
+          <Input placeholder="OR #" value={data.official_receipt_number} onChange={e => onChange({...data, official_receipt_number: e.target.value})} className={`${inputCls} ${highlightCls('official_receipt_number')}`} />
         </div>
         <Select value={data.category} onValueChange={v => onChange({...data, category: v})}>
           <SelectTrigger className={inputCls}><SelectValue placeholder="Category *" /></SelectTrigger>
           <SelectContent>{EXPENSE_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
         </Select>
-        <Input placeholder="Description" value={data.description} onChange={e => onChange({...data, description: e.target.value})} className={inputCls} />
+        <Input placeholder="Description" value={data.description} onChange={e => onChange({...data, description: e.target.value})} className={`${inputCls} ${highlightCls('description')}`} />
         <div className="grid grid-cols-2 gap-2">
-          <Input placeholder="Total Amount *" type="number" value={data.amount} onChange={e => onChange({...data, amount: e.target.value})} className={inputCls} />
-          <Input type="date" value={data.expense_date} onChange={e => onChange({...data, expense_date: e.target.value})} className={inputCls} />
+          <Input placeholder="Total Amount *" type="number" value={data.amount} onChange={e => onChange({...data, amount: e.target.value})} className={`${inputCls} ${highlightCls('amount')}`} />
+          <Input type="date" value={data.expense_date} onChange={e => onChange({...data, expense_date: e.target.value})} className={`${inputCls} ${highlightCls('expense_date')}`} />
         </div>
         {/* Computed VAT breakdown (read-only display) */}
         {data.amount && parseFloat(data.amount) > 0 && (
@@ -916,7 +1030,7 @@ const ResortOpsDashboard = () => {
               <ExpenseFormFields data={newExpense} onChange={setNewExpense} />
               <div className="flex gap-2">
                 <Button size="sm" onClick={addExpense} className="flex-1"><Check className="w-4 h-4 mr-1" /> Save</Button>
-                <Button size="sm" variant="outline" onClick={() => { setShowAddExpenseForm(false); setNewExpense({ ...EMPTY_EXPENSE }); }}>Cancel</Button>
+                <Button size="sm" variant="outline" onClick={() => { setShowAddExpenseForm(false); setNewExpense({ ...EMPTY_EXPENSE }); setScannedFields(new Set()); }}>Cancel</Button>
               </div>
             </div>
           ) : (
