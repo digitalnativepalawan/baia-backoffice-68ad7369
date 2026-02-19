@@ -4,12 +4,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, AlertTriangle, Download, Package } from 'lucide-react';
+import { Plus, AlertTriangle, Download, Package, UtensilsCrossed } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 
-const UNITS = ['grams', 'ml', 'pcs', 'kg', 'liters', 'bottles', 'cans'];
+const UNITS = ['grams', 'ml', 'pcs', 'kg', 'liters', 'bottles', 'cans', 'slices'];
 
 const InventoryDashboard = () => {
   const qc = useQueryClient();
@@ -20,6 +20,24 @@ const InventoryDashboard = () => {
       const { data } = await supabase.from('ingredients').select('*').order('name');
       return data || [];
     },
+  });
+
+  const { data: recipeLinks = [] } = useQuery({
+    queryKey: ['recipe_ingredients_with_menu'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('recipe_ingredients')
+        .select('ingredient_id, menu_item_id, quantity, menu_items(name)');
+      return data || [];
+    },
+  });
+
+  // Build a map: ingredient_id -> [{dishName, quantity}]
+  const usageMap: Record<string, { dishName: string; quantity: number }[]> = {};
+  recipeLinks.forEach((rl: any) => {
+    const dishName = rl.menu_items?.name || 'Unknown';
+    if (!usageMap[rl.ingredient_id]) usageMap[rl.ingredient_id] = [];
+    usageMap[rl.ingredient_id].push({ dishName, quantity: rl.quantity });
   });
 
   const [search, setSearch] = useState('');
@@ -55,7 +73,6 @@ const InventoryDashboard = () => {
     if (editIng === 'new') {
       await supabase.from('ingredients').insert(payload);
     } else {
-      // Log stock change if stock changed
       const oldStock = editIng.current_stock;
       if (payload.current_stock !== oldStock) {
         await supabase.from('inventory_logs').insert({
@@ -100,6 +117,8 @@ const InventoryDashboard = () => {
     URL.revokeObjectURL(url);
   };
 
+  const editIngUsage = editIng && editIng !== 'new' ? (usageMap[editIng.id] || []) : [];
+
   return (
     <div className="space-y-4">
       {/* Low stock alerts */}
@@ -137,6 +156,7 @@ const InventoryDashboard = () => {
       {/* Ingredients list */}
       {filtered.map((ing: any) => {
         const isLow = ing.current_stock <= ing.low_stock_threshold && ing.low_stock_threshold > 0;
+        const dishCount = (usageMap[ing.id] || []).length;
         return (
           <button key={ing.id} onClick={() => openEdit(ing)}
             className={`w-full text-left p-3 border rounded-lg transition-colors ${
@@ -149,9 +169,19 @@ const InventoryDashboard = () => {
                   <p className="font-display text-sm text-foreground">{ing.name}</p>
                   {isLow && <Badge variant="destructive" className="text-[10px] py-0">LOW</Badge>}
                 </div>
-                <p className="font-body text-xs text-cream-dim mt-0.5">
-                  ₱{ing.cost_per_unit}/{ing.unit}
-                </p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <p className="font-body text-xs text-cream-dim">
+                    ₱{ing.cost_per_unit}/{ing.unit}
+                  </p>
+                  {dishCount > 0 && (
+                    <span className="font-body text-xs text-muted-foreground">
+                      · {dishCount} {dishCount === 1 ? 'dish' : 'dishes'}
+                    </span>
+                  )}
+                  {dishCount === 0 && (
+                    <span className="font-body text-xs text-muted-foreground">· No recipe</span>
+                  )}
+                </div>
               </div>
               <div className="text-right">
                 <p className="font-display text-sm text-foreground">{ing.current_stock}</p>
@@ -168,7 +198,7 @@ const InventoryDashboard = () => {
 
       {/* Edit dialog */}
       <Dialog open={!!editIng} onOpenChange={() => setEditIng(null)}>
-        <DialogContent className="bg-card border-border max-w-sm">
+        <DialogContent className="bg-card border-border max-w-sm max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-display text-foreground tracking-wider">
               {editIng === 'new' ? 'New Ingredient' : 'Edit Ingredient'}
@@ -202,6 +232,27 @@ const InventoryDashboard = () => {
                   type="number" className="bg-secondary border-border text-foreground font-body mt-1" />
               </div>
             </div>
+
+            {/* Used in dishes section */}
+            {editIngUsage.length > 0 && (
+              <div className="border border-border rounded-lg p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <UtensilsCrossed className="w-3.5 h-3.5 text-cream-dim" />
+                  <span className="font-display text-xs tracking-wider text-foreground">
+                    Used in {editIngUsage.length} {editIngUsage.length === 1 ? 'dish' : 'dishes'}
+                  </span>
+                </div>
+                {editIngUsage
+                  .sort((a, b) => a.dishName.localeCompare(b.dishName))
+                  .map((u, idx) => (
+                  <div key={idx} className="flex justify-between items-center">
+                    <span className="font-body text-xs text-foreground">{u.dishName}</span>
+                    <span className="font-body text-[10px] text-cream-dim">{u.quantity} per order</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <Button onClick={save} className="font-display tracking-wider w-full">Save</Button>
             {editIng && editIng !== 'new' && (
               <Button variant="destructive" onClick={() => deleteIng(editIng.id)} className="font-display tracking-wider w-full">
