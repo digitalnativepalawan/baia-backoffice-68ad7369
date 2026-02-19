@@ -79,14 +79,19 @@ const ResortProfileForm = () => {
   };
 
   const handleSave = async () => {
-    if (!profile) return;
     setSaving(true);
     try {
-      await supabase.from('resort_profile').update(form).eq('id', profile.id);
+      if (profile?.id) {
+        const { error } = await supabase.from('resort_profile').update(form).eq('id', profile.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('resort_profile').insert(form);
+        if (error) throw error;
+      }
       qc.invalidateQueries({ queryKey: ['resort-profile'] });
       toast.success('Resort profile saved');
-    } catch {
-      toast.error('Failed to save profile');
+    } catch (err: any) {
+      toast.error('Failed to save profile: ' + (err?.message || 'Unknown error'));
     } finally {
       setSaving(false);
     }

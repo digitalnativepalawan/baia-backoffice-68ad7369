@@ -45,12 +45,6 @@ const MenuPage = () => {
     },
   });
 
-  useEffect(() => {
-    if (categories.length > 0 && !activeCategory) {
-      setActiveCategory(categories[0].name);
-    }
-  }, [categories, activeCategory]);
-
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
   const [addQuantity, setAddQuantity] = useState(1);
   const [cartOpen, setCartOpen] = useState(false);
@@ -64,6 +58,17 @@ const MenuPage = () => {
       return (data || []) as MenuItem[];
     },
   });
+
+  // Derive categories from items as fallback when menu_categories is empty
+  const derivedCategories = categories.length > 0
+    ? categories
+    : [...new Set(menuItems.map(i => i.category))].map((name, idx) => ({ id: name, name, sort_order: idx }));
+
+  useEffect(() => {
+    if (derivedCategories.length > 0 && !activeCategory) {
+      setActiveCategory(derivedCategories[0].name);
+    }
+  }, [derivedCategories, activeCategory]);
 
   // Count active orders for badge (staff only)
   const { data: activeOrderCount = 0 } = useQuery({
@@ -144,7 +149,7 @@ const MenuPage = () => {
             {!searchOpen && (
               <div className="max-w-2xl mx-auto">
               <div className="px-4 pb-3 flex flex-wrap gap-1">
-                  {categories.map((cat: any) => (
+                  {derivedCategories.map((cat: any) => (
                     <button
                       key={cat.id}
                       onClick={() => setActiveCategory(cat.name)}
