@@ -8,7 +8,8 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Plus, ArrowLeft, Home, Eye, EyeOff, Receipt, Search, Download, Package, Trash2, Minus } from 'lucide-react';
+import { Plus, ArrowLeft, Home, Eye, EyeOff, Receipt, Search, Download, Upload, Package, Trash2, Minus } from 'lucide-react';
+import MenuBulkImportModal from '@/components/admin/MenuBulkImportModal';
 import ResortProfileForm from '@/components/admin/ResortProfileForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import EditableRow from '@/components/admin/EditableRow';
@@ -228,6 +229,7 @@ const AdminPage = () => {
   };
 
   // Delete menu item
+  const [bulkImportOpen, setBulkImportOpen] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const deleteItem = async () => {
     if (!editItem || editItem === 'new') return;
@@ -527,6 +529,9 @@ const AdminPage = () => {
               <Button onClick={openNewItem} className="font-display tracking-wider flex-1" variant="outline">
                 <Plus className="w-4 h-4 mr-2" /> Add Menu Item
               </Button>
+              <Button variant="outline" onClick={() => setBulkImportOpen(true)} title="Bulk Import">
+                <Upload className="w-4 h-4" />
+              </Button>
               <Button
                 variant="outline"
                 className="font-display tracking-wider"
@@ -547,6 +552,12 @@ const AdminPage = () => {
                 <Download className="w-4 h-4" />
               </Button>
             </div>
+            <MenuBulkImportModal
+              open={bulkImportOpen}
+              onOpenChange={setBulkImportOpen}
+              onComplete={() => qc.invalidateQueries({ queryKey: ['menu-admin'] })}
+              categories={menuCategories.map((c: any) => c.name)}
+            />
             {menuItems
               .filter(item => {
                 if (!menuSearch.trim()) return true;
