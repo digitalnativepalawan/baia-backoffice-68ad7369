@@ -1,28 +1,44 @@
 
 
-# Clear Low Stock Alerts -- Set Current Stock to Match Threshold
+# Fix: Populate Order Types and Restore Full Ordering Flow
 
-## Overview
+## Problem
 
-Update all 67 ingredients so their `current_stock` matches their `low_stock_threshold` (200). This eliminates all "Low Stock Alert" warnings since the alert triggers when stock is **at or below** the threshold.
+The `order_types` table is completely empty. This single missing data issue breaks three flows:
 
-To fully clear alerts, we need to set `current_stock` to **201** (one above threshold), OR set `low_stock_threshold` to 0. The cleaner approach: set `current_stock = 200` and change the alert logic from `<=` to `<` so that equal values don't trigger alerts.
+- **Staff** cannot proceed past the Order Type page (no buttons render)
+- **Guest** cannot send orders from the cart (the "Send to Kitchen" button requires an order type and location, but there are no options to select)
+- **"Send to Kitchen"** is disabled because `needsOrderType` is always `true`
 
-**Actually, simplest fix:** Set all `current_stock` to the same value as `low_stock_threshold` (200) AND fix the comparison in `InventoryDashboard.tsx` from `<=` to `<` so "equal to threshold" is not considered low.
+## Solution
 
-## Changes
+### 1. Insert Order Types (Database)
 
-### 1. Database Update (data operation)
-Run a single SQL update:
-```sql
-UPDATE ingredients SET current_stock = low_stock_threshold;
-```
-This sets every ingredient's stock to 200 (or whatever its threshold is).
+Populate the `order_types` table with the four standard types that the app already references in code (`Room`, `DineIn`, `Beach`, `WalkIn`):
 
-### 2. Fix Low Stock Logic in InventoryDashboard.tsx
-Change the comparison from `<=` to `<` in two places so that stock **equal** to threshold is considered OK:
-- Line calculating `lowStockItems`
-- Line determining `isLow` in the ingredient card
+| type_key | label | input_mode | source_table | placeholder | sort_order |
+|----------|-------|------------|--------------|-------------|------------|
+| Room | Room Delivery | select | units | Select room | 1 |
+| DineIn | Dine In | select | resort_tables | Select table | 2 |
+| Beach | Beach Delivery | text | (none) | Beach area or spot | 3 |
+| WalkIn | Walk-In | text | (none) | Your name | 4 |
 
-This way, stock of 200 with threshold of 200 = no alert. Only when stock drops **below** 200 will it trigger.
+- Room and DineIn use `select` mode, pulling options from the `units` and `resort_tables` tables respectively
+- Beach and WalkIn use free `text` input
+
+### 2. Verify Supporting Data
+
+Check that `units` and `resort_tables` tables have at least some entries so the Room/DineIn dropdowns have options. If empty, insert sample entries.
+
+### 3. No Code Changes Needed
+
+The existing code in `CartDrawer.tsx`, `OrderType.tsx`, and `MenuPage.tsx` already handles all the logic correctly -- the only problem is the missing data. Once order types are populated:
+
+- Staff will see the 4 order type buttons on `/order-type`
+- Guests will see order type selection inside the cart drawer
+- "Send to Kitchen" will enable once type and location are selected
+
+## Technical Details
+
+Single SQL migration to insert the 4 order types. Conditionally insert sample units/tables if those tables are empty.
 
