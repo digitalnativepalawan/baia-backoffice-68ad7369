@@ -1,44 +1,42 @@
 
 
-# Fix: Populate Order Types and Restore Full Ordering Flow
+# Update Invoice to Use Resort Profile Data Instead of Hardcoded Logo
 
-## Problem
+## Overview
 
-The `order_types` table is completely empty. This single missing data issue breaks three flows:
+Remove the hardcoded "Binga Beach" logo image from the PDF invoice and WhatsApp text. Replace it with the resort name from the profile ("BAIA Palawan") and use all profile data (address, phone, email, website) dynamically.
 
-- **Staff** cannot proceed past the Order Type page (no buttons render)
-- **Guest** cannot send orders from the cart (the "Send to Kitchen" button requires an order type and location, but there are no options to select)
-- **"Send to Kitchen"** is disabled because `needsOrderType` is always `true`
+## Changes to `src/lib/generateInvoicePdf.ts`
 
-## Solution
+### PDF Generation (`generateInvoicePdf`)
 
-### 1. Insert Order Types (Database)
+1. **Remove** the hardcoded logo image loading (`INVOICE_LOGO_PATH`, `loadImageAsBase64` call, and `addImage` block)
+2. **Add resort name as text header**: Display `profile.resort_name` ("BAIA Palawan") in bold, larger font, centered at the top
+3. **Add tagline** if set in profile (currently empty but future-proof)
+4. **Keep** address, phone, and email lines (already dynamic from profile)
+5. **Update footer**: Replace hardcoded `www.bingabeach.com` with `profile.website_url` (currently empty, so fall back gracefully)
 
-Populate the `order_types` table with the four standard types that the app already references in code (`Room`, `DineIn`, `Beach`, `WalkIn`):
+### WhatsApp Text (`buildInvoiceWhatsAppText`)
 
-| type_key | label | input_mode | source_table | placeholder | sort_order |
-|----------|-------|------------|--------------|-------------|------------|
-| Room | Room Delivery | select | units | Select room | 1 |
-| DineIn | Dine In | select | resort_tables | Select table | 2 |
-| Beach | Beach Delivery | text | (none) | Beach area or spot | 3 |
-| WalkIn | Walk-In | text | (none) | Your name | 4 |
-
-- Room and DineIn use `select` mode, pulling options from the `units` and `resort_tables` tables respectively
-- Beach and WalkIn use free `text` input
-
-### 2. Verify Supporting Data
-
-Check that `units` and `resort_tables` tables have at least some entries so the Room/DineIn dropdowns have options. If empty, insert sample entries.
-
-### 3. No Code Changes Needed
-
-The existing code in `CartDrawer.tsx`, `OrderType.tsx`, and `MenuPage.tsx` already handles all the logic correctly -- the only problem is the missing data. Once order types are populated:
-
-- Staff will see the 4 order type buttons on `/order-type`
-- Guests will see order type selection inside the cart drawer
-- "Send to Kitchen" will enable once type and location are selected
+1. Already uses `profile.resort_name` for the header -- no change needed there
+2. **Update footer**: Replace hardcoded `www.bingabeach.com` with `profile.website_url` or omit if empty
 
 ## Technical Details
 
-Single SQL migration to insert the 4 order types. Conditionally insert sample units/tables if those tables are empty.
+### Lines changed in `generateInvoicePdf.ts`:
+
+- Remove `const INVOICE_LOGO_PATH` (line 20)
+- Remove `loadImageAsBase64` function can stay (unused, but clean to remove)
+- Lines 51-59: Replace logo image block with text-based resort name header
+- Line 163: Replace `www.bingabeach.com` with dynamic `profile?.website_url`
+- Line 191: Same for WhatsApp text footer
+
+### No database or schema changes needed
+
+All data already exists in the `resort_profile` table:
+- `resort_name`: "BAIA Palawan"
+- `address`: "Sitio Panindigan, Barangay Poblacion, San Vicente Palawan..."
+- `phone`: "+63 967 206 2327"
+- `email`: "booking@baia.com"
+- `website_url`: (currently empty)
 
