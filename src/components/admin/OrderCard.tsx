@@ -24,7 +24,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 interface OrderCardProps {
   order: any;
-  onAdvance: (orderId: string, nextStatus: string) => void;
+  onAdvance: (orderId: string, nextStatus: string) => void | Promise<void>;
   resortProfile?: ResortProfile | null;
   onAddItems?: (order: any) => void;
   onViewTab?: (tabId: string) => void;
@@ -33,6 +33,7 @@ interface OrderCardProps {
 
 const OrderCard = ({ order, onAdvance, resortProfile, onAddItems, onViewTab, onDelete }: OrderCardProps) => {
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [advancing, setAdvancing] = useState(false);
   const canInvoice = order.status === 'Served' || order.status === 'Paid';
 
   const handleDownloadPdf = async () => {
@@ -176,14 +177,22 @@ const OrderCard = ({ order, onAdvance, resortProfile, onAddItems, onViewTab, onD
           {flow && (
             <Button
               size={isNew ? 'default' : 'sm'}
-              onClick={() => onAdvance(order.id, flow.next)}
+              disabled={advancing}
+              onClick={async () => {
+                if (advancing) return;
+                setAdvancing(true);
+                try {
+                  await onAdvance(order.id, flow.next);
+                } finally {
+                  setAdvancing(false);
+                }
+              }}
               className={`font-body text-xs gap-1.5 relative ${isNew ? 'new-order-btn bg-gold text-primary-foreground hover:bg-gold/90 font-bold text-sm px-5' : ''}`}
             >
-              {isNew && (
+              {isNew && !advancing && (
                 <span className="absolute -top-1 -left-1 w-2.5 h-2.5 rounded-full bg-destructive blink-dot" />
               )}
-              {flow.icon}
-              {flow.label}
+              {advancing ? 'Updating…' : <>{flow.icon} {flow.label}</>}
             </Button>
           )}
         </div>
