@@ -1,41 +1,87 @@
 
 
-# Fix Room Order Type Label and Improve Chef Documentation
+# Employee Access Control + Room Guest Dashboard
 
-## Problem
-- The order type is labeled "Room Delivery" but should just reflect the unit/room name since these are guest units, not delivery runs
-- Scheduled breakfast orders taken the night before need to be clearly documented for the chef in the morning
-- The WhatsApp message and order cards need to prominently show the unit name + scheduled time so the chef knows exactly what to prepare and when
+## Overview
+Two major features: (1) a per-tab permission system so you can control which admin tabs each employee can access, and (2) a comprehensive room/unit guest dashboard showing all guest information in one place.
 
-## Changes
+---
 
-### 1. Rename "Room Delivery" to "Room" in order_types table
-- Update the label from "Room Delivery" to "Room" in the database
+## Part 1: Employee Access Control
 
-### 2. Update labels in CartDrawer.tsx
-- Change the `TYPE_LABELS` map entry from `Room: 'Room Delivery'` to `Room: 'Room'`
-- Change the "Delivery Time" heading to "Scheduled Time" (since it's not always a "delivery")
+### How it works
+- New "Staff Access" section in the Admin Setup tab
+- For each employee, you toggle which tabs they can see: Orders, Menu, Reports, Inventory, Payroll, Resort Ops, and the new Rooms dashboard
+- When an employee logs in via the Employee Portal, they get a "Manager View" button that opens a restricted version of the admin dashboard showing only their permitted tabs
+- You (James) keep full admin access to everything
 
-### 3. Update labels in order.ts (WhatsApp message)
-- Change the type label from `Room: 'Room Delivery'` to `Room: 'Room'`
-- Change `*Scheduled Delivery:*` to `*Scheduled for:*`
-- Make the WhatsApp message more chef-friendly: include unit name prominently at the top when scheduled, e.g.:
-  ```
-  SCHEDULED ORDER - Unit 3
-  Tomorrow 7:00 AM
-  ```
+### Database changes
+- New `employee_permissions` table:
+  - `id` (uuid), `employee_id` (uuid), `permission` (text -- e.g. 'orders', 'menu', 'reports', 'inventory', 'payroll', 'resort_ops', 'rooms'), `created_at`
+  - Unique constraint on (employee_id, permission)
+  - Public RLS (matching existing pattern)
 
-### 4. Improve OrderCard.tsx scheduled badge
-- Make the scheduled badge more prominent for the chef -- show unit name + time together clearly
-- For scheduled orders, change the card header to emphasize "SCHEDULED" similar to how "NEW ORDER" is emphasized
-- Show the scheduled time in a more readable format, e.g. "Tomorrow 7:00 AM - Unit 3"
+### UI changes
+- **Admin Setup tab**: New "Staff Access" section with a grid showing each employee and toggle switches for each permission
+- **Employee Portal**: If an employee has any permissions, show a "Dashboard" tab that loads a filtered version of the admin page showing only their allowed tabs
+- New route `/manager` that checks employee permissions from localStorage employee ID and renders only permitted tabs
 
-### 5. StaffOrdersView - ensure scheduled orders are visible
-- Check that staff orders view properly surfaces scheduled orders so the chef sees them in the morning
+---
+
+## Part 2: Room/Unit Guest Dashboard
+
+### How it works
+- New "Rooms" tab in the admin dashboard (and available to permitted employees)
+- Shows all units as cards. Click a unit to see its full guest profile:
+  - Current booking info (guest name, check-in/out, platform)
+  - All orders made by that room (pulled from `orders` table where `location_detail` matches the unit name and `order_type = 'Room'`)
+  - Guest notes and special requests
+  - Passport/ID scans (uploaded images)
+  - Tour bookings
+
+### Database changes
+- New `guest_documents` table for passport/ID uploads:
+  - `id`, `guest_id` (uuid, references resort_ops_guests), `document_type` (text -- 'passport', 'id', 'other'), `image_url` (text), `notes` (text), `created_at`
+- New `guest_notes` table for special requests and notes:
+  - `id`, `booking_id` (uuid), `unit_name` (text), `note_type` (text -- 'request', 'allergy', 'preference', 'general'), `content` (text), `created_by` (text), `created_at`
+- New `guest_tours` table for tour bookings:
+  - `id`, `booking_id` (uuid), `tour_name` (text), `tour_date` (date), `pax` (integer), `price` (numeric), `status` (text -- 'booked', 'completed', 'cancelled'), `notes` (text), `created_at`
+- Storage bucket `guest-documents` for passport/ID image uploads
+
+### UI: Room Dashboard page
+- Grid of unit cards showing current guest (if any) and occupancy status
+- Click a unit to open a detail view with tabs:
+  - **Guest Info**: Current booking details, guest name, check-in/out dates
+  - **Orders**: All food/drink orders for this room, with timestamps and items
+  - **Documents**: Upload and view passport/ID scans (camera or file upload)
+  - **Notes**: Add/view special requests, allergies, preferences
+  - **Tours**: Add/view booked tours and activities
+
+---
 
 ## Technical Details
-- Database update: `UPDATE order_types SET label = 'Room' WHERE type_key = 'Room'`
-- No schema changes needed -- the `scheduled_for` column already exists
-- All label changes are in 3 files: CartDrawer.tsx, order.ts, OrderCard.tsx
-- The WhatsApp message format change makes it scannable for the chef preparing morning orders
+
+### Files to create
+- `src/components/admin/StaffAccessManager.tsx` -- permission toggles UI
+- `src/components/admin/RoomsDashboard.tsx` -- rooms overview + detail view
+- `src/pages/ManagerPage.tsx` -- restricted admin view for permitted employees
+
+### Files to modify
+- `src/pages/AdminPage.tsx` -- add Rooms tab, add Staff Access section in Setup
+- `src/pages/EmployeePortal.tsx` -- add Dashboard button for employees with permissions
+- `src/App.tsx` -- add `/manager` route
+
+### Database migrations
+1. Create `employee_permissions` table with RLS
+2. Create `guest_documents` table with RLS
+3. Create `guest_notes` table with RLS
+4. Create `guest_tours` table with RLS
+5. Create `guest-documents` storage bucket
+
+### Implementation order
+1. Database tables and storage bucket
+2. Staff Access Manager component + Admin Setup integration
+3. Room Dashboard component
+4. Manager Page with permission filtering
+5. Employee Portal integration
 
