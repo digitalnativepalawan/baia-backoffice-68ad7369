@@ -1,35 +1,14 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { useResortProfile } from '@/hooks/useResortProfile';
 
 const Index = () => {
   const navigate = useNavigate();
   const { data: profile } = useResortProfile();
-  const [passkeyMode, setPasskeyMode] = useState<'staff' | 'admin' | 'employee' | null>(null);
-  const [passkey, setPasskey] = useState('');
-  const [error, setError] = useState('');
-
-  const handlePasskey = () => {
-    if (passkey === '5309') {
-      if (passkeyMode === 'staff') navigate('/order-type?mode=staff');
-      else if (passkeyMode === 'employee') navigate('/employee');
-      else navigate('/admin');
-      setPasskeyMode(null);
-      setPasskey('');
-      setError('');
-    } else {
-      setError('Invalid passkey');
-    }
-  };
 
   const logoSize = profile?.logo_size || 128;
 
   return (
     <div className="min-h-screen bg-navy-texture flex flex-col items-center justify-center px-6">
-      {/* Logo */}
       {profile?.logo_url && (
         <img
           src={profile.logo_url}
@@ -39,7 +18,6 @@ const Index = () => {
         />
       )}
 
-      {/* Brand */}
       {profile?.resort_name && (
         <h1 className="font-display text-4xl md:text-5xl tracking-[0.2em] text-foreground text-center mb-2">
           {profile.resort_name}
@@ -51,7 +29,6 @@ const Index = () => {
       )}
       <div className="mb-12" />
 
-      {/* Entry buttons */}
       <div className="flex flex-col gap-4 w-full max-w-xs">
         <button
           onClick={() => navigate('/menu?mode=guest')}
@@ -60,52 +37,24 @@ const Index = () => {
           View Menu
         </button>
         <button
-          onClick={() => setPasskeyMode('staff')}
+          onClick={() => navigate('/order-type?mode=staff')}
           className="font-display text-base tracking-wider py-4 border border-foreground/20 text-cream-dim hover:bg-foreground/5 transition-colors"
         >
           Staff Order
         </button>
         <button
-          onClick={() => setPasskeyMode('admin')}
+          onClick={() => navigate('/admin')}
           className="font-body text-sm tracking-wider py-3 text-cream-dim/60 hover:text-cream-dim transition-colors"
         >
           Admin
         </button>
         <button
-          onClick={() => setPasskeyMode('employee')}
+          onClick={() => navigate('/employee')}
           className="font-body text-sm tracking-wider py-3 text-cream-dim/60 hover:text-cream-dim transition-colors"
         >
           Employee
         </button>
       </div>
-
-      {/* Passkey dialog */}
-      <Dialog open={!!passkeyMode} onOpenChange={() => { setPasskeyMode(null); setPasskey(''); setError(''); }}>
-        <DialogContent className="bg-card border-border max-w-xs">
-          <DialogHeader>
-            <DialogTitle className="font-display text-foreground tracking-wider text-center">
-              {passkeyMode === 'staff' ? 'Staff Access' : passkeyMode === 'employee' ? 'Employee Access' : 'Admin Access'}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-4 pt-2">
-            <Input
-              type="tel"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              maxLength={6}
-              placeholder="Enter passkey"
-              value={passkey}
-              onChange={(e) => { setPasskey(e.target.value.replace(/\D/g, '')); setError(''); }}
-              onKeyDown={(e) => e.key === 'Enter' && handlePasskey()}
-              className="bg-secondary border-border text-foreground text-center font-body text-2xl tracking-[0.5em]"
-            />
-            {error && <p className="text-destructive text-sm text-center font-body">{error}</p>}
-            <Button onClick={handlePasskey} className="font-display tracking-wider">
-              Enter
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };
