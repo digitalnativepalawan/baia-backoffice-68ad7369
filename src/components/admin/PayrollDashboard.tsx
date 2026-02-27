@@ -58,6 +58,10 @@ const PayrollDashboard = () => {
   const [editMessenger, setEditMessenger] = useState('');
   const [contactEditId, setContactEditId] = useState<string | null>(null);
 
+  // EOM selector state
+  const [eomMonth, setEomMonth] = useState(() => format(new Date(), 'yyyy-MM'));
+  const [eomEmployeeId, setEomEmployeeId] = useState('');
+
   const { data: employees = [] } = useQuery({
     queryKey: ['employees-all'],
     queryFn: async () => {
@@ -1134,7 +1138,91 @@ const PayrollDashboard = () => {
               placeholder="Default bonus amount (₱)"
               className="bg-secondary border-border text-foreground font-body text-sm" />
             <p className="font-body text-xs text-muted-foreground">
-              This amount auto-fills when adding an "Employee of the Month" bonus.
+              This amount auto-fills when selecting an Employee of the Month below.
+            </p>
+          </div>
+
+          {/* Choose Employee of the Month */}
+          <div className="border border-primary/30 bg-primary/5 rounded-lg p-4 space-y-3">
+            <p className="font-display text-xs tracking-wider text-foreground flex items-center gap-1.5">
+              <Star className="w-4 h-4 text-primary" /> Choose Employee of the Month
+            </p>
+
+            {/* Current EOM for selected month */}
+            {(() => {
+              const monthStr = eomMonth + '-01';
+              const currentEOM = bonuses.find((b: any) => b.is_employee_of_month && b.bonus_month === monthStr);
+              if (currentEOM) {
+                return (
+                  <div className="border border-primary/50 rounded-md p-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Star className="w-5 h-5 text-primary" />
+                      <div>
+                        <p className="font-display text-sm text-foreground">{getEmployeeName(currentEOM.employee_id)}</p>
+                        <p className="font-body text-xs text-muted-foreground">
+                          {format(new Date(monthStr + 'T00:00:00'), 'MMMM yyyy')} · ₱{Number(currentEOM.amount).toFixed(0)} bonus
+                        </p>
+                      </div>
+                    </div>
+                    <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-destructive h-7"
+                      onClick={async () => {
+                        await (supabase.from('employee_bonuses' as any) as any).delete().eq('id', currentEOM.id);
+                        qc.invalidateQueries({ queryKey: ['employee-bonuses'] });
+                        toast.success('Employee of the Month removed');
+                      }}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="font-body text-xs text-muted-foreground">Month</label>
+                <Input type="month" value={eomMonth} onChange={e => setEomMonth(e.target.value)}
+                  className="bg-secondary border-border text-foreground font-body text-sm mt-1" />
+              </div>
+              <div>
+                <label className="font-body text-xs text-muted-foreground">Employee</label>
+                <select value={eomEmployeeId} onChange={e => setEomEmployeeId(e.target.value)}
+                  className="w-full bg-secondary border border-border text-foreground font-body text-sm rounded-md px-3 py-2 mt-1">
+                  <option value="">Select employee</option>
+                  {employees.filter(e => e.active).map(e => (
+                    <option key={e.id} value={e.id}>{e.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <Button className="w-full font-display text-xs tracking-wider gap-1.5"
+              disabled={!eomEmployeeId || !eomMonth}
+              onClick={async () => {
+                const monthStr = eomMonth + '-01';
+                // Check if there's already an EOM for this month
+                const existing = bonuses.find((b: any) => b.is_employee_of_month && b.bonus_month === monthStr);
+                if (existing) {
+                  // Replace: delete old, add new
+                  await (supabase.from('employee_bonuses' as any) as any).delete().eq('id', existing.id);
+                }
+                const amount = Number(payrollSettings?.eom_bonus_amount || 0);
+                await (supabase.from('employee_bonuses' as any) as any).insert({
+                  employee_id: eomEmployeeId,
+                  amount,
+                  reason: 'Employee of the Month',
+                  bonus_month: monthStr,
+                  is_employee_of_month: true,
+                });
+                qc.invalidateQueries({ queryKey: ['employee-bonuses'] });
+                toast.success(`${getEmployeeName(eomEmployeeId)} is Employee of the Month!`);
+                setEomEmployeeId('');
+              }}>
+              <Star className="w-3.5 h-3.5" /> Set Employee of the Month
+            </Button>
+
+            <p className="font-body text-xs text-muted-foreground">
+              Selecting an employee automatically creates a bonus of ₱{Number(payrollSettings?.eom_bonus_amount || 0).toLocaleString()} for that month.
             </p>
           </div>
         </div>
