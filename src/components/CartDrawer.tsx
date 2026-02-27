@@ -205,7 +205,7 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
   };
 
   const TYPE_LABELS: Record<string, string> = {
-    Room: 'Room Delivery',
+    Room: 'Room',
     DineIn: 'Dine In',
     Beach: 'Beach Delivery',
     WalkIn: 'Walk-In Guest',
@@ -384,7 +384,7 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
                     <div className="mt-4 pt-3 border-t border-border">
                       <div className="flex items-center gap-2 mb-3">
                         <Clock className="w-4 h-4 text-cream-dim" />
-                        <p className="font-display text-sm text-foreground tracking-wider">Delivery Time</p>
+                        <p className="font-display text-sm text-foreground tracking-wider">Scheduled Time</p>
                       </div>
                       <div className="flex gap-2 mb-3">
                         <button

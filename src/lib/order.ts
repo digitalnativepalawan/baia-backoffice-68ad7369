@@ -9,7 +9,7 @@ export interface OrderInfo {
 
 export function formatWhatsAppMessage(order: OrderInfo, items: CartItem[], total: number, scheduledFor?: string | null): string {
   const typeLabels: Record<string, string> = {
-    Room: 'Room Delivery',
+    Room: 'Room',
     DineIn: 'Dine In',
     Beach: 'Beach Delivery',
     WalkIn: 'Walk-In Guest',
@@ -18,23 +18,32 @@ export function formatWhatsAppMessage(order: OrderInfo, items: CartItem[], total
   const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
   const serviceCharge = Math.round(subtotal * 0.10);
 
-  const lines = [
-    '🌴 *NEW ORDER – BAIA PALAWAN*',
-    '',
-    `*Type:* ${typeLabels[order.orderType] || order.orderType}`,
-    `*Location:* ${order.locationDetail}`,
-  ];
-
-  if (order.isStaff && order.paymentType) {
-    lines.push(`*Payment:* ${order.paymentType}`);
-  }
-
+  // For scheduled orders, make the header chef-friendly
+  let scheduledLabel = '';
   if (scheduledFor) {
     const d = new Date(scheduledFor);
     const now = new Date();
     const isToday = d.toDateString() === now.toDateString();
     const timeStr = d.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', hour12: true });
-    lines.push(`*🕐 Scheduled Delivery:* ${isToday ? timeStr : `Tomorrow ${timeStr}`}`);
+    scheduledLabel = isToday ? timeStr : `Tomorrow ${timeStr}`;
+  }
+
+  const lines = scheduledFor
+    ? [
+        `📋 *SCHEDULED ORDER — ${order.locationDetail}*`,
+        `🕐 *${scheduledLabel}*`,
+        '',
+        `*Type:* ${typeLabels[order.orderType] || order.orderType}`,
+      ]
+    : [
+        '🌴 *NEW ORDER – BAIA PALAWAN*',
+        '',
+        `*Type:* ${typeLabels[order.orderType] || order.orderType}`,
+        `*Location:* ${order.locationDetail}`,
+      ];
+
+  if (order.isStaff && order.paymentType) {
+    lines.push(`*Payment:* ${order.paymentType}`);
   }
 
   lines.push('', '*Items:*');

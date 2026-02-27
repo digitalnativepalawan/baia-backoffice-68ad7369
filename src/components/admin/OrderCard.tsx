@@ -68,6 +68,22 @@ const OrderCard = ({ order, onAdvance, resortProfile, onAddItems, onViewTab, onD
         </div>
       )}
 
+      {/* SCHEDULED ORDER banner */}
+      {order.scheduled_for && (
+        <div className="flex items-center gap-2 mb-3 bg-blue-500/20 rounded px-3 py-1.5 border border-blue-400/40">
+          <Clock className="w-4 h-4 text-blue-400" />
+          <span className="font-display text-sm text-blue-400 tracking-widest font-bold uppercase">
+            Scheduled — {order.location_detail} — {(() => {
+              const d = new Date(order.scheduled_for);
+              const now = new Date();
+              const isToday = d.toDateString() === now.toDateString();
+              const timeStr = d.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', hour12: true });
+              return isToday ? timeStr : `Tomorrow ${timeStr}`;
+            })()}
+          </span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex justify-between items-start mb-3">
         <div>
