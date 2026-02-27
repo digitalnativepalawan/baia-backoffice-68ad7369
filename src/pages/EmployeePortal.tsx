@@ -109,8 +109,21 @@ const EmployeePortal = () => {
       const { data, error } = await supabase.functions.invoke('employee-auth', {
         body: { action: 'verify', name: loginName, pin: loginPin },
       });
-      if (error || data?.error) {
-        toast.error(data?.error || 'Login failed');
+      if (error) {
+        // Extract message from FunctionsHttpError context
+        let msg = 'Login failed';
+        try {
+          const ctx = await (error as any).context?.json?.();
+          if (ctx?.error) msg = ctx.error;
+        } catch {
+          if (typeof data === 'object' && data?.error) msg = data.error;
+        }
+        toast.error(msg);
+        setLoginLoading(false);
+        return;
+      }
+      if (data?.error) {
+        toast.error(data.error);
         setLoginLoading(false);
         return;
       }
