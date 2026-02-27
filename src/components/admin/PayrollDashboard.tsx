@@ -524,7 +524,7 @@ const PayrollDashboard = () => {
       )}
 
       {/* Sub-view toggle */}
-      <div className="flex gap-1 flex-wrap">
+      <div className="grid grid-cols-3 gap-1">
         {([
           { key: 'employees' as SubView, label: 'Team', icon: Users },
           { key: 'shifts' as SubView, label: 'Shifts', icon: Clock },
@@ -534,7 +534,7 @@ const PayrollDashboard = () => {
           { key: 'settings' as SubView, label: 'Settings', icon: Settings },
         ]).map(({ key, label, icon: Icon }) => (
           <Button key={key} size="sm" variant={subView === key ? 'default' : 'outline'}
-            onClick={() => setSubView(key)} className="font-display text-xs tracking-wider flex-1 gap-1">
+            onClick={() => setSubView(key)} className="font-display text-xs tracking-wider gap-1 w-full">
             <Icon className="w-3.5 h-3.5" /> {label}
           </Button>
         ))}
@@ -544,60 +544,69 @@ const PayrollDashboard = () => {
       {subView === 'employees' && (
         <div className="space-y-1">
           {employees.map(emp => (
-            <div key={emp.id} className="flex items-center justify-between py-2.5 px-2 border-b border-border gap-2">
+            <div key={emp.id} className="border border-border rounded-lg p-3 space-y-2">
               {editingId === emp.id ? (
-                <div className="flex items-center gap-2 flex-1 flex-wrap">
+                <div className="space-y-2">
                   <Input value={editName} onChange={e => setEditName(e.target.value)}
-                    className="bg-secondary border-border text-foreground font-body h-8 text-sm flex-1 min-w-[100px]" autoFocus
+                    className="bg-secondary border-border text-foreground font-body h-8 text-sm w-full" autoFocus
                     onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingId(null); }} />
-                  <select value={editRateType} onChange={e => {
-                    setEditRateType(e.target.value as any);
-                    const empData = employees.find(x => x.id === editingId);
-                    if (e.target.value === 'hourly') setEditRate(String(empData?.hourly_rate || 0));
-                    else if (e.target.value === 'daily') setEditRate(String((empData as any)?.daily_rate || 0));
-                    else setEditRate(String((empData as any)?.monthly_rate || 0));
-                  }}
-                    className="bg-secondary border border-border text-foreground font-body h-8 text-sm rounded-md px-2">
-                    <option value="hourly">Per Hour</option>
-                    <option value="daily">Per Day</option>
-                    <option value="monthly">Per Month</option>
-                  </select>
-                  <Input value={editRate} onChange={e => setEditRate(e.target.value)} type="number"
-                    className="bg-secondary border-border text-foreground font-body h-8 text-sm w-24"
-                    placeholder={editRateType === 'hourly' ? '₱/hr' : editRateType === 'daily' ? '₱/day' : '₱/mo'} />
-                  <Button size="icon" variant="ghost" className="h-7 w-7 text-primary" onClick={saveEdit}><Check className="w-3.5 h-3.5" /></Button>
-                  <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" onClick={() => setEditingId(null)}><X className="w-3.5 h-3.5" /></Button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <select value={editRateType} onChange={e => {
+                      setEditRateType(e.target.value as any);
+                      const empData = employees.find(x => x.id === editingId);
+                      if (e.target.value === 'hourly') setEditRate(String(empData?.hourly_rate || 0));
+                      else if (e.target.value === 'daily') setEditRate(String((empData as any)?.daily_rate || 0));
+                      else setEditRate(String((empData as any)?.monthly_rate || 0));
+                    }}
+                      className="bg-secondary border border-border text-foreground font-body h-8 text-sm rounded-md px-2">
+                      <option value="hourly">Per Hour</option>
+                      <option value="daily">Per Day</option>
+                      <option value="monthly">Per Month</option>
+                    </select>
+                    <Input value={editRate} onChange={e => setEditRate(e.target.value)} type="number"
+                      className="bg-secondary border-border text-foreground font-body h-8 text-sm"
+                      placeholder={editRateType === 'hourly' ? '₱/hr' : editRateType === 'daily' ? '₱/day' : '₱/mo'} />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" className="font-display text-xs tracking-wider flex-1" onClick={saveEdit}><Check className="w-3.5 h-3.5 mr-1" /> Save</Button>
+                    <Button size="sm" variant="outline" className="flex-1" onClick={() => setEditingId(null)}><X className="w-3.5 h-3.5 mr-1" /> Cancel</Button>
+                  </div>
                 </div>
               ) : (
                 <>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-body text-sm text-foreground">{emp.name}</span>
-                      {(emp as any).phone && (
-                        <a href={`tel:${(emp as any).phone}`} className="text-muted-foreground hover:text-primary"><Phone className="w-3 h-3" /></a>
-                      )}
-                      {(emp as any).messenger_link && (
-                        <a href={(emp as any).messenger_link.startsWith('http') ? (emp as any).messenger_link : `https://m.me/${(emp as any).messenger_link}`}
-                          target="_blank" rel="noopener" className="text-muted-foreground hover:text-primary"><MessageCircle className="w-3 h-3" /></a>
-                      )}
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-body text-sm text-foreground">{emp.name}</span>
+                        {(emp as any).phone && (
+                          <a href={`tel:${(emp as any).phone}`} className="text-muted-foreground hover:text-primary"><Phone className="w-3 h-3" /></a>
+                        )}
+                        {(emp as any).messenger_link && (
+                          <a href={(emp as any).messenger_link.startsWith('http') ? (emp as any).messenger_link : `https://m.me/${(emp as any).messenger_link}`}
+                            target="_blank" rel="noopener" className="text-muted-foreground hover:text-primary"><MessageCircle className="w-3 h-3" /></a>
+                        )}
+                        {(emp as any).password_hash && <Lock className="w-3 h-3 text-primary" />}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="font-body text-xs text-muted-foreground">{getRateDisplay(emp)}</span>
+                        <span className="font-body text-xs text-primary">Paid: ₱{(allTimePaid[emp.id] || 0).toFixed(0)}</span>
+                      </div>
                     </div>
-                    <span className="font-body text-xs text-muted-foreground">{getRateDisplay(emp)}</span>
-                    <span className="font-body text-xs text-primary ml-2">Paid: ₱{(allTimePaid[emp.id] || 0).toFixed(0)}</span>
-                    {(emp as any).password_hash && <Lock className="w-3 h-3 text-primary inline ml-1.5" />}
+                    <Switch checked={emp.active} onCheckedChange={v => toggleActive(emp.id, v)} />
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-primary"
-                      title="Set PIN" onClick={() => { setPinEmployeeId(pinEmployeeId === emp.id ? null : emp.id); setPinValue(''); }}>
-                      <Lock className="w-3.5 h-3.5" />
+                  <div className="flex gap-1 flex-wrap">
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-muted-foreground hover:text-primary gap-1 font-body text-xs"
+                      onClick={() => { setPinEmployeeId(pinEmployeeId === emp.id ? null : emp.id); setPinValue(''); }}>
+                      <Lock className="w-3.5 h-3.5" /> PIN
                     </Button>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-primary"
-                      title="Contact info" onClick={() => {
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-muted-foreground hover:text-primary gap-1 font-body text-xs"
+                      onClick={() => {
                         if (contactEditId === emp.id) { setContactEditId(null); return; }
                         setContactEditId(emp.id); setEditPhone((emp as any).phone || ''); setEditMessenger((emp as any).messenger_link || '');
                       }}>
-                      <Phone className="w-3.5 h-3.5" />
+                      <Phone className="w-3.5 h-3.5" /> Contact
                     </Button>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-muted-foreground hover:text-foreground gap-1 font-body text-xs"
                       onClick={() => {
                         setEditingId(emp.id);
                         setEditName(emp.name);
@@ -605,69 +614,77 @@ const PayrollDashboard = () => {
                         setEditRateType(rt);
                         setEditRate(String(rt === 'daily' ? (emp as any).daily_rate || 0 : rt === 'monthly' ? (emp as any).monthly_rate || 0 : emp.hourly_rate));
                       }}>
-                      <Pencil className="w-3.5 h-3.5" />
+                      <Pencil className="w-3.5 h-3.5" /> Edit
                     </Button>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-muted-foreground hover:text-destructive gap-1 font-body text-xs"
                       onClick={() => deleteEmployee(emp.id)}>
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-3.5 h-3.5" /> Delete
                     </Button>
-                    <Switch checked={emp.active} onCheckedChange={v => toggleActive(emp.id, v)} />
                   </div>
                 </>
               )}
               {/* PIN form */}
               {pinEmployeeId === emp.id && !editingId && (
-                <div className="flex gap-2 items-center mt-2 w-full">
+                <div className="space-y-2 border-t border-border pt-2">
                   <Input type="password" value={pinValue} onChange={e => setPinValue(e.target.value)}
-                    placeholder="New PIN" className="bg-secondary border-border text-foreground font-body text-sm h-8 flex-1" />
-                  <Button size="sm" className="font-display text-xs tracking-wider h-8" disabled={!pinValue}
-                    onClick={async () => {
-                      const { error } = await supabase.functions.invoke('employee-auth', {
-                        body: { action: 'set-password', employee_id: emp.id, pin: pinValue },
-                      });
-                      if (error) { toast.error('Failed to set PIN'); return; }
-                      setPinEmployeeId(null); setPinValue('');
-                      qc.invalidateQueries({ queryKey: ['employees-all'] });
-                      toast.success(`PIN set for ${emp.name}`);
-                    }}>Set</Button>
-                  <Button size="sm" variant="outline" className="h-8" onClick={() => setPinEmployeeId(null)}><X className="w-3.5 h-3.5" /></Button>
+                    placeholder="New PIN" className="bg-secondary border-border text-foreground font-body text-sm h-8 w-full" />
+                  <div className="flex gap-2">
+                    <Button size="sm" className="font-display text-xs tracking-wider h-8 flex-1" disabled={!pinValue}
+                      onClick={async () => {
+                        const { error } = await supabase.functions.invoke('employee-auth', {
+                          body: { action: 'set-password', employee_id: emp.id, pin: pinValue },
+                        });
+                        if (error) { toast.error('Failed to set PIN'); return; }
+                        setPinEmployeeId(null); setPinValue('');
+                        qc.invalidateQueries({ queryKey: ['employees-all'] });
+                        toast.success(`PIN set for ${emp.name}`);
+                      }}>Set PIN</Button>
+                    <Button size="sm" variant="outline" className="h-8" onClick={() => setPinEmployeeId(null)}><X className="w-3.5 h-3.5" /></Button>
+                  </div>
                 </div>
               )}
               {/* Contact edit */}
               {contactEditId === emp.id && !editingId && (
-                <div className="flex gap-2 items-center mt-2 w-full flex-wrap">
+                <div className="space-y-2 border-t border-border pt-2">
                   <Input value={editPhone} onChange={e => setEditPhone(e.target.value)}
-                    placeholder="Phone number" className="bg-secondary border-border text-foreground font-body text-sm h-8 flex-1 min-w-[120px]" />
+                    placeholder="Phone number" className="bg-secondary border-border text-foreground font-body text-sm h-8 w-full" />
                   <Input value={editMessenger} onChange={e => setEditMessenger(e.target.value)}
-                    placeholder="Messenger username" className="bg-secondary border-border text-foreground font-body text-sm h-8 flex-1 min-w-[120px]" />
-                  <Button size="sm" className="font-display text-xs tracking-wider h-8"
-                    onClick={async () => {
-                      await supabase.from('employees').update({ phone: editPhone.trim(), messenger_link: editMessenger.trim() } as any).eq('id', emp.id);
-                      setContactEditId(null);
-                      qc.invalidateQueries({ queryKey: ['employees-all'] });
-                      toast.success('Contact info saved');
-                    }}>Save</Button>
-                  <Button size="sm" variant="outline" className="h-8" onClick={() => setContactEditId(null)}><X className="w-3.5 h-3.5" /></Button>
+                    placeholder="Messenger username" className="bg-secondary border-border text-foreground font-body text-sm h-8 w-full" />
+                  <div className="flex gap-2">
+                    <Button size="sm" className="font-display text-xs tracking-wider h-8 flex-1"
+                      onClick={async () => {
+                        await supabase.from('employees').update({ phone: editPhone.trim(), messenger_link: editMessenger.trim() } as any).eq('id', emp.id);
+                        setContactEditId(null);
+                        qc.invalidateQueries({ queryKey: ['employees-all'] });
+                        toast.success('Contact info saved');
+                      }}>Save</Button>
+                    <Button size="sm" variant="outline" className="h-8" onClick={() => setContactEditId(null)}><X className="w-3.5 h-3.5" /></Button>
+                  </div>
                 </div>
               )}
             </div>
           ))}
           {/* Add employee form */}
-          <div className="flex gap-2 mt-3 flex-wrap">
+          <div className="border border-dashed border-border rounded-lg p-3 space-y-2 mt-3">
+            <p className="font-display text-xs tracking-wider text-muted-foreground">Add Employee</p>
             <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Employee name"
-              className="bg-secondary border-border text-foreground font-body flex-1 min-w-[120px]" />
-            <select value={newRateType} onChange={e => setNewRateType(e.target.value as any)}
-              className="bg-secondary border border-border text-foreground font-body text-sm rounded-md px-2 h-10">
-              <option value="hourly">Per Hour</option>
-              <option value="daily">Per Day</option>
-              <option value="monthly">Per Month</option>
-            </select>
-            <Input value={newRate} onChange={e => setNewRate(e.target.value)}
-              placeholder={newRateType === 'hourly' ? '₱/hr' : newRateType === 'daily' ? '₱/day' : '₱/mo'}
-              type="number" className="bg-secondary border-border text-foreground font-body w-24" />
+              className="bg-secondary border-border text-foreground font-body text-sm w-full" />
+            <div className="grid grid-cols-2 gap-2">
+              <select value={newRateType} onChange={e => setNewRateType(e.target.value as any)}
+                className="bg-secondary border border-border text-foreground font-body text-sm rounded-md px-2 h-10">
+                <option value="hourly">Per Hour</option>
+                <option value="daily">Per Day</option>
+                <option value="monthly">Per Month</option>
+              </select>
+              <Input value={newRate} onChange={e => setNewRate(e.target.value)}
+                placeholder={newRateType === 'hourly' ? '₱/hr' : newRateType === 'daily' ? '₱/day' : '₱/mo'}
+                type="number" className="bg-secondary border-border text-foreground font-body text-sm" />
+            </div>
             <Input value={newMessenger} onChange={e => setNewMessenger(e.target.value)}
-              placeholder="Messenger username" className="bg-secondary border-border text-foreground font-body flex-1 min-w-[120px]" />
-            <Button onClick={addEmployee} size="icon" variant="outline"><Plus className="w-4 h-4" /></Button>
+              placeholder="Messenger username" className="bg-secondary border-border text-foreground font-body text-sm w-full" />
+            <Button onClick={addEmployee} className="font-display text-xs tracking-wider w-full gap-1" disabled={!newName.trim() || !newRate}>
+              <Plus className="w-3.5 h-3.5" /> Add Employee
+            </Button>
           </div>
 
           {/* Bonuses section */}
@@ -943,7 +960,7 @@ const PayrollDashboard = () => {
                 <p className="font-display text-sm text-foreground">{emp.name}</p>
                 <span className="font-body text-xs text-muted-foreground">{getRateDisplay(emp)}</span>
               </div>
-              <div className="grid grid-cols-4 gap-2 text-center">
+              <div className="grid grid-cols-2 gap-2 text-center">
                 <div>
                   <p className="font-body text-xs text-muted-foreground">Hours</p>
                   <p className="font-display text-sm text-foreground">{emp.hours.toFixed(1)}</p>
