@@ -195,9 +195,9 @@ const EmployeePortal = () => {
               <option value="">Select your name</option>
               {employees.map(e => <option key={e.id} value={e.name}>{e.name}</option>)}
             </select>
-            <Input type="password" value={loginPin} onChange={e => setLoginPin(e.target.value)}
-              placeholder="Enter PIN" className="bg-secondary border-border text-foreground font-body py-3"
-              onKeyDown={e => { if (e.key === 'Enter') login(); }} />
+            <Input type="tel" inputMode="numeric" pattern="[0-9]*" value={loginPin} onChange={e => setLoginPin(e.target.value.replace(/\D/g, ''))}
+              placeholder="Enter PIN" className="bg-secondary border-border text-foreground font-body py-3 text-center text-2xl tracking-[0.5em]"
+              maxLength={6} onKeyDown={e => { if (e.key === 'Enter') login(); }} />
             <Button onClick={login} disabled={loginLoading || !loginName || !loginPin}
               className="w-full font-display text-sm tracking-wider">
               {loginLoading ? 'Logging in…' : 'Login'}
