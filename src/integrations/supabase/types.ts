@@ -523,6 +523,7 @@ export type Database = {
           location_detail: string | null
           order_type: string
           payment_type: string | null
+          scheduled_for: string | null
           service_charge: number
           status: string
           tab_id: string | null
@@ -537,6 +538,7 @@ export type Database = {
           location_detail?: string | null
           order_type?: string
           payment_type?: string | null
+          scheduled_for?: string | null
           service_charge?: number
           status?: string
           tab_id?: string | null
@@ -551,6 +553,7 @@ export type Database = {
           location_detail?: string | null
           order_type?: string
           payment_type?: string | null
+          scheduled_for?: string | null
           service_charge?: number
           status?: string
           tab_id?: string | null

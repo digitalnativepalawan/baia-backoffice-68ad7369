@@ -8,7 +8,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter } from '
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Minus, Plus, Trash2, Send, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Minus, Plus, Trash2, Send, CheckCircle2, AlertTriangle, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { Separator } from '@/components/ui/separator';
 import { checkStock, type Shortage } from '@/lib/stockCheck';
@@ -31,6 +31,11 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
   const [orderSummary, setOrderSummary] = useState({ itemCount: 0, grandTotal: 0 });
   const [stockWarning, setStockWarning] = useState<Shortage[]>([]);
   const [overrideStock, setOverrideStock] = useState(false);
+  const [scheduleMode, setScheduleMode] = useState<'asap' | 'scheduled'>('asap');
+  const [scheduledDay, setScheduledDay] = useState<'today' | 'tomorrow'>('today');
+  const [scheduledHour, setScheduledHour] = useState('7');
+  const [scheduledMinute, setScheduledMinute] = useState('00');
+  const [scheduledPeriod, setScheduledPeriod] = useState<'AM' | 'PM'>('PM');
 
   // Order type selection state (for guests who haven't pre-selected)
   const [selectedOrderType, setSelectedOrderType] = useState(initialOrderType);
@@ -115,6 +120,19 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
     setStockWarning([]);
     setOverrideStock(false);
 
+    // Compute scheduled_for timestamp
+    let scheduledFor: string | null = null;
+    if (selectedOrderType === 'Room' && scheduleMode === 'scheduled') {
+      const now = new Date();
+      const d = new Date(now);
+      if (scheduledDay === 'tomorrow') d.setDate(d.getDate() + 1);
+      let h = parseInt(scheduledHour);
+      if (scheduledPeriod === 'PM' && h < 12) h += 12;
+      if (scheduledPeriod === 'AM' && h === 12) h = 0;
+      d.setHours(h, parseInt(scheduledMinute), 0, 0);
+      scheduledFor = d.toISOString();
+    }
+
     setSubmitting(true);
     try {
       const { data: existingTabs } = await supabase
@@ -144,7 +162,7 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
         tabId = newTab.id;
       }
 
-      await supabase.from('orders').insert({
+      const insertData: any = {
         order_type: selectedOrderType,
         location_detail: selectedLocation,
         items: cart.items.map(i => ({ name: i.name, qty: i.quantity, price: i.price })),
@@ -153,7 +171,10 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
         payment_type: isStaff ? paymentType : '',
         status: 'New',
         tab_id: tabId,
-      });
+      };
+      if (scheduledFor) insertData.scheduled_for = scheduledFor;
+
+      await supabase.from('orders').insert(insertData);
 
       // Capture cart items before clearing for WhatsApp fallback
       const cartSnapshot = cart.items.map(i => ({ ...i }));
@@ -172,7 +193,7 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
           isStaff,
           paymentType: isStaff ? paymentType : undefined,
         };
-        const msg = formatWhatsAppMessage(orderInfo, cartSnapshot, grandTotal);
+        const msg = formatWhatsAppMessage(orderInfo, cartSnapshot, grandTotal, scheduledFor);
         const url = buildWhatsAppUrl(kitchenPhone, msg);
         window.open(url, '_blank');
       }
@@ -355,6 +376,99 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
                           <SelectItem value="Card" className="text-foreground font-body">Card</SelectItem>
                         </SelectContent>
                       </Select>
+                    </div>
+                  )}
+
+                  {/* Scheduled Delivery for Room orders */}
+                  {selectedOrderType === 'Room' && (
+                    <div className="mt-4 pt-3 border-t border-border">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Clock className="w-4 h-4 text-cream-dim" />
+                        <p className="font-display text-sm text-foreground tracking-wider">Delivery Time</p>
+                      </div>
+                      <div className="flex gap-2 mb-3">
+                        <button
+                          onClick={() => setScheduleMode('asap')}
+                          className={`flex-1 min-h-[44px] py-2 border font-display text-xs tracking-wider rounded transition-colors ${
+                            scheduleMode === 'asap'
+                              ? 'border-gold text-gold bg-gold/10'
+                              : 'border-border text-cream-dim'
+                          }`}
+                        >
+                          ASAP
+                        </button>
+                        <button
+                          onClick={() => setScheduleMode('scheduled')}
+                          className={`flex-1 min-h-[44px] py-2 border font-display text-xs tracking-wider rounded transition-colors ${
+                            scheduleMode === 'scheduled'
+                              ? 'border-gold text-gold bg-gold/10'
+                              : 'border-border text-cream-dim'
+                          }`}
+                        >
+                          Schedule
+                        </button>
+                      </div>
+
+                      {scheduleMode === 'scheduled' && (
+                        <div className="space-y-3">
+                          {/* Day toggle */}
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setScheduledDay('today')}
+                              className={`flex-1 min-h-[44px] py-2 border font-body text-xs rounded transition-colors ${
+                                scheduledDay === 'today'
+                                  ? 'border-gold text-gold bg-gold/10'
+                                  : 'border-border text-cream-dim'
+                              }`}
+                            >
+                              Today
+                            </button>
+                            <button
+                              onClick={() => setScheduledDay('tomorrow')}
+                              className={`flex-1 min-h-[44px] py-2 border font-body text-xs rounded transition-colors ${
+                                scheduledDay === 'tomorrow'
+                                  ? 'border-gold text-gold bg-gold/10'
+                                  : 'border-border text-cream-dim'
+                              }`}
+                            >
+                              Tomorrow
+                            </button>
+                          </div>
+
+                          {/* Time picker */}
+                          <div className="flex gap-2">
+                            <Select onValueChange={setScheduledHour} value={scheduledHour}>
+                              <SelectTrigger className="bg-secondary border-border text-foreground font-body flex-1">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent className="bg-card border-border">
+                                {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
+                                  <SelectItem key={h} value={String(h)} className="text-foreground font-body">{h}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Select onValueChange={setScheduledMinute} value={scheduledMinute}>
+                              <SelectTrigger className="bg-secondary border-border text-foreground font-body w-20">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent className="bg-card border-border">
+                                {['00', '15', '30', '45'].map(m => (
+                                  <SelectItem key={m} value={m} className="text-foreground font-body">:{m}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Select onValueChange={(v) => setScheduledPeriod(v as 'AM' | 'PM')} value={scheduledPeriod}>
+                              <SelectTrigger className="bg-secondary border-border text-foreground font-body w-20">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent className="bg-card border-border">
+                                <SelectItem value="AM" className="text-foreground font-body">AM</SelectItem>
+                                <SelectItem value="PM" className="text-foreground font-body">PM</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </>

@@ -7,7 +7,7 @@ export interface OrderInfo {
   paymentType?: string;
 }
 
-export function formatWhatsAppMessage(order: OrderInfo, items: CartItem[], total: number): string {
+export function formatWhatsAppMessage(order: OrderInfo, items: CartItem[], total: number, scheduledFor?: string | null): string {
   const typeLabels: Record<string, string> = {
     Room: 'Room Delivery',
     DineIn: 'Dine In',
@@ -27,6 +27,14 @@ export function formatWhatsAppMessage(order: OrderInfo, items: CartItem[], total
 
   if (order.isStaff && order.paymentType) {
     lines.push(`*Payment:* ${order.paymentType}`);
+  }
+
+  if (scheduledFor) {
+    const d = new Date(scheduledFor);
+    const now = new Date();
+    const isToday = d.toDateString() === now.toDateString();
+    const timeStr = d.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', hour12: true });
+    lines.push(`*🕐 Scheduled Delivery:* ${isToday ? timeStr : `Tomorrow ${timeStr}`}`);
   }
 
   lines.push('', '*Items:*');

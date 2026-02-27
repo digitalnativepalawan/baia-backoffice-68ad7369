@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ChefHat, Truck, CreditCard, CheckCircle2, AlertTriangle, Download, MessageCircle, PlusCircle, Receipt, Trash2 } from 'lucide-react';
+import { ChefHat, Truck, CreditCard, CheckCircle2, AlertTriangle, Download, MessageCircle, PlusCircle, Receipt, Trash2, Clock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ResortProfile } from '@/hooks/useResortProfile';
 import { generateInvoicePdf, buildInvoiceWhatsAppText } from '@/lib/generateInvoicePdf';
@@ -78,7 +78,19 @@ const OrderCard = ({ order, onAdvance, resortProfile, onAddItems, onViewTab, onD
             {formatDistanceToNow(new Date(order.created_at), { addSuffix: true })}
           </p>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {order.scheduled_for && (
+            <Badge variant="outline" className="font-body text-[10px] bg-blue-500/20 text-blue-400 border-blue-400/40 gap-1">
+              <Clock className="w-3 h-3" />
+              {(() => {
+                const d = new Date(order.scheduled_for);
+                const now = new Date();
+                const isToday = d.toDateString() === now.toDateString();
+                const timeStr = d.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', hour12: true });
+                return isToday ? timeStr : `Tomorrow ${timeStr}`;
+              })()}
+            </Badge>
+          )}
           {order.tab_id && (
             <Badge variant="outline" className="font-body text-[10px] bg-purple-500/20 text-purple-400 border-purple-400/40">
               Tab
