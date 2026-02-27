@@ -1,104 +1,120 @@
 
-# Payroll Enhancement: Rate Types, Payday Settings, Bonuses, and Employee of the Month
+
+# Employee Portal: Contact Info, Personal Login, Tasks System
 
 ## Overview
 
-Enhance the payroll system with flexible pay rate options (per hour/day/month), configurable payday schedules, per-employee bonuses, and an "Employee of the Month" feature with a bonus amount factored into payroll calculations.
+Transform the employee system from a shared clock-in page into a full employee portal where each employee logs in with their name + password, and gets access to their own dashboard with clock in/out, tasks, payments, and bonuses. Also add phone/messenger contact fields and a task management system for both admin and employees.
 
 ## Database Changes
 
 ### 1. Alter `employees` table
 
 Add columns:
-- `rate_type` (text, default `'hourly'`) -- values: `'hourly'`, `'daily'`, `'monthly'`
-- `daily_rate` (numeric, default 0)
-- `monthly_rate` (numeric, default 0)
+- `phone` (text, default '') -- phone number
+- `messenger_link` (text, default '') -- FB Messenger link/username
+- `password_hash` (text, default '') -- simple PIN/password (hashed)
+- `display_name` (text, default '') -- changeable display name (login still uses original name)
 
-The existing `hourly_rate` column stays. Admin picks which rate type applies per employee.
-
-### 2. Alter `payroll_payments` table
-
-Add column:
-- `bonus_amount` (numeric, default 0) -- bonus included in this payment
-
-### 3. New table: `employee_bonuses`
+### 2. New table: `employee_tasks`
 
 | Column | Type | Default |
 |--------|------|---------|
 | id | uuid | gen_random_uuid() |
 | employee_id | uuid | NOT NULL |
-| amount | numeric | 0 |
-| reason | text | '' |
-| bonus_month | date | NULL |
-| is_employee_of_month | boolean | false |
-| created_at | timestamptz | now() |
-
-RLS: Public read/insert/update/delete (matching existing pattern).
-
-### 4. New table: `payroll_settings`
-
-Single-row settings table:
-
-| Column | Type | Default |
-|--------|------|---------|
-| id | uuid | gen_random_uuid() |
-| payday_type | text | 'weekly' |
-| payday_day_of_week | integer | 6 (Saturday) |
-| payday_days_interval | integer | 15 |
-| eom_bonus_amount | numeric | 0 |
+| title | text | NOT NULL |
+| description | text | '' |
+| status | text | 'pending' |
+| due_date | timestamptz | NULL |
+| completed_at | timestamptz | NULL |
+| created_by | text | 'admin' |
 | created_at | timestamptz | now() |
 | updated_at | timestamptz | now() |
 
-`payday_type` values: `'weekly'`, `'bimonthly'` (every 15 days), `'monthly'` (every 30 days).
+`status` values: `'pending'`, `'in_progress'`, `'completed'`
+`created_by` values: `'admin'` or `'employee'`
 
-RLS: Public read/insert/update.
+RLS: Public read/insert/update/delete (matching existing pattern).
+
+### 3. Password hashing approach
+
+Since this is a resort staff tool (not auth-level security), we'll use a simple approach: store a bcrypt-hashed PIN via an edge function that handles login verification. The employee "logs in" by selecting their name and entering their PIN. The edge function verifies the PIN and returns employee data. No Supabase Auth needed -- this is a lightweight staff access system.
+
+## New Edge Function: `employee-auth`
+
+Handles:
+- **POST /set-password**: Hash and store a PIN for an employee (admin action)
+- **POST /verify**: Verify employee name + PIN, return employee record
+
+Uses bcrypt from Deno standard library. Stores hashed password in `employees.password_hash`.
 
 ## File Changes
 
-### 1. `src/components/admin/PayrollDashboard.tsx`
+### 1. Admin: `PayrollDashboard.tsx` -- Employee Contact Fields
 
-**Employees sub-view changes:**
-- Add rate type selector (Per Hour / Per Day / Per Month) next to each employee
-- Show the relevant rate field based on selection (hourly_rate, daily_rate, or monthly_rate)
-- Add a "Bonuses" section per employee showing pending bonuses
-- Add inline bonus form: amount + reason + "Employee of the Month" toggle
-- Display total bonuses pending for each employee
+In the Employees sub-view:
+- Add phone number input field when adding/editing employees
+- Add Messenger link input field when adding/editing employees
+- Add "Set PIN" button per employee to set their login password
+- Display phone and messenger icons next to employee names
+- Show quick-action links to call/message employees
 
-**Payroll settings section (new):**
-- Add a settings area at the top or as a new sub-view tab
-- Payday schedule selector: Weekly (pick day) / Every 15 Days / Every 30 Days
-- Day-of-week picker (Mon-Sun) when weekly is selected
-- Employee of the Month default bonus amount
-- Pay period banner updates dynamically based on settings
+### 2. New page: `src/pages/EmployeePortal.tsx`
 
-**Summary sub-view changes:**
-- Factor in bonuses when showing total earnings per employee
-- Show bonus line items in employee summary
-- Calculate daily/monthly rate employees differently:
-  - Daily: count distinct work days x daily_rate
-  - Monthly: monthly_rate (prorated if partial period)
+Full employee self-service portal with:
 
-**Payments sub-view changes:**
-- Show bonus amount as separate line in payment records
-- Include bonuses in payment totals
+**Login screen** (when not authenticated):
+- Select name from dropdown of active employees
+- Enter PIN
+- Calls `employee-auth/verify` edge function
+- Stores session in localStorage (employee_id + name)
 
-**CSV export:**
-- Add bonus columns to export
+**Dashboard** (after login, tabbed layout):
+- **Clock In/Out** tab: Same clock-in/out functionality as current EmployeePage but for the logged-in employee only
+- **My Tasks** tab: View assigned tasks, mark complete, add own tasks with due date/time
+- **My Pay** tab: View shift history, payments, bonuses
+- **Settings** tab: Change display name, view own info
 
-### 2. `src/pages/EmployeePage.tsx`
+### 3. Update `src/pages/EmployeePage.tsx`
 
-- Update clock-out pay calculation to use the correct rate type
-- For daily-rate employees: total_pay = daily_rate (flat per day, regardless of hours)
-- For monthly-rate employees: total_pay = monthly_rate / working_days_in_month
-- For hourly-rate employees: keep existing hours x rate logic
+Redirect to `/employee-portal` (the new page). Keep the old page as a redirect for backward compatibility.
 
-### 3. New hook: `src/hooks/usePayrollSettings.ts`
+### 4. New component: `src/components/employee/EmployeeTaskList.tsx`
 
-React-query hook to fetch/upsert the single row from `payroll_settings`.
+Task list component used in both admin and employee views:
+- List tasks with title, description, due date, status
+- Add new task form (title, description, due date+time)
+- Edit task inline
+- Delete task
+- Mark as completed (sets completed_at timestamp)
+- Filter by status (all/pending/completed)
 
-## Technical Details
+### 5. Admin: `PayrollDashboard.tsx` -- Tasks Sub-View
 
-- Rate type logic: When `rate_type = 'daily'`, shift `total_pay` = `daily_rate` (one flat amount per calendar day worked, even with split shifts). When `rate_type = 'monthly'`, shift tracking is for attendance only; pay is calculated as `monthly_rate / working_days`.
-- Pay period calculation changes from hardcoded Sunday-Saturday to dynamic based on `payroll_settings.payday_type` and `payday_day_of_week`.
-- Employee of the Month: admin selects one employee per month via a toggle in the bonuses section. The `eom_bonus_amount` from `payroll_settings` is auto-populated but editable per instance.
-- Bonuses are standalone records that get factored into the payroll summary but are separate from shift-based pay.
+Add a new "Tasks" sub-view tab in PayrollDashboard:
+- View all tasks across all employees
+- Assign tasks to specific employees
+- Add/edit/delete tasks with due date and time
+- See completion status
+- Filter by employee and status
+
+### 6. Update `src/App.tsx`
+
+- Add route `/employee-portal` for the new EmployeePortal page
+- Keep `/employee` route pointing to redirect
+
+### 7. Edge function: `supabase/functions/employee-auth/index.ts`
+
+Two endpoints:
+- `POST` with `action: 'set-password'`: Takes employee_id + pin, hashes with bcrypt, stores in employees.password_hash
+- `POST` with `action: 'verify'`: Takes employee name + pin, finds employee, verifies bcrypt hash, returns employee data
+
+## Technical Notes
+
+- Employee login is lightweight (name + PIN), not full Supabase Auth. This is appropriate for a resort staff tool where the admin manages all accounts.
+- The PIN is stored as a bcrypt hash for security.
+- Employee session is stored in localStorage with the employee's ID -- simple but sufficient for this use case.
+- Tasks have a `created_by` field so we can distinguish admin-assigned vs self-created tasks.
+- The `due_date` is a timestamptz so it includes both date and time of expected completion.
+- Phone and messenger fields enable the admin to quickly contact employees directly from the dashboard.
+
