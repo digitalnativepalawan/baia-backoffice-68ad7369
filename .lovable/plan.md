@@ -1,120 +1,55 @@
 
-
-# Employee Portal: Contact Info, Personal Login, Tasks System
+# Scheduled Delivery Time for Room Orders
 
 ## Overview
 
-Transform the employee system from a shared clock-in page into a full employee portal where each employee logs in with their name + password, and gets access to their own dashboard with clock in/out, tasks, payments, and bonuses. Also add phone/messenger contact fields and a task management system for both admin and employees.
+Add an optional "Delivery Time" picker that appears when the order type is "Room". This lets staff/guests schedule orders for later (e.g., take dinner orders at 5pm for 7:30pm delivery, or breakfast selections in the evening for the next morning).
+
+## How It Works
+
+- When "Room" order type is selected in the CartDrawer, a new "Scheduled Delivery" section appears
+- User can choose "ASAP" (default, current behavior) or "Schedule for later"
+- If scheduling, they pick a date+time using a simple time selector (hour + minute in 15-min increments + AM/PM), plus an optional date toggle for "Tomorrow" (for next-morning breakfast orders)
+- The scheduled time is saved to the `orders` table and displayed on the OrderCard in the admin/staff view
 
 ## Database Changes
 
-### 1. Alter `employees` table
+### Alter `orders` table
 
-Add columns:
-- `phone` (text, default '') -- phone number
-- `messenger_link` (text, default '') -- FB Messenger link/username
-- `password_hash` (text, default '') -- simple PIN/password (hashed)
-- `display_name` (text, default '') -- changeable display name (login still uses original name)
-
-### 2. New table: `employee_tasks`
-
-| Column | Type | Default |
-|--------|------|---------|
-| id | uuid | gen_random_uuid() |
-| employee_id | uuid | NOT NULL |
-| title | text | NOT NULL |
-| description | text | '' |
-| status | text | 'pending' |
-| due_date | timestamptz | NULL |
-| completed_at | timestamptz | NULL |
-| created_by | text | 'admin' |
-| created_at | timestamptz | now() |
-| updated_at | timestamptz | now() |
-
-`status` values: `'pending'`, `'in_progress'`, `'completed'`
-`created_by` values: `'admin'` or `'employee'`
-
-RLS: Public read/insert/update/delete (matching existing pattern).
-
-### 3. Password hashing approach
-
-Since this is a resort staff tool (not auth-level security), we'll use a simple approach: store a bcrypt-hashed PIN via an edge function that handles login verification. The employee "logs in" by selecting their name and entering their PIN. The edge function verifies the PIN and returns employee data. No Supabase Auth needed -- this is a lightweight staff access system.
-
-## New Edge Function: `employee-auth`
-
-Handles:
-- **POST /set-password**: Hash and store a PIN for an employee (admin action)
-- **POST /verify**: Verify employee name + PIN, return employee record
-
-Uses bcrypt from Deno standard library. Stores hashed password in `employees.password_hash`.
+Add one column:
+- `scheduled_for` (timestamptz, nullable, default NULL) -- when NULL or in the past, means "ASAP"
 
 ## File Changes
 
-### 1. Admin: `PayrollDashboard.tsx` -- Employee Contact Fields
+### 1. `src/components/CartDrawer.tsx`
 
-In the Employees sub-view:
-- Add phone number input field when adding/editing employees
-- Add Messenger link input field when adding/editing employees
-- Add "Set PIN" button per employee to set their login password
-- Display phone and messenger icons next to employee names
-- Show quick-action links to call/message employees
+- Add state: `scheduleMode` ('asap' | 'scheduled'), `scheduledDate` (today/tomorrow), `scheduledHour`, `scheduledMinute`, `scheduledPeriod`
+- After the order type / location section, when `selectedOrderType === 'Room'`, render a "Delivery Time" section:
+  - Two toggle buttons: "ASAP" and "Schedule"
+  - When "Schedule" is selected, show:
+    - Date toggle: "Today" / "Tomorrow" buttons
+    - Time picker: Hour (1-12) select + Minute (00, 15, 30, 45) select + AM/PM select
+- When submitting, compute the `scheduled_for` timestamp and include it in the order insert
+- Include the scheduled time in the WhatsApp message if set
 
-### 2. New page: `src/pages/EmployeePortal.tsx`
+### 2. `src/components/admin/OrderCard.tsx`
 
-Full employee self-service portal with:
+- If `order.scheduled_for` exists and is in the future, show a badge like "Scheduled: 7:30 PM" or "Tomorrow 7:00 AM" near the order header
+- Use a Clock icon from lucide-react
 
-**Login screen** (when not authenticated):
-- Select name from dropdown of active employees
-- Enter PIN
-- Calls `employee-auth/verify` edge function
-- Stores session in localStorage (employee_id + name)
+### 3. `src/lib/order.ts`
 
-**Dashboard** (after login, tabbed layout):
-- **Clock In/Out** tab: Same clock-in/out functionality as current EmployeePage but for the logged-in employee only
-- **My Tasks** tab: View assigned tasks, mark complete, add own tasks with due date/time
-- **My Pay** tab: View shift history, payments, bonuses
-- **Settings** tab: Change display name, view own info
+- Update `formatWhatsAppMessage` to accept an optional `scheduledFor` date parameter
+- If provided, add a line like "*Scheduled Delivery:* 7:30 PM" or "*Scheduled Delivery:* Tomorrow 7:00 AM"
 
-### 3. Update `src/pages/EmployeePage.tsx`
+### 4. `src/components/staff/StaffOrdersView.tsx`
 
-Redirect to `/employee-portal` (the new page). Keep the old page as a redirect for backward compatibility.
+- Display the scheduled time on order cards if present (same badge approach)
 
-### 4. New component: `src/components/employee/EmployeeTaskList.tsx`
+## Technical Details
 
-Task list component used in both admin and employee views:
-- List tasks with title, description, due date, status
-- Add new task form (title, description, due date+time)
-- Edit task inline
-- Delete task
-- Mark as completed (sets completed_at timestamp)
-- Filter by status (all/pending/completed)
-
-### 5. Admin: `PayrollDashboard.tsx` -- Tasks Sub-View
-
-Add a new "Tasks" sub-view tab in PayrollDashboard:
-- View all tasks across all employees
-- Assign tasks to specific employees
-- Add/edit/delete tasks with due date and time
-- See completion status
-- Filter by employee and status
-
-### 6. Update `src/App.tsx`
-
-- Add route `/employee-portal` for the new EmployeePortal page
-- Keep `/employee` route pointing to redirect
-
-### 7. Edge function: `supabase/functions/employee-auth/index.ts`
-
-Two endpoints:
-- `POST` with `action: 'set-password'`: Takes employee_id + pin, hashes with bcrypt, stores in employees.password_hash
-- `POST` with `action: 'verify'`: Takes employee name + pin, finds employee, verifies bcrypt hash, returns employee data
-
-## Technical Notes
-
-- Employee login is lightweight (name + PIN), not full Supabase Auth. This is appropriate for a resort staff tool where the admin manages all accounts.
-- The PIN is stored as a bcrypt hash for security.
-- Employee session is stored in localStorage with the employee's ID -- simple but sufficient for this use case.
-- Tasks have a `created_by` field so we can distinguish admin-assigned vs self-created tasks.
-- The `due_date` is a timestamptz so it includes both date and time of expected completion.
-- Phone and messenger fields enable the admin to quickly contact employees directly from the dashboard.
-
+- Migration: `ALTER TABLE orders ADD COLUMN scheduled_for timestamptz DEFAULT NULL;`
+- The scheduled_for column stores a full timestamp so it handles both same-day and next-day scheduling
+- Time picker uses simple Select dropdowns (matching existing TimePicker pattern) with 15-minute increments for practical scheduling
+- "ASAP" is the default -- no behavior change for non-Room orders or when users don't want to schedule
+- The feature appears for Room orders only since that's the primary use case for scheduled deliveries
