@@ -91,11 +91,22 @@ const EmployeePage = () => {
     const active = getActiveShift(employeeId);
     if (!active) return;
 
-    const emp = employees.find(e => e.id === employeeId);
+    const emp = employees.find(e => e.id === employeeId) as any;
     const clockInTime = new Date(active.clock_in);
     const now = new Date();
     const hoursWorked = Math.round(((now.getTime() - clockInTime.getTime()) / (1000 * 60 * 60)) * 100) / 100;
-    const totalPay = Math.round(hoursWorked * Number(emp?.hourly_rate || 0) * 100) / 100;
+
+    // Calculate pay based on rate type
+    const rateType = emp?.rate_type || 'hourly';
+    let totalPay: number;
+    if (rateType === 'daily') {
+      totalPay = Number(emp?.daily_rate || 0);
+    } else if (rateType === 'monthly') {
+      // Assume ~22 working days per month
+      totalPay = Math.round((Number(emp?.monthly_rate || 0) / 22) * 100) / 100;
+    } else {
+      totalPay = Math.round(hoursWorked * Number(emp?.hourly_rate || 0) * 100) / 100;
+    }
 
     const { error } = await supabase.from('employee_shifts').update({
       clock_out: now.toISOString(),
@@ -133,7 +144,11 @@ const EmployeePage = () => {
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="font-display text-sm tracking-wider text-foreground">{emp.name}</p>
-                    <p className="font-body text-xs text-cream-dim">₱{Number(emp.hourly_rate).toFixed(0)}/hr</p>
+                    <p className="font-body text-xs text-cream-dim">
+                      {(emp as any).rate_type === 'daily' ? `₱${Number((emp as any).daily_rate || 0).toFixed(0)}/day`
+                        : (emp as any).rate_type === 'monthly' ? `₱${Number((emp as any).monthly_rate || 0).toLocaleString()}/mo`
+                        : `₱${Number(emp.hourly_rate).toFixed(0)}/hr`}
+                    </p>
                   </div>
                   <div className="flex items-center gap-1.5">
                     {shiftCount > 1 && (
