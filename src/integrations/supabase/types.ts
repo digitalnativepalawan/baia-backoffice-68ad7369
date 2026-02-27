@@ -14,6 +14,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      employee_bonuses: {
+        Row: {
+          amount: number
+          bonus_month: string | null
+          created_at: string
+          employee_id: string
+          id: string
+          is_employee_of_month: boolean
+          reason: string
+        }
+        Insert: {
+          amount?: number
+          bonus_month?: string | null
+          created_at?: string
+          employee_id: string
+          id?: string
+          is_employee_of_month?: boolean
+          reason?: string
+        }
+        Update: {
+          amount?: number
+          bonus_month?: string | null
+          created_at?: string
+          employee_id?: string
+          id?: string
+          is_employee_of_month?: boolean
+          reason?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_bonuses_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_shifts: {
         Row: {
           clock_in: string
@@ -62,23 +100,32 @@ export type Database = {
         Row: {
           active: boolean
           created_at: string
+          daily_rate: number
           hourly_rate: number
           id: string
+          monthly_rate: number
           name: string
+          rate_type: string
         }
         Insert: {
           active?: boolean
           created_at?: string
+          daily_rate?: number
           hourly_rate?: number
           id?: string
+          monthly_rate?: number
           name: string
+          rate_type?: string
         }
         Update: {
           active?: boolean
           created_at?: string
+          daily_rate?: number
           hourly_rate?: number
           id?: string
+          monthly_rate?: number
           name?: string
+          rate_type?: string
         }
         Relationships: []
       }
@@ -464,6 +511,7 @@ export type Database = {
       payroll_payments: {
         Row: {
           amount: number
+          bonus_amount: number
           created_at: string
           employee_id: string
           id: string
@@ -475,6 +523,7 @@ export type Database = {
         }
         Insert: {
           amount?: number
+          bonus_amount?: number
           created_at?: string
           employee_id: string
           id?: string
@@ -486,6 +535,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          bonus_amount?: number
           created_at?: string
           employee_id?: string
           id?: string
@@ -504,6 +554,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      payroll_settings: {
+        Row: {
+          created_at: string
+          eom_bonus_amount: number
+          id: string
+          payday_day_of_week: number
+          payday_days_interval: number
+          payday_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          eom_bonus_amount?: number
+          id?: string
+          payday_day_of_week?: number
+          payday_days_interval?: number
+          payday_type?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          eom_bonus_amount?: number
+          id?: string
+          payday_day_of_week?: number
+          payday_days_interval?: number
+          payday_type?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       recipe_ingredients: {
         Row: {

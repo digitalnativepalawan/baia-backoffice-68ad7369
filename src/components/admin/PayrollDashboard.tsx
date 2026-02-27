@@ -6,23 +6,31 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Check, X, DollarSign, Clock, Users, Download, Banknote } from 'lucide-react';
-import { format, startOfDay, endOfDay, subDays, startOfWeek, startOfMonth, previousSunday, nextSaturday, isSunday } from 'date-fns';
+import { Plus, Pencil, Trash2, Check, X, DollarSign, Clock, Users, Download, Banknote, Star, Settings } from 'lucide-react';
+import { format, startOfDay, endOfDay, subDays, startOfWeek, startOfMonth, previousSunday, nextSaturday, isSunday, addDays, getDay } from 'date-fns';
+import { usePayrollSettings } from '@/hooks/usePayrollSettings';
 
 type DateFilter = 'today' | 'yesterday' | 'week' | 'month' | 'all';
-type SubView = 'employees' | 'shifts' | 'summary' | 'payments';
+type SubView = 'employees' | 'shifts' | 'summary' | 'payments' | 'settings';
+
+const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 const PayrollDashboard = () => {
   const qc = useQueryClient();
   const [subView, setSubView] = useState<SubView>('employees');
   const [dateFilter, setDateFilter] = useState<DateFilter>('today');
 
+  // Payroll settings
+  const { settings: payrollSettings, upsert: upsertSettings } = usePayrollSettings();
+
   // Employee management state
   const [newName, setNewName] = useState('');
   const [newRate, setNewRate] = useState('');
+  const [newRateType, setNewRateType] = useState<'hourly' | 'daily' | 'monthly'>('hourly');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editRate, setEditRate] = useState('');
+  const [editRateType, setEditRateType] = useState<'hourly' | 'daily' | 'monthly'>('hourly');
 
   // Shift editing state
   const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
@@ -34,6 +42,13 @@ const PayrollDashboard = () => {
   const [newShiftEmployee, setNewShiftEmployee] = useState('');
   const [newShiftClockIn, setNewShiftClockIn] = useState('');
   const [newShiftClockOut, setNewShiftClockOut] = useState('');
+
+  // Bonus state
+  const [bonusEmployee, setBonusEmployee] = useState('');
+  const [bonusAmount, setBonusAmount] = useState('');
+  const [bonusReason, setBonusReason] = useState('');
+  const [bonusIsEOM, setBonusIsEOM] = useState(false);
+  const [showBonusForm, setShowBonusForm] = useState(false);
 
   const { data: employees = [] } = useQuery({
     queryKey: ['employees-all'],
@@ -60,6 +75,15 @@ const PayrollDashboard = () => {
     },
   });
 
+  // Bonuses
+  const { data: bonuses = [] } = useQuery({
+    queryKey: ['employee-bonuses'],
+    queryFn: async () => {
+      const { data } = await (supabase.from('employee_bonuses' as any) as any).select('*').order('created_at', { ascending: false });
+      return (data || []) as any[];
+    },
+  });
+
   // Payment form state
   const [payEmployee, setPayEmployee] = useState('');
   const [payAmount, setPayAmount] = useState('');
@@ -69,6 +93,21 @@ const PayrollDashboard = () => {
   const [editPayAmount, setEditPayAmount] = useState('');
   const [editPayNotes, setEditPayNotes] = useState('');
   const [confirmDeletePayment, setConfirmDeletePayment] = useState<string | null>(null);
+
+  // Helper to get rate display
+  const getRateDisplay = (emp: any) => {
+    const rateType = emp.rate_type || 'hourly';
+    if (rateType === 'daily') return `₱${Number(emp.daily_rate || 0).toFixed(0)}/day`;
+    if (rateType === 'monthly') return `₱${Number(emp.monthly_rate || 0).toLocaleString()}/mo`;
+    return `₱${Number(emp.hourly_rate).toFixed(0)}/hr`;
+  };
+
+  const getRateValue = (emp: any) => {
+    const rateType = emp.rate_type || 'hourly';
+    if (rateType === 'daily') return Number(emp.daily_rate || 0);
+    if (rateType === 'monthly') return Number(emp.monthly_rate || 0);
+    return Number(emp.hourly_rate);
+  };
 
   // Date-filtered shifts
   const filteredShifts = useMemo(() => {
@@ -121,16 +160,18 @@ const PayrollDashboard = () => {
     return { totalHours, totalPay, totalPaid, outstanding: totalPay - totalPaid };
   }, [filteredShifts]);
 
-  // Per-employee summary
+  // Per-employee summary with bonuses
   const employeeSummary = useMemo(() => {
     return employees.map(emp => {
       const empShifts = filteredShifts.filter(s => s.employee_id === emp.id);
       const hours = empShifts.reduce((s, sh) => s + Number(sh.hours_worked || 0), 0);
       const total = empShifts.reduce((s, sh) => s + Number(sh.total_pay || 0), 0);
       const paid = empShifts.filter(s => s.is_paid).reduce((s, sh) => s + Number(sh.total_pay || 0), 0);
-      return { ...emp, hours, total, paid, outstanding: total - paid, shiftCount: empShifts.length };
+      const empBonuses = bonuses.filter((b: any) => b.employee_id === emp.id);
+      const totalBonuses = empBonuses.reduce((s: number, b: any) => s + Number(b.amount || 0), 0);
+      return { ...emp, hours, total, paid, outstanding: total - paid, shiftCount: empShifts.length, totalBonuses, bonusList: empBonuses };
     });
-  }, [employees, filteredShifts]);
+  }, [employees, filteredShifts, bonuses]);
 
   // All-time paid-out per employee
   const allTimePaid = useMemo(() => {
@@ -149,15 +190,31 @@ const PayrollDashboard = () => {
   // CRUD - Employees
   const addEmployee = async () => {
     if (!newName.trim() || !newRate) return;
-    await supabase.from('employees').insert({ name: newName.trim(), hourly_rate: parseFloat(newRate) || 0 });
-    setNewName(''); setNewRate('');
+    const rateVal = parseFloat(newRate) || 0;
+    const insertData: any = {
+      name: newName.trim(),
+      hourly_rate: newRateType === 'hourly' ? rateVal : 0,
+      rate_type: newRateType,
+      daily_rate: newRateType === 'daily' ? rateVal : 0,
+      monthly_rate: newRateType === 'monthly' ? rateVal : 0,
+    };
+    await supabase.from('employees').insert(insertData as any);
+    setNewName(''); setNewRate(''); setNewRateType('hourly');
     qc.invalidateQueries({ queryKey: ['employees-all'] });
     toast.success('Employee added');
   };
 
   const saveEdit = async () => {
     if (!editingId || !editName.trim()) return;
-    await supabase.from('employees').update({ name: editName.trim(), hourly_rate: parseFloat(editRate) || 0 }).eq('id', editingId);
+    const rateVal = parseFloat(editRate) || 0;
+    const updateData: any = {
+      name: editName.trim(),
+      rate_type: editRateType,
+      hourly_rate: editRateType === 'hourly' ? rateVal : employees.find(e => e.id === editingId)?.hourly_rate || 0,
+      daily_rate: editRateType === 'daily' ? rateVal : (employees.find(e => e.id === editingId) as any)?.daily_rate || 0,
+      monthly_rate: editRateType === 'monthly' ? rateVal : (employees.find(e => e.id === editingId) as any)?.monthly_rate || 0,
+    };
+    await supabase.from('employees').update(updateData as any).eq('id', editingId);
     setEditingId(null);
     qc.invalidateQueries({ queryKey: ['employees-all'] });
     toast.success('Employee updated');
@@ -216,7 +273,8 @@ const PayrollDashboard = () => {
     let totalPay: number | null = null;
     if (clockOut) {
       hoursWorked = Math.round(((clockOut.getTime() - clockIn.getTime()) / (1000 * 60 * 60)) * 100) / 100;
-      totalPay = Math.round(hoursWorked * getEmployeeRate(shift.employee_id) * 100) / 100;
+      const emp = employees.find(e => e.id === shift.employee_id);
+      totalPay = calculateShiftPay(emp, hoursWorked, shift.employee_id);
     }
     await supabase.from('employee_shifts').update({
       clock_in: clockIn.toISOString(),
@@ -229,6 +287,14 @@ const PayrollDashboard = () => {
     toast.success('Shift updated');
   };
 
+  const calculateShiftPay = (emp: any, hoursWorked: number, employeeId: string): number => {
+    if (!emp) return Math.round(hoursWorked * getEmployeeRate(employeeId) * 100) / 100;
+    const rateType = emp.rate_type || 'hourly';
+    if (rateType === 'daily') return Number(emp.daily_rate || 0);
+    if (rateType === 'monthly') return Math.round((Number(emp.monthly_rate || 0) / 22) * 100) / 100;
+    return Math.round(hoursWorked * Number(emp.hourly_rate) * 100) / 100;
+  };
+
   const addShift = async () => {
     if (!newShiftEmployee || !newShiftClockIn) return;
     const clockIn = new Date(newShiftClockIn);
@@ -237,7 +303,8 @@ const PayrollDashboard = () => {
     let totalPay: number | null = null;
     if (clockOut) {
       hoursWorked = Math.round(((clockOut.getTime() - clockIn.getTime()) / (1000 * 60 * 60)) * 100) / 100;
-      totalPay = Math.round(hoursWorked * getEmployeeRate(newShiftEmployee) * 100) / 100;
+      const emp = employees.find(e => e.id === newShiftEmployee);
+      totalPay = calculateShiftPay(emp, hoursWorked, newShiftEmployee);
     }
     await supabase.from('employee_shifts').insert({
       employee_id: newShiftEmployee,
@@ -254,7 +321,29 @@ const PayrollDashboard = () => {
     toast.success('Shift added');
   };
 
-  // CSV Export with split shift subtotals
+  // Bonus CRUD
+  const addBonus = async () => {
+    if (!bonusEmployee || !bonusAmount) return;
+    const amount = bonusIsEOM ? (parseFloat(bonusAmount) || Number(payrollSettings?.eom_bonus_amount || 0)) : parseFloat(bonusAmount) || 0;
+    await (supabase.from('employee_bonuses' as any) as any).insert({
+      employee_id: bonusEmployee,
+      amount,
+      reason: bonusReason.trim() || (bonusIsEOM ? 'Employee of the Month' : ''),
+      bonus_month: format(new Date(), 'yyyy-MM-01'),
+      is_employee_of_month: bonusIsEOM,
+    });
+    setBonusEmployee(''); setBonusAmount(''); setBonusReason(''); setBonusIsEOM(false); setShowBonusForm(false);
+    qc.invalidateQueries({ queryKey: ['employee-bonuses'] });
+    toast.success(bonusIsEOM ? 'Employee of the Month bonus added!' : 'Bonus added');
+  };
+
+  const deleteBonus = async (id: string) => {
+    await (supabase.from('employee_bonuses' as any) as any).delete().eq('id', id);
+    qc.invalidateQueries({ queryKey: ['employee-bonuses'] });
+    toast.success('Bonus deleted');
+  };
+
+  // CSV Export with bonuses
   const downloadCSV = () => {
     let csv = 'Payroll Report\n';
     csv += `Period,${dateFilter}\n`;
@@ -267,9 +356,9 @@ const PayrollDashboard = () => {
     csv += `Outstanding,${stats.outstanding.toFixed(2)}\n\n`;
 
     csv += 'EMPLOYEE SUMMARY\n';
-    csv += 'Employee,Hourly Rate,Hours,Earned,Paid,Outstanding\n';
+    csv += 'Employee,Rate Type,Rate,Hours,Earned,Bonuses,Total,Paid,Outstanding\n';
     employeeSummary.forEach(e => {
-      csv += `"${e.name}",${Number(e.hourly_rate).toFixed(2)},${e.hours.toFixed(2)},${e.total.toFixed(2)},${e.paid.toFixed(2)},${e.outstanding.toFixed(2)}\n`;
+      csv += `"${e.name}",${(e as any).rate_type || 'hourly'},${getRateValue(e)},${e.hours.toFixed(2)},${e.total.toFixed(2)},${e.totalBonuses.toFixed(2)},${(e.total + e.totalBonuses).toFixed(2)},${e.paid.toFixed(2)},${e.outstanding.toFixed(2)}\n`;
     });
 
     csv += '\nSHIFT DETAIL\n';
@@ -291,6 +380,14 @@ const PayrollDashboard = () => {
       }
     });
 
+    if (bonuses.length > 0) {
+      csv += '\nBONUSES\n';
+      csv += 'Employee,Amount,Reason,Month,Employee of Month\n';
+      bonuses.forEach((b: any) => {
+        csv += `"${getEmployeeName(b.employee_id)}",${Number(b.amount).toFixed(2)},"${b.reason}",${b.bonus_month || ''},${b.is_employee_of_month ? 'Yes' : 'No'}\n`;
+      });
+    }
+
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -302,18 +399,40 @@ const PayrollDashboard = () => {
   };
 
   // Payment CRUD
+  const getPayPeriod = () => {
+    const now = new Date();
+    const type = payrollSettings?.payday_type || 'weekly';
+    const dow = payrollSettings?.payday_day_of_week ?? 6;
+    if (type === 'weekly') {
+      const periodStart = isSunday(now) ? now : previousSunday(now);
+      const periodEnd = nextSaturday(now);
+      return { periodStart, periodEnd, label: `${DAYS_OF_WEEK[dow]}` };
+    }
+    if (type === 'bimonthly') {
+      const day = now.getDate();
+      const year = now.getFullYear();
+      const month = now.getMonth();
+      if (day <= 15) {
+        return { periodStart: new Date(year, month, 1), periodEnd: new Date(year, month, 15), label: 'Every 15 Days' };
+      }
+      const lastDay = new Date(year, month + 1, 0).getDate();
+      return { periodStart: new Date(year, month, 16), periodEnd: new Date(year, month, lastDay), label: 'Every 15 Days' };
+    }
+    // monthly
+    return { periodStart: new Date(now.getFullYear(), now.getMonth(), 1), periodEnd: new Date(now.getFullYear(), now.getMonth() + 1, 0), label: 'Monthly' };
+  };
+
+  const payPeriod = getPayPeriod();
+
   const recordPayment = async () => {
     if (!payEmployee || !payAmount) return;
-    const now = new Date();
-    // Default period: Sunday to Saturday of current week
-    const periodStart = isSunday(now) ? now : previousSunday(now);
-    const periodEnd = nextSaturday(now);
-    await supabase.from('payroll_payments').insert({
+    await (supabase.from('payroll_payments') as any).insert({
       employee_id: payEmployee,
       amount: parseFloat(payAmount) || 0,
+      bonus_amount: 0,
       payment_type: payType,
-      period_start: format(periodStart, 'yyyy-MM-dd'),
-      period_end: format(periodEnd, 'yyyy-MM-dd'),
+      period_start: format(payPeriod.periodStart, 'yyyy-MM-dd'),
+      period_end: format(payPeriod.periodEnd, 'yyyy-MM-dd'),
       notes: payNotes.trim(),
       paid_at: new Date().toISOString(),
     });
@@ -371,10 +490,9 @@ const PayrollDashboard = () => {
     { key: 'all', label: 'All' },
   ];
 
-  // Pay period dates
-  const now = new Date();
-  const payPeriodStart = isSunday(now) ? startOfDay(now) : previousSunday(now);
-  const payPeriodEnd = nextSaturday(now);
+  const paydayLabel = payrollSettings?.payday_type === 'bimonthly' ? 'Every 15 Days'
+    : payrollSettings?.payday_type === 'monthly' ? 'Monthly (30 days)'
+    : `Every ${DAYS_OF_WEEK[payrollSettings?.payday_day_of_week ?? 6]}`;
 
   return (
     <div className="space-y-4">
@@ -384,10 +502,10 @@ const PayrollDashboard = () => {
           <div className="flex items-center gap-2">
             <Clock className="w-4 h-4 text-primary" />
             <span className="font-display text-xs tracking-wider text-foreground">
-              Pay Period: {format(payPeriodStart, 'EEE, MMM d')} – {format(payPeriodEnd, 'EEE, MMM d')}
+              Pay Period: {format(payPeriod.periodStart, 'EEE, MMM d')} – {format(payPeriod.periodEnd, 'EEE, MMM d')}
             </span>
           </div>
-          <Badge variant="outline" className="text-xs font-body">Payday: Saturday</Badge>
+          <Badge variant="outline" className="text-xs font-body">Payday: {paydayLabel}</Badge>
         </div>
       )}
 
@@ -395,9 +513,10 @@ const PayrollDashboard = () => {
       <div className="flex gap-1 flex-wrap">
         {([
           { key: 'employees' as SubView, label: 'Employees', icon: Users },
-          { key: 'shifts' as SubView, label: 'Shift Log', icon: Clock },
+          { key: 'shifts' as SubView, label: 'Shifts', icon: Clock },
           { key: 'summary' as SubView, label: 'Payroll', icon: DollarSign },
           { key: 'payments' as SubView, label: 'Payments', icon: Banknote },
+          { key: 'settings' as SubView, label: 'Settings', icon: Settings },
         ]).map(({ key, label, icon: Icon }) => (
           <Button key={key} size="sm" variant={subView === key ? 'default' : 'outline'}
             onClick={() => setSubView(key)} className="font-display text-xs tracking-wider flex-1 gap-1">
@@ -416,8 +535,21 @@ const PayrollDashboard = () => {
                   <Input value={editName} onChange={e => setEditName(e.target.value)}
                     className="bg-secondary border-border text-foreground font-body h-8 text-sm flex-1 min-w-[100px]" autoFocus
                     onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingId(null); }} />
+                  <select value={editRateType} onChange={e => {
+                    setEditRateType(e.target.value as any);
+                    const empData = employees.find(x => x.id === editingId);
+                    if (e.target.value === 'hourly') setEditRate(String(empData?.hourly_rate || 0));
+                    else if (e.target.value === 'daily') setEditRate(String((empData as any)?.daily_rate || 0));
+                    else setEditRate(String((empData as any)?.monthly_rate || 0));
+                  }}
+                    className="bg-secondary border border-border text-foreground font-body h-8 text-sm rounded-md px-2">
+                    <option value="hourly">Per Hour</option>
+                    <option value="daily">Per Day</option>
+                    <option value="monthly">Per Month</option>
+                  </select>
                   <Input value={editRate} onChange={e => setEditRate(e.target.value)} type="number"
-                    className="bg-secondary border-border text-foreground font-body h-8 text-sm w-20" placeholder="₱/hr" />
+                    className="bg-secondary border-border text-foreground font-body h-8 text-sm w-24"
+                    placeholder={editRateType === 'hourly' ? '₱/hr' : editRateType === 'daily' ? '₱/day' : '₱/mo'} />
                   <Button size="icon" variant="ghost" className="h-7 w-7 text-primary" onClick={saveEdit}><Check className="w-3.5 h-3.5" /></Button>
                   <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" onClick={() => setEditingId(null)}><X className="w-3.5 h-3.5" /></Button>
                 </div>
@@ -425,12 +557,18 @@ const PayrollDashboard = () => {
                 <>
                   <div className="flex-1">
                     <span className="font-body text-sm text-foreground">{emp.name}</span>
-                    <span className="font-body text-xs text-muted-foreground ml-2">₱{Number(emp.hourly_rate).toFixed(0)}/hr</span>
+                    <span className="font-body text-xs text-muted-foreground ml-2">{getRateDisplay(emp)}</span>
                     <span className="font-body text-xs text-primary ml-2">Paid: ₱{(allTimePaid[emp.id] || 0).toFixed(0)}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                      onClick={() => { setEditingId(emp.id); setEditName(emp.name); setEditRate(String(emp.hourly_rate)); }}>
+                      onClick={() => {
+                        setEditingId(emp.id);
+                        setEditName(emp.name);
+                        const rt = (emp as any).rate_type || 'hourly';
+                        setEditRateType(rt);
+                        setEditRate(String(rt === 'daily' ? (emp as any).daily_rate || 0 : rt === 'monthly' ? (emp as any).monthly_rate || 0 : emp.hourly_rate));
+                      }}>
                       <Pencil className="w-3.5 h-3.5" />
                     </Button>
                     <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive"
@@ -443,12 +581,92 @@ const PayrollDashboard = () => {
               )}
             </div>
           ))}
-          <div className="flex gap-2 mt-3">
+          {/* Add employee form */}
+          <div className="flex gap-2 mt-3 flex-wrap">
             <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Employee name"
-              className="bg-secondary border-border text-foreground font-body flex-1" />
-            <Input value={newRate} onChange={e => setNewRate(e.target.value)} placeholder="₱/hr" type="number"
-              className="bg-secondary border-border text-foreground font-body w-20" />
+              className="bg-secondary border-border text-foreground font-body flex-1 min-w-[120px]" />
+            <select value={newRateType} onChange={e => setNewRateType(e.target.value as any)}
+              className="bg-secondary border border-border text-foreground font-body text-sm rounded-md px-2 h-10">
+              <option value="hourly">Per Hour</option>
+              <option value="daily">Per Day</option>
+              <option value="monthly">Per Month</option>
+            </select>
+            <Input value={newRate} onChange={e => setNewRate(e.target.value)}
+              placeholder={newRateType === 'hourly' ? '₱/hr' : newRateType === 'daily' ? '₱/day' : '₱/mo'}
+              type="number" className="bg-secondary border-border text-foreground font-body w-24" />
             <Button onClick={addEmployee} size="icon" variant="outline"><Plus className="w-4 h-4" /></Button>
+          </div>
+
+          {/* Bonuses section */}
+          <div className="mt-6 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-display text-sm tracking-wider text-foreground flex items-center gap-1.5">
+                <Star className="w-4 h-4 text-primary" /> Bonuses
+              </h3>
+              <Button size="sm" variant="outline" onClick={() => setShowBonusForm(!showBonusForm)}
+                className="font-display text-xs tracking-wider gap-1">
+                <Plus className="w-3.5 h-3.5" /> Add Bonus
+              </Button>
+            </div>
+
+            {showBonusForm && (
+              <div className="border border-primary/30 rounded-lg p-3 space-y-2">
+                <select value={bonusEmployee} onChange={e => setBonusEmployee(e.target.value)}
+                  className="w-full bg-secondary border border-border text-foreground font-body text-sm rounded-md px-3 py-2">
+                  <option value="">Select employee</option>
+                  {employees.filter(e => e.active).map(e => (
+                    <option key={e.id} value={e.id}>{e.name}</option>
+                  ))}
+                </select>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input value={bonusAmount} onChange={e => setBonusAmount(e.target.value)} type="number"
+                    placeholder={`Amount (₱${payrollSettings?.eom_bonus_amount || 0} default)`}
+                    className="bg-secondary border-border text-foreground font-body text-sm" />
+                  <Input value={bonusReason} onChange={e => setBonusReason(e.target.value)} placeholder="Reason"
+                    className="bg-secondary border-border text-foreground font-body text-sm" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch checked={bonusIsEOM} onCheckedChange={v => {
+                    setBonusIsEOM(v);
+                    if (v && !bonusAmount) setBonusAmount(String(payrollSettings?.eom_bonus_amount || 0));
+                    if (v && !bonusReason) setBonusReason('Employee of the Month');
+                  }} />
+                  <span className="font-body text-xs text-muted-foreground flex items-center gap-1">
+                    <Star className="w-3 h-3 text-primary" /> Employee of the Month
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={addBonus} className="font-display text-xs tracking-wider flex-1" disabled={!bonusEmployee || !bonusAmount}>
+                    Save Bonus
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setShowBonusForm(false)} className="font-display text-xs tracking-wider flex-1">Cancel</Button>
+                </div>
+              </div>
+            )}
+
+            {/* Bonus list */}
+            {bonuses.length === 0 && !showBonusForm && (
+              <p className="font-body text-xs text-muted-foreground text-center py-4">No bonuses recorded</p>
+            )}
+            {bonuses.map((b: any) => (
+              <div key={b.id} className="flex items-center justify-between py-2 px-2 border-b border-border">
+                <div className="flex-1">
+                  <span className="font-body text-sm text-foreground">{getEmployeeName(b.employee_id)}</span>
+                  {b.is_employee_of_month && (
+                    <Badge variant="default" className="font-body text-xs ml-2 gap-1">
+                      <Star className="w-3 h-3" /> EOM
+                    </Badge>
+                  )}
+                  <p className="font-body text-xs text-muted-foreground">
+                    ₱{Number(b.amount).toFixed(0)} · {b.reason || 'No reason'} · {b.bonus_month ? format(new Date(b.bonus_month + 'T00:00:00'), 'MMM yyyy') : ''}
+                  </p>
+                </div>
+                <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                  onClick={() => deleteBonus(b.id)}>
+                  <Trash2 className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -650,7 +868,7 @@ const PayrollDashboard = () => {
             <div key={emp.id} className="border border-border rounded-lg p-4 space-y-2">
               <div className="flex justify-between items-start">
                 <p className="font-display text-sm text-foreground">{emp.name}</p>
-                <span className="font-body text-xs text-muted-foreground">₱{Number(emp.hourly_rate).toFixed(0)}/hr</span>
+                <span className="font-body text-xs text-muted-foreground">{getRateDisplay(emp)}</span>
               </div>
               <div className="grid grid-cols-4 gap-2 text-center">
                 <div>
@@ -662,14 +880,27 @@ const PayrollDashboard = () => {
                   <p className="font-display text-sm text-foreground">₱{emp.total.toFixed(0)}</p>
                 </div>
                 <div>
-                  <p className="font-body text-xs text-muted-foreground">Paid</p>
-                  <p className="font-display text-sm text-primary">₱{emp.paid.toFixed(0)}</p>
+                  <p className="font-body text-xs text-muted-foreground">Bonuses</p>
+                  <p className="font-display text-sm text-primary">₱{emp.totalBonuses.toFixed(0)}</p>
                 </div>
                 <div>
                   <p className="font-body text-xs text-muted-foreground">Unpaid</p>
                   <p className="font-display text-sm text-foreground">₱{emp.outstanding.toFixed(0)}</p>
                 </div>
               </div>
+              {emp.totalBonuses > 0 && (
+                <div className="border-t border-border pt-2">
+                  <p className="font-body text-xs text-muted-foreground">
+                    Total (shifts + bonuses): <span className="text-foreground font-display">₱{(emp.total + emp.totalBonuses).toFixed(0)}</span>
+                  </p>
+                  {emp.bonusList.map((b: any) => (
+                    <p key={b.id} className="font-body text-xs text-muted-foreground">
+                      {b.is_employee_of_month && <Star className="w-3 h-3 text-primary inline mr-1" />}
+                      Bonus: ₱{Number(b.amount).toFixed(0)} — {b.reason || 'No reason'}
+                    </p>
+                  ))}
+                </div>
+              )}
               <div className="border-t border-border pt-2">
                 <p className="font-body text-xs text-muted-foreground">All-time paid out: <span className="text-primary font-display">₱{(allTimePaid[emp.id] || 0).toFixed(0)}</span></p>
               </div>
@@ -750,6 +981,9 @@ const PayrollDashboard = () => {
                     </div>
                     <div className="text-right">
                       <p className="font-display text-sm text-foreground">₱{Number(payment.amount).toFixed(0)}</p>
+                      {Number((payment as any).bonus_amount || 0) > 0 && (
+                        <p className="font-body text-xs text-primary">+₱{Number((payment as any).bonus_amount).toFixed(0)} bonus</p>
+                      )}
                       <Badge variant={payment.payment_type === 'advance' ? 'destructive' : 'default'} className="font-body text-xs">
                         {payment.payment_type === 'advance' ? 'Advance' : 'Regular'}
                       </Badge>
@@ -778,6 +1012,56 @@ const PayrollDashboard = () => {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* SETTINGS SUB-VIEW */}
+      {subView === 'settings' && (
+        <div className="space-y-4">
+          <h3 className="font-display text-sm tracking-wider text-foreground">Payroll Settings</h3>
+
+          {/* Payday Schedule */}
+          <div className="border border-border rounded-lg p-4 space-y-3">
+            <p className="font-display text-xs tracking-wider text-foreground">Payday Schedule</p>
+            <select
+              value={payrollSettings?.payday_type || 'weekly'}
+              onChange={e => upsertSettings({ payday_type: e.target.value })}
+              className="w-full bg-secondary border border-border text-foreground font-body text-sm rounded-md px-3 py-2">
+              <option value="weekly">Weekly (pick day)</option>
+              <option value="bimonthly">Every 15 Days</option>
+              <option value="monthly">Every 30 Days</option>
+            </select>
+
+            {(payrollSettings?.payday_type || 'weekly') === 'weekly' && (
+              <div>
+                <label className="font-body text-xs text-muted-foreground">Payday Day</label>
+                <select
+                  value={payrollSettings?.payday_day_of_week ?? 6}
+                  onChange={e => upsertSettings({ payday_day_of_week: parseInt(e.target.value) })}
+                  className="w-full bg-secondary border border-border text-foreground font-body text-sm rounded-md px-3 py-2 mt-1">
+                  {DAYS_OF_WEEK.map((day, i) => (
+                    <option key={i} value={i}>{day}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          {/* Employee of the Month Bonus */}
+          <div className="border border-border rounded-lg p-4 space-y-3">
+            <p className="font-display text-xs tracking-wider text-foreground flex items-center gap-1.5">
+              <Star className="w-4 h-4 text-primary" /> Employee of the Month Default Bonus
+            </p>
+            <Input
+              type="number"
+              value={payrollSettings?.eom_bonus_amount ?? 0}
+              onChange={e => upsertSettings({ eom_bonus_amount: parseFloat(e.target.value) || 0 })}
+              placeholder="Default bonus amount (₱)"
+              className="bg-secondary border-border text-foreground font-body text-sm" />
+            <p className="font-body text-xs text-muted-foreground">
+              This amount auto-fills when adding an "Employee of the Month" bonus.
+            </p>
+          </div>
         </div>
       )}
     </div>
