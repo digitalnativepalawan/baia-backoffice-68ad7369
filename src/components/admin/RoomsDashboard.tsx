@@ -26,8 +26,8 @@ const RoomsDashboard = () => {
   const { data: units = [] } = useQuery({
     queryKey: ['rooms-units'],
     queryFn: async () => {
-      const { data } = await supabase.from('resort_ops_units').select('*').order('name');
-      return data || [];
+      const { data } = await supabase.from('units').select('*').eq('active', true).order('unit_name');
+      return (data || []).map((u: any) => ({ ...u, name: u.unit_name, type: '', capacity: 0 }));
     },
   });
 
