@@ -445,26 +445,67 @@ const PayrollDashboard = () => {
 
   const recordPayment = async () => {
     if (!payEmployee || !payAmount) return;
-    await (supabase.from('payroll_payments') as any).insert({
+    const amount = parseFloat(payAmount) || 0;
+    const empName = getEmployeeName(payEmployee);
+    const periodStart = format(payPeriod.periodStart, 'yyyy-MM-dd');
+    const periodEnd = format(payPeriod.periodEnd, 'yyyy-MM-dd');
+    const notes = payNotes.trim();
+
+    const { data: inserted } = await (supabase.from('payroll_payments') as any).insert({
       employee_id: payEmployee,
-      amount: parseFloat(payAmount) || 0,
+      amount,
       bonus_amount: 0,
       payment_type: payType,
-      period_start: format(payPeriod.periodStart, 'yyyy-MM-dd'),
-      period_end: format(payPeriod.periodEnd, 'yyyy-MM-dd'),
-      notes: payNotes.trim(),
+      period_start: periodStart,
+      period_end: periodEnd,
+      notes,
       paid_at: new Date().toISOString(),
-    });
+    }).select('id').single();
+
+    // Auto-sync to resort_ops_expenses
+    if (inserted?.id) {
+      const desc = `${payType === 'advance' ? 'Advance' : 'Regular'} pay ${periodStart} to ${periodEnd}${notes ? ' - ' + notes : ''}`;
+      await (supabase.from('resort_ops_expenses') as any).insert({
+        expense_date: format(new Date(), 'yyyy-MM-dd'),
+        name: `Payroll - ${empName}`,
+        category: 'Labor/Staff',
+        amount,
+        vat_status: 'Non-VAT',
+        is_paid: true,
+        payment_method: 'Bank Transfer',
+        description: desc,
+        notes: `[payroll:${inserted.id}]`,
+        vatable_sale: 0,
+        vat_amount: 0,
+        vat_exempt_amount: 0,
+        zero_rated_amount: 0,
+        withholding_tax: 0,
+      });
+    }
+
     setPayEmployee(''); setPayAmount(''); setPayNotes(''); setPayType('regular');
     qc.invalidateQueries({ queryKey: ['payroll-payments'] });
     toast.success(payType === 'advance' ? 'Advance recorded' : 'Payment recorded');
   };
 
   const updatePayment = async (id: string) => {
+    const amount = parseFloat(editPayAmount) || 0;
     await supabase.from('payroll_payments').update({
-      amount: parseFloat(editPayAmount) || 0,
+      amount,
       notes: editPayNotes.trim(),
     }).eq('id', id);
+
+    // Sync update to linked resort_ops_expense
+    const { data: linkedExpenses } = await (supabase.from('resort_ops_expenses') as any)
+      .select('id')
+      .eq('notes', `[payroll:${id}]`)
+      .limit(1);
+    if (linkedExpenses && linkedExpenses.length > 0) {
+      await (supabase.from('resort_ops_expenses') as any)
+        .update({ amount })
+        .eq('id', linkedExpenses[0].id);
+    }
+
     setEditingPaymentId(null);
     qc.invalidateQueries({ queryKey: ['payroll-payments'] });
     toast.success('Payment updated');
@@ -476,6 +517,11 @@ const PayrollDashboard = () => {
       setTimeout(() => setConfirmDeletePayment(null), 3000);
       return;
     }
+    // Delete linked resort_ops_expense first
+    await (supabase.from('resort_ops_expenses') as any)
+      .delete()
+      .eq('notes', `[payroll:${id}]`);
+
     await supabase.from('payroll_payments').delete().eq('id', id);
     setConfirmDeletePayment(null);
     qc.invalidateQueries({ queryKey: ['payroll-payments'] });
