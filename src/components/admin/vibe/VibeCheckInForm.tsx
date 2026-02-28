@@ -9,6 +9,22 @@ import { ArrowLeft, Save } from 'lucide-react';
 import PillToggle from './PillToggle';
 import { useAppOptions, getOptionsByCategory } from '@/hooks/useAppOptions';
 
+const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
+  <div className="space-y-2">
+    <h4 className="font-display text-xs tracking-wider text-muted-foreground uppercase">{title}</h4>
+    {children}
+  </div>
+);
+
+const Field = ({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) => (
+  <div className="space-y-1.5">
+    <label className="font-body text-sm text-foreground">
+      {label} {required && <span className="text-destructive">*</span>}
+    </label>
+    {children}
+  </div>
+);
+
 interface Props {
   unitName: string;
   onClose: () => void;
@@ -75,22 +91,6 @@ const VibeCheckInForm = ({ unitName, onClose, existingRecord }: Props) => {
     setSaving(false);
     onClose();
   };
-
-  const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <div className="space-y-2">
-      <h4 className="font-display text-xs tracking-wider text-muted-foreground uppercase">{title}</h4>
-      {children}
-    </div>
-  );
-
-  const Field = ({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) => (
-    <div className="space-y-1.5">
-      <label className="font-body text-sm text-foreground">
-        {label} {required && <span className="text-destructive">*</span>}
-      </label>
-      {children}
-    </div>
-  );
 
   return (
     <div className="space-y-5">
