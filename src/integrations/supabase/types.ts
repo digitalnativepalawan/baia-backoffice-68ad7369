@@ -185,6 +185,7 @@ export type Database = {
           name: string
           password_hash: string
           phone: string
+          preferred_contact_method: string
           rate_type: string
         }
         Insert: {
@@ -199,6 +200,7 @@ export type Database = {
           name: string
           password_hash?: string
           phone?: string
+          preferred_contact_method?: string
           rate_type?: string
         }
         Update: {
@@ -213,6 +215,7 @@ export type Database = {
           name?: string
           password_hash?: string
           phone?: string
+          preferred_contact_method?: string
           rate_type?: string
         }
         Relationships: []

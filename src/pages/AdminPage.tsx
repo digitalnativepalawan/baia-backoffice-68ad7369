@@ -23,6 +23,7 @@ import InventoryDashboard from '@/components/admin/InventoryDashboard';
 import ResortOpsDashboard from '@/components/admin/ResortOpsDashboard';
 import InvoiceSettingsForm from '@/components/admin/InvoiceSettingsForm';
 import StaffAccessManager from '@/components/admin/StaffAccessManager';
+import EmployeeContactConfig from '@/components/admin/EmployeeContactConfig';
 import RoomsDashboard from '@/components/admin/RoomsDashboard';
 import AdminLoginGate from '@/components/admin/AdminLoginGate';
 
@@ -521,6 +522,7 @@ const AdminPage = () => {
               </div>
             </section>
             <StaffAccessManager />
+            <EmployeeContactConfig />
           </TabsContent>
 
           {/* MENU TAB */}
