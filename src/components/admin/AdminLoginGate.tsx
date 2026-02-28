@@ -10,6 +10,7 @@ interface AdminLoginGateProps {
 }
 
 const SESSION_KEY = 'admin_session';
+const STAFF_SESSION_KEY = 'staff_home_session';
 const SESSION_DURATION = 8 * 60 * 60 * 1000; // 8 hours
 
 const AdminLoginGate = ({ children }: AdminLoginGateProps) => {
@@ -20,17 +21,38 @@ const AdminLoginGate = ({ children }: AdminLoginGateProps) => {
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
 
-  // Check existing session on mount
+  // Check existing session on mount — reuse home staff session if admin
   useEffect(() => {
     try {
+      // First check dedicated admin session
       const stored = sessionStorage.getItem(SESSION_KEY);
       if (stored) {
         const session = JSON.parse(stored);
         if (session.expiresAt > Date.now()) {
           setAuthenticated(true);
           setAdminName(session.name);
+          setChecking(false);
+          return;
         } else {
           sessionStorage.removeItem(SESSION_KEY);
+        }
+      }
+      // Then check if staff home session is admin — skip double login
+      const staffStored = sessionStorage.getItem(STAFF_SESSION_KEY);
+      if (staffStored) {
+        const staffSession = JSON.parse(staffStored);
+        if (staffSession.expiresAt > Date.now() && staffSession.isAdmin) {
+          // Mirror into admin session so logout works independently
+          const adminSession = {
+            name: staffSession.name,
+            employeeId: staffSession.employeeId,
+            expiresAt: staffSession.expiresAt,
+          };
+          sessionStorage.setItem(SESSION_KEY, JSON.stringify(adminSession));
+          setAuthenticated(true);
+          setAdminName(staffSession.name);
+          setChecking(false);
+          return;
         }
       }
     } catch {
