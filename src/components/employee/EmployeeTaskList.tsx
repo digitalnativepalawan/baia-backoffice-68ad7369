@@ -192,7 +192,7 @@ const EmployeeTaskList = ({ employeeId, createdBy = 'admin', employees = [] }: P
                 </div>
                 <div className="flex items-center gap-0.5">
                    <Button size="icon" variant="ghost" className="h-10 w-10" onClick={() => toggleComplete(task)}>
-                     <Check className={`${task.status === 'completed' ? 'w-6 h-6 text-green-600 stroke-[3]' : 'w-5 h-5 text-muted-foreground'}`} />
+                     <Check className={`${task.status === 'completed' ? 'w-7 h-7 text-green-500 stroke-[4]' : 'w-5 h-5 text-muted-foreground'}`} />
                    </Button>
                    <Button size="icon" variant="ghost" className="h-10 w-10 text-muted-foreground" onClick={() => {
                      setEditId(task.id); setEditTitle(task.title); setEditDesc(task.description || '');
