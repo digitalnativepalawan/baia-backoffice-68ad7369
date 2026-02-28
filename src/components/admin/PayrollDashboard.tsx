@@ -1152,7 +1152,7 @@ const PayrollDashboard = () => {
           <h3 className="font-display text-sm tracking-wider text-foreground flex items-center gap-1.5">
             <ListTodo className="w-4 h-4 text-primary" /> Employee Tasks
           </h3>
-          <EmployeeTaskList employees={employees.map(e => ({ id: e.id, name: e.name }))} createdBy="admin" />
+          <EmployeeTaskList employees={employees.map(e => ({ id: e.id, name: e.name, messenger_link: (e as any).messenger_link, whatsapp_number: (e as any).whatsapp_number, display_name: (e as any).display_name, active: (e as any).active }))} createdBy="admin" />
         </div>
       )}
 

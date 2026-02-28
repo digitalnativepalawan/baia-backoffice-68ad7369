@@ -5,15 +5,15 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Check, Pencil, Trash2, X, MessageCircle } from 'lucide-react';
+import { Plus, Check, Pencil, Trash2, X, MessageCircle, Phone } from 'lucide-react';
 import { format } from 'date-fns';
-import { sendMessengerMessage } from '@/lib/messenger';
+import { sendMessengerMessage, openWhatsApp } from '@/lib/messenger';
 import { useResortProfile } from '@/hooks/useResortProfile';
 
 interface Props {
   employeeId?: string; // filter to one employee (portal) or all (admin)
   createdBy?: 'admin' | 'employee';
-  employees?: { id: string; name: string; messenger_link?: string; active?: boolean; display_name?: string }[];
+  employees?: { id: string; name: string; messenger_link?: string; whatsapp_number?: string; active?: boolean; display_name?: string }[];
 }
 
 const EmployeeTaskList = ({ employeeId, createdBy = 'admin', employees = [] }: Props) => {
@@ -163,18 +163,32 @@ const EmployeeTaskList = ({ employeeId, createdBy = 'admin', employees = [] }: P
                    <Button size="icon" variant="ghost" className="h-10 w-10 text-muted-foreground hover:text-destructive"
                      onClick={() => deleteTask(task.id)}><Trash2 className="w-5 h-5" /></Button>
                    <Button size="icon" variant="ghost" className="h-10 w-10 text-muted-foreground"
-                     title="Send via Messenger"
-                     disabled={(() => { const emp = employees.find(e => e.id === task.employee_id); return !emp?.messenger_link || emp?.active === false; })()}
-                     onClick={() => {
-                       const emp = employees.find(e => e.id === task.employee_id);
-                       if (emp) sendMessengerMessage(
-                         { name: emp.name, display_name: emp.display_name, messenger_link: emp.messenger_link || '', active: emp.active !== false },
-                         `Task: ${task.title}${task.description ? '\n' + task.description : ''}`,
-                         resortProfile?.resort_name || 'Resort'
-                       );
-                     }}>
-                     <MessageCircle className="w-5 h-5" />
-                   </Button>
+                      title="Send via Messenger"
+                      disabled={(() => { const emp = employees.find(e => e.id === task.employee_id); return !emp?.messenger_link || emp?.active === false; })()}
+                      onClick={() => {
+                        const emp = employees.find(e => e.id === task.employee_id);
+                        if (emp) sendMessengerMessage(
+                          { name: emp.name, display_name: emp.display_name, messenger_link: emp.messenger_link || '', active: emp.active !== false },
+                          `Task: ${task.title}${task.description ? '\n' + task.description : ''}`,
+                          resortProfile?.resort_name || 'Resort'
+                        );
+                      }}>
+                      <MessageCircle className="w-5 h-5" />
+                    </Button>
+                    <Button size="icon" variant="ghost" className="h-10 w-10 text-green-600"
+                      title="Send via WhatsApp"
+                      disabled={(() => { const emp = employees.find(e => e.id === task.employee_id); return !emp?.whatsapp_number || emp?.active === false; })()}
+                      onClick={() => {
+                        const emp = employees.find(e => e.id === task.employee_id);
+                        if (emp?.whatsapp_number) {
+                          const displayName = emp.display_name || emp.name;
+                          const due = task.due_date ? `\nDue: ${format(new Date(task.due_date), 'MMM d, h:mm a')}` : '';
+                          const msg = `Hi ${displayName},\n\nTask: ${task.title}${task.description ? '\n' + task.description : ''}${due}\n\n— ${resortProfile?.resort_name || 'Resort'} Admin`;
+                          openWhatsApp(emp.whatsapp_number, msg);
+                        }
+                      }}>
+                      <Phone className="w-5 h-5" />
+                    </Button>
                  </div>
               </div>
               <div className="flex gap-2 items-center">
