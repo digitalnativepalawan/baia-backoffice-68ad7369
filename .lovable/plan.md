@@ -1,41 +1,33 @@
 
 
-## Add WhatsApp Integration to Team Contact
+## Add WhatsApp and Messenger Send Buttons to Task List
 
 ### What This Does
-Adds a WhatsApp icon button next to each employee's name (like the existing Phone and Messenger icons), and a WhatsApp field in the Contact edit form. When tapped, it opens WhatsApp with a pre-formatted message containing the employee's tasks/schedule.
+When you create or view a task in the Tasks section, each task will have both a **Messenger** button and a **WhatsApp** button. Tapping either one opens the respective app with a pre-formatted message containing the task details (title, description, due date) ready to send to that employee.
 
 ### Changes
 
-#### 1. Add WhatsApp number field to Contact edit form (`PayrollDashboard.tsx`)
-- Add a new state variable `editWhatsapp` for the WhatsApp number field
-- Add a WhatsApp number input field in the contact edit section (alongside phone and messenger)
-- Save the WhatsApp number to the employee record when saving contact info
-- Pre-populate from `(emp as any).whatsapp_number` on edit
+#### 1. Pass full employee contact data to the Task List (`PayrollDashboard.tsx`)
+- Currently the Tasks section only passes employee `id` and `name` -- it strips out contact info
+- Update line 1155 to also pass `messenger_link`, `whatsapp_number`, `display_name`, and `active` so the send buttons can work
 
-#### 2. Add WhatsApp icon button next to employee name
-- Add a green WhatsApp icon (using MessageCircle or a custom icon) next to the existing Phone and Messenger icons in the employee row
-- When tapped, it opens `https://wa.me/{number}?text={formatted_message}` with:
-  - Employee greeting
-  - Their pending tasks (fetched from the tasks table)
-  - Their upcoming schedule/shift info
-  - Resort name footer
+#### 2. Update the Task List Props to include WhatsApp (`EmployeeTaskList.tsx`)
+- Add `whatsapp_number` to the employee interface in the Props type
+- Add a green WhatsApp icon button next to the existing Messenger button on each task
+- When tapped, it formats a message with the task title, description, and due date, then opens WhatsApp via `wa.me`
+- The WhatsApp button is disabled if the employee has no WhatsApp number configured
 
-#### 3. Add `whatsapp_number` column to employees table
-- Database migration to add `whatsapp_number TEXT` column to the `employees` table
+#### 3. Use existing messenger utilities (`src/lib/messenger.ts`)
+- Reuse the existing `openWhatsApp` helper already in the codebase -- no new utility code needed
 
-#### 4. Create WhatsApp message builder
-- Add a helper function `buildTeamWhatsAppMessage(employee, tasks, shifts, resortName)` in `src/lib/messenger.ts` that formats a clean message with pending tasks and schedule data
-- Reuses the existing `wa.me` URL pattern already used elsewhere in the app
+### How It Works
+1. Admin goes to Team, taps Tasks
+2. Each task shows a Messenger icon (existing) and a new green WhatsApp icon
+3. Tapping WhatsApp opens WhatsApp with: "Hi {name}, Task: {title} {description} Due: {date} -- {resort} Admin"
+4. Tapping Messenger works as before (copies message to clipboard and opens Messenger)
+5. Buttons are grayed out if the employee has no WhatsApp number or Messenger link configured
 
 ### Files to Update
-1. **Database migration** -- add `whatsapp_number` column to `employees`
-2. **`src/components/admin/PayrollDashboard.tsx`** -- add WhatsApp field to contact form, WhatsApp icon button, and send functionality
-3. **`src/lib/messenger.ts`** -- add `buildTeamWhatsAppMessage` helper
+1. `src/components/admin/PayrollDashboard.tsx` -- pass full employee data to EmployeeTaskList
+2. `src/components/employee/EmployeeTaskList.tsx` -- add `whatsapp_number` to props, add WhatsApp send button
 
-### How It Works for the Admin
-1. Go to Team, tap "Contact" on an employee
-2. Enter their WhatsApp number (with country code, e.g., +639171940917)
-3. Save
-4. A green WhatsApp icon appears next to the employee name
-5. Tap it to open WhatsApp with a pre-filled message containing their tasks and schedule
