@@ -576,14 +576,27 @@ const PayrollDashboard = () => {
                 <>
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-body text-sm text-foreground">{emp.name}</span>
+                      <div className="flex items-center gap-0.5 flex-wrap -ml-1">
+                        <span className="font-body text-sm text-foreground mr-0.5">{emp.name}</span>
                         {(emp as any).phone && (
-                          <a href={`tel:${(emp as any).phone}`} className="text-muted-foreground hover:text-primary"><Phone className="w-3 h-3" /></a>
+                          <a
+                            href={`tel:${(emp as any).phone}`}
+                            aria-label={`Call ${emp.name}`}
+                            className="inline-flex items-center justify-center h-11 w-11 sm:h-9 sm:w-9 rounded-md text-muted-foreground hover:text-primary hover:bg-accent/60 transition-colors"
+                          >
+                            <Phone className="w-5 h-5 sm:w-4 sm:h-4" />
+                          </a>
                         )}
                         {(emp as any).messenger_link && (
-                          <a href={(emp as any).messenger_link.startsWith('http') ? (emp as any).messenger_link : `https://m.me/${(emp as any).messenger_link}`}
-                            target="_blank" rel="noopener" className="text-muted-foreground hover:text-primary"><MessageCircle className="w-3 h-3" /></a>
+                          <a
+                            href={(emp as any).messenger_link.startsWith('http') ? (emp as any).messenger_link : `https://m.me/${(emp as any).messenger_link}`}
+                            target="_blank"
+                            rel="noopener"
+                            aria-label={`Message ${emp.name} on Messenger`}
+                            className="inline-flex items-center justify-center h-11 w-11 sm:h-9 sm:w-9 rounded-md text-muted-foreground hover:text-primary hover:bg-accent/60 transition-colors"
+                          >
+                            <MessageCircle className="w-5 h-5 sm:w-4 sm:h-4" />
+                          </a>
                         )}
                         {(emp as any).password_hash && <Lock className="w-3 h-3 text-primary" />}
                       </div>
