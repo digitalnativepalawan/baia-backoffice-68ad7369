@@ -23,6 +23,7 @@ const EmployeeTaskList = ({ employeeId, createdBy = 'admin', employees = [] }: P
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [assignee, setAssignee] = useState(employeeId || '');
+  const [sendVia, setSendVia] = useState<'whatsapp' | 'messenger' | 'none'>('whatsapp');
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
@@ -46,7 +47,8 @@ const EmployeeTaskList = ({ employeeId, createdBy = 'admin', employees = [] }: P
     return true;
   });
 
-  const autoSendTask = (targetId: string, taskTitle: string, taskDesc: string, taskDue: string) => {
+  const autoSendTask = (targetId: string, taskTitle: string, taskDesc: string, taskDue: string, method: 'whatsapp' | 'messenger' | 'none') => {
+    if (method === 'none') return;
     const emp = employees.find(e => e.id === targetId);
     if (!emp || emp.active === false) return;
 
@@ -54,19 +56,9 @@ const EmployeeTaskList = ({ employeeId, createdBy = 'admin', employees = [] }: P
     const due = taskDue ? `\nDue: ${format(new Date(taskDue), 'MMM d, h:mm a')}` : '';
     const msg = `Hi ${displayName},\n\nTask: ${taskTitle}${taskDesc ? '\n' + taskDesc : ''}${due}\n\n— ${resortProfile?.resort_name || 'Resort'} Admin`;
 
-    const pref = emp.preferred_contact_method || 'whatsapp';
-
-    if (pref === 'whatsapp' && emp.whatsapp_number) {
+    if (method === 'whatsapp' && emp.whatsapp_number) {
       openWhatsApp(emp.whatsapp_number, msg);
-    } else if (pref === 'messenger' && emp.messenger_link) {
-      sendMessengerMessage(
-        { name: emp.name, display_name: emp.display_name, messenger_link: emp.messenger_link, active: true },
-        `Task: ${taskTitle}${taskDesc ? '\n' + taskDesc : ''}${due}`,
-        resortProfile?.resort_name || 'Resort'
-      );
-    } else if (emp.whatsapp_number) {
-      openWhatsApp(emp.whatsapp_number, msg);
-    } else if (emp.messenger_link) {
+    } else if (method === 'messenger' && emp.messenger_link) {
       sendMessengerMessage(
         { name: emp.name, display_name: emp.display_name, messenger_link: emp.messenger_link, active: true },
         `Task: ${taskTitle}${taskDesc ? '\n' + taskDesc : ''}${due}`,
@@ -91,7 +83,7 @@ const EmployeeTaskList = ({ employeeId, createdBy = 'admin', employees = [] }: P
     setTitle(''); setDescription(''); setDueDate(''); setShowForm(false);
     qc.invalidateQueries({ queryKey: ['employee-tasks'] });
     toast.success('Task added');
-    autoSendTask(targetId, savedTitle, savedDesc, savedDue);
+    autoSendTask(targetId, savedTitle, savedDesc, savedDue, sendVia);
   };
 
   const toggleComplete = async (task: any) => {
@@ -154,6 +146,19 @@ const EmployeeTaskList = ({ employeeId, createdBy = 'admin', employees = [] }: P
             <label className="font-body text-xs text-muted-foreground">Due date & time</label>
             <Input type="datetime-local" value={dueDate} onChange={e => setDueDate(e.target.value)}
               className="bg-secondary border-border text-foreground font-body text-sm" />
+          </div>
+          <div className="space-y-1">
+            <label className="font-body text-xs text-muted-foreground">Send via</label>
+            <div className="flex gap-1">
+              {(['whatsapp', 'messenger', 'none'] as const).map(m => (
+                <Button key={m} size="sm" type="button"
+                  variant={sendVia === m ? 'default' : 'outline'}
+                  onClick={() => setSendVia(m)}
+                  className="font-body text-xs flex-1 capitalize">
+                  {m === 'none' ? 'Don\'t send' : m === 'whatsapp' ? '📱 WhatsApp' : '💬 Messenger'}
+                </Button>
+              ))}
+            </div>
           </div>
           <div className="flex gap-2">
             <Button size="sm" onClick={addTask} className="font-display text-xs tracking-wider flex-1"
