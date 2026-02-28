@@ -1,26 +1,22 @@
 
 
-## Add "Admin" Toggle to Staff Access Manager
+## Fix: Single Login Across All Pages
 
 ### Problem
-The StaffAccessManager under the Team tab has toggles for Orders, Menu, Reports, etc. but no toggle to grant a team member full Admin access. Admins like James, Ron GM, and David need a way to designate other employees as admins directly from this screen.
+The home page login stores credentials in `sessionStorage` (`staff_home_session`), but the Employee Portal and Manager page look for credentials in `localStorage` (`emp_id` / `emp_name`). This forces employees to log in twice.
+
+### Solution
+When a user logs in on the home page, also write their credentials to `localStorage` so the Employee Portal and Manager page recognize them automatically.
 
 ### Changes
 
-#### 1. Add "Admin" permission to `StaffAccessManager.tsx`
-- Add `{ key: 'admin', label: 'Admin (Full Access)' }` to the PERMISSIONS list
-- Style the Admin toggle distinctly (e.g., highlighted or separated) so it's clear this grants full access
-- When the Admin toggle is ON for an employee, visually indicate that all other permissions are implied (dim/disable the individual toggles or show a note)
-- The `admin` permission already works in the `employee-auth` edge function -- it checks for `permission = 'admin'` in the `employee_permissions` table
+#### 1. `src/pages/Index.tsx`
+- After a successful login, also write `emp_id` and `emp_name` to `localStorage` so the Employee Portal and Manager page pick them up without requiring a second login.
+- On logout, also clear `emp_id` and `emp_name` from `localStorage`.
 
-#### 2. Visual behavior
-- Admin toggle appears first in the list, separated from the granular permissions
-- When Admin is toggled ON: show a note like "Full access to all sections" and grey out individual toggles (since admin overrides them)
-- When Admin is toggled OFF: individual toggles become active again
+#### 2. `src/pages/EmployeePortal.tsx`
+- On mount, check for `staff_home_session` in `sessionStorage`. If it exists and is valid, auto-populate `localStorage` with `emp_id` and `emp_name` so the portal recognizes the user immediately without a second login.
 
-### Files to Update
-1. **`src/components/admin/StaffAccessManager.tsx`** -- add admin toggle with distinct styling and override behavior
-
-### No database changes needed
-The `employee_permissions` table already supports storing `admin` as a permission value. The edge function already checks for it.
+### No database or backend changes needed
+Jessa's data is correct: she has a PIN set and permissions for Orders and Rooms. The Manager page already correctly filters tabs based on permissions -- so once she can get there without a double login, she will only see Orders and Rooms tabs.
 
