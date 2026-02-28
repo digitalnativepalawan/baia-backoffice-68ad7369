@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Upload, Trash2, Plus, Users, FileText, UtensilsCrossed, MapPin, StickyNote, Sparkles, LogIn, LogOut } from 'lucide-react';
+import { ArrowLeft, Upload, Trash2, Plus, Users, FileText, UtensilsCrossed, MapPin, StickyNote, Sparkles, LogIn, LogOut, Camera, Download, Link as LinkIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import VibeCheckInForm from './vibe/VibeCheckInForm';
@@ -28,10 +28,29 @@ const RoomsDashboard = () => {
   const [checkInForm, setCheckInForm] = useState({
     guestName: '', phone: '', email: '',
     checkIn: new Date().toISOString().split('T')[0],
-    checkOut: '', adults: '1', platform: 'Direct', roomRate: '0', notes: '',
+    checkOut: '', adults: '1', children: '0', platform: 'Direct', roomRate: '0', notes: '', specialRequests: '',
   });
   const [checkingIn, setCheckingIn] = useState(false);
   const [showCheckInForm, setShowCheckInForm] = useState(false);
+
+  // Document form state
+  const [docType, setDocType] = useState('passport');
+  const [docNotes, setDocNotes] = useState('');
+  const [docUrl, setDocUrl] = useState('');
+  const [showUrlInput, setShowUrlInput] = useState(false);
+
+  // Tour form state
+  const [tourName, setTourName] = useState('');
+  const [tourDate, setTourDate] = useState('');
+  const [tourPax, setTourPax] = useState('1');
+  const [tourPrice, setTourPrice] = useState('');
+  const [tourProvider, setTourProvider] = useState('');
+  const [tourPickupTime, setTourPickupTime] = useState('');
+  const [tourNotes, setTourNotes] = useState('');
+
+  // Note form
+  const [noteContent, setNoteContent] = useState('');
+  const [noteType, setNoteType] = useState('general');
 
   // Units
   const { data: units = [] } = useQuery({
@@ -101,11 +120,12 @@ const RoomsDashboard = () => {
   const currentBooking = getActiveBooking(selectedUnit);
   const guestId = (currentBooking as any)?.guest_id;
 
+  // Documents - query by unit_name (works with or without guest)
   const { data: documents = [] } = useQuery({
-    queryKey: ['guest-documents', guestId],
-    enabled: !!guestId,
+    queryKey: ['guest-documents', selectedUnit?.name],
+    enabled: !!selectedUnit,
     queryFn: async () => {
-      const { data } = await from('guest_documents').select('*').eq('guest_id', guestId).order('created_at', { ascending: false });
+      const { data } = await from('guest_documents').select('*').eq('unit_name', selectedUnit!.name).order('created_at', { ascending: false });
       return (data || []) as any[];
     },
   });
@@ -120,22 +140,18 @@ const RoomsDashboard = () => {
     },
   });
 
-  // Guest tours
+  // Guest tours - query by unit_name (works without booking)
   const { data: tours = [] } = useQuery({
-    queryKey: ['guest-tours', currentBooking?.id],
-    enabled: !!currentBooking,
+    queryKey: ['guest-tours', selectedUnit?.name],
+    enabled: !!selectedUnit,
     queryFn: async () => {
-      const { data } = await from('guest_tours').select('*').eq('booking_id', currentBooking!.id).order('tour_date');
+      const { data } = await from('guest_tours').select('*').eq('unit_name', selectedUnit!.name).order('tour_date');
       return (data || []) as any[];
     },
   });
 
   // Vibe records for selected unit
   const unitVibeRecords = vibeRecords.filter((v: any) => v.unit_name === selectedUnit?.name);
-
-  // Note form
-  const [noteContent, setNoteContent] = useState('');
-  const [noteType, setNoteType] = useState('general');
 
   const addNote = async () => {
     if (!noteContent.trim() || !selectedUnit) return;
@@ -157,54 +173,79 @@ const RoomsDashboard = () => {
     toast.success('Note deleted');
   };
 
-  // Tour form
-  const [tourName, setTourName] = useState('');
-  const [tourDate, setTourDate] = useState('');
-  const [tourPax, setTourPax] = useState('1');
-  const [tourPrice, setTourPrice] = useState('');
-
   const addTour = async () => {
-    if (!tourName.trim() || !tourDate || !currentBooking) return;
+    if (!tourName.trim() || !tourDate || !selectedUnit) return;
     await from('guest_tours').insert({
-      booking_id: currentBooking.id,
+      booking_id: currentBooking?.id || null,
+      unit_name: selectedUnit.name,
       tour_name: tourName.trim(),
       tour_date: tourDate,
       pax: parseInt(tourPax) || 1,
       price: parseFloat(tourPrice) || 0,
+      provider: tourProvider.trim(),
+      pickup_time: tourPickupTime.trim(),
+      notes: tourNotes.trim(),
     });
     setTourName(''); setTourDate(''); setTourPax('1'); setTourPrice('');
-    qc.invalidateQueries({ queryKey: ['guest-tours', currentBooking.id] });
+    setTourProvider(''); setTourPickupTime(''); setTourNotes('');
+    qc.invalidateQueries({ queryKey: ['guest-tours', selectedUnit.name] });
     toast.success('Tour added');
   };
 
   const updateTourStatus = async (id: string, status: string) => {
     await from('guest_tours').update({ status }).eq('id', id);
-    qc.invalidateQueries({ queryKey: ['guest-tours', currentBooking?.id] });
+    qc.invalidateQueries({ queryKey: ['guest-tours', selectedUnit?.name] });
     toast.success('Tour updated');
   };
 
-  // Document upload
+  const deleteTour = async (id: string) => {
+    await from('guest_tours').delete().eq('id', id);
+    qc.invalidateQueries({ queryKey: ['guest-tours', selectedUnit?.name] });
+    toast.success('Tour deleted');
+  };
+
+  // Document upload (file or camera)
   const uploadDocument = async (file: File) => {
-    if (!guestId) { toast.error('No guest checked in'); return; }
+    if (!selectedUnit) return;
     const ext = file.name.split('.').pop();
-    const path = `${guestId}/${Date.now()}.${ext}`;
+    const folder = guestId || selectedUnit.name.replace(/\s+/g, '_');
+    const path = `${folder}/${Date.now()}.${ext}`;
     const { error } = await supabase.storage.from('guest-documents').upload(path, file);
     if (error) { toast.error('Upload failed'); return; }
     const { data: urlData } = supabase.storage.from('guest-documents').getPublicUrl(path);
     await from('guest_documents').insert({
-      guest_id: guestId,
-      document_type: 'passport',
+      guest_id: guestId || null,
+      unit_name: selectedUnit.name,
+      document_type: docType,
       image_url: urlData.publicUrl,
+      notes: docNotes.trim() || null,
     });
-    qc.invalidateQueries({ queryKey: ['guest-documents', guestId] });
+    setDocNotes('');
+    qc.invalidateQueries({ queryKey: ['guest-documents', selectedUnit.name] });
     toast.success('Document uploaded');
+  };
+
+  const addDocumentUrl = async () => {
+    if (!docUrl.trim() || !selectedUnit) return;
+    await from('guest_documents').insert({
+      guest_id: guestId || null,
+      unit_name: selectedUnit.name,
+      document_type: docType,
+      image_url: docUrl.trim(),
+      notes: docNotes.trim() || null,
+    });
+    setDocUrl(''); setDocNotes(''); setShowUrlInput(false);
+    qc.invalidateQueries({ queryKey: ['guest-documents', selectedUnit.name] });
+    toast.success('Document link added');
   };
 
   const deleteDocument = async (doc: any) => {
     const path = doc.image_url.split('/guest-documents/')[1];
-    if (path) await supabase.storage.from('guest-documents').remove([path]);
+    if (path && !doc.image_url.startsWith('http://') && !doc.image_url.includes('//') === false) {
+      await supabase.storage.from('guest-documents').remove([path]);
+    }
     await from('guest_documents').delete().eq('id', doc.id);
-    qc.invalidateQueries({ queryKey: ['guest-documents', guestId] });
+    qc.invalidateQueries({ queryKey: ['guest-documents', selectedUnit?.name] });
     toast.success('Document deleted');
   };
 
@@ -274,8 +315,10 @@ const RoomsDashboard = () => {
         check_in: checkInForm.checkIn,
         check_out: checkInForm.checkOut,
         adults: parseInt(checkInForm.adults) || 1,
+        children: parseInt(checkInForm.children) || 0,
         room_rate: parseFloat(checkInForm.roomRate) || 0,
         notes: checkInForm.notes || '',
+        special_requests: checkInForm.specialRequests || '',
       });
       if (bErr) throw new Error(bErr.message);
 
@@ -285,7 +328,7 @@ const RoomsDashboard = () => {
       setCheckInForm({
         guestName: '', phone: '', email: '',
         checkIn: new Date().toISOString().split('T')[0],
-        checkOut: '', adults: '1', platform: 'Direct', roomRate: '0', notes: '',
+        checkOut: '', adults: '1', children: '0', platform: 'Direct', roomRate: '0', notes: '', specialRequests: '',
       });
       toast.success(`${checkInForm.guestName.trim()} checked in to ${selectedUnit.name}`);
     } catch (err: any) {
@@ -389,6 +432,12 @@ const RoomsDashboard = () => {
                       <p className="font-body text-xs text-muted-foreground">Adults</p>
                       <p className="font-body text-sm text-foreground">{booking.adults}</p>
                     </div>
+                    {(booking as any).children > 0 && (
+                      <div>
+                        <p className="font-body text-xs text-muted-foreground">Children</p>
+                        <p className="font-body text-sm text-foreground">{(booking as any).children}</p>
+                      </div>
+                    )}
                     <div>
                       <p className="font-body text-xs text-muted-foreground">Rate</p>
                       <p className="font-body text-sm text-foreground">₱{Number(booking.room_rate).toLocaleString()}</p>
@@ -398,6 +447,12 @@ const RoomsDashboard = () => {
                     <div>
                       <p className="font-body text-xs text-muted-foreground">Booking Notes</p>
                       <p className="font-body text-sm text-foreground">{booking.notes}</p>
+                    </div>
+                  )}
+                  {(booking as any).special_requests && (
+                    <div>
+                      <p className="font-body text-xs text-muted-foreground">Special Requests</p>
+                      <p className="font-body text-sm text-foreground">{(booking as any).special_requests}</p>
                     </div>
                   )}
                 </div>
@@ -411,7 +466,7 @@ const RoomsDashboard = () => {
                 {!showCheckInForm ? (
                   <div className="border border-dashed border-border rounded-lg p-6 text-center space-y-3">
                     <p className="font-body text-sm text-muted-foreground">No guest currently checked in</p>
-                    <p className="font-body text-xs text-muted-foreground">Check in a guest to enable Docs, Tours, and more.</p>
+                    <p className="font-body text-xs text-muted-foreground">Check in a guest to enable full room management.</p>
                     <Button size="sm" onClick={() => setShowCheckInForm(true)}
                       className="font-display text-xs tracking-wider min-h-[44px]">
                       <LogIn className="w-4 h-4 mr-2" /> Check In Guest
@@ -445,11 +500,17 @@ const RoomsDashboard = () => {
                           className="bg-secondary border-border text-foreground font-body text-xs" />
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-4 gap-2">
                       <div>
                         <label className="font-body text-xs text-muted-foreground">Adults</label>
                         <Input type="number" value={checkInForm.adults}
                           onChange={e => setCheckInForm(p => ({ ...p, adults: e.target.value }))}
+                          className="bg-secondary border-border text-foreground font-body text-xs" />
+                      </div>
+                      <div>
+                        <label className="font-body text-xs text-muted-foreground">Children</label>
+                        <Input type="number" value={checkInForm.children}
+                          onChange={e => setCheckInForm(p => ({ ...p, children: e.target.value }))}
                           className="bg-secondary border-border text-foreground font-body text-xs" />
                       </div>
                       <div>
@@ -469,12 +530,16 @@ const RoomsDashboard = () => {
                         </Select>
                       </div>
                       <div>
-                        <label className="font-body text-xs text-muted-foreground">Room rate</label>
+                        <label className="font-body text-xs text-muted-foreground">Rate</label>
                         <Input type="number" value={checkInForm.roomRate}
                           onChange={e => setCheckInForm(p => ({ ...p, roomRate: e.target.value }))}
                           className="bg-secondary border-border text-foreground font-body text-xs" />
                       </div>
                     </div>
+                    <Textarea value={checkInForm.specialRequests}
+                      onChange={e => setCheckInForm(p => ({ ...p, specialRequests: e.target.value }))}
+                      placeholder="Special requests (dietary, accessibility, etc.)"
+                      className="bg-secondary border-border text-foreground font-body text-sm min-h-[50px]" />
                     <Textarea value={checkInForm.notes}
                       onChange={e => setCheckInForm(p => ({ ...p, notes: e.target.value }))}
                       placeholder="Notes (optional)"
@@ -518,41 +583,95 @@ const RoomsDashboard = () => {
           </div>
         )}
 
-        {/* DOCUMENTS */}
+        {/* DOCUMENTS - always available */}
         {detailTab === 'documents' && (
           <div className="space-y-3">
-            {!guestId ? (
-              <div className="border border-dashed border-border rounded-lg p-6 text-center space-y-2">
-                <p className="font-body text-sm text-muted-foreground">No guest checked in</p>
-                <p className="font-body text-xs text-muted-foreground">Check in a guest first to upload documents.</p>
-                <Button size="sm" variant="outline" onClick={() => { setDetailTab('info'); setShowCheckInForm(true); }}
-                  className="font-display text-xs tracking-wider">
-                  <LogIn className="w-3.5 h-3.5 mr-1" /> Go to Check-In
-                </Button>
-              </div>
-            ) : (
-              <>
-                <label className="flex items-center gap-2 cursor-pointer border border-dashed border-border rounded-lg p-4 justify-center hover:bg-secondary/50">
-                  <Upload className="w-4 h-4 text-muted-foreground" />
-                  <span className="font-body text-sm text-muted-foreground">Upload Passport / ID</span>
-                  <input type="file" accept="image/*" className="hidden" capture="environment"
+            {/* Document type selector */}
+            <div className="border border-border rounded-lg p-3 space-y-2">
+              <Select value={docType} onValueChange={setDocType}>
+                <SelectTrigger className="bg-secondary border-border text-foreground font-body text-xs">
+                  <SelectValue placeholder="Document type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="passport">Passport</SelectItem>
+                  <SelectItem value="government_id">Government ID</SelectItem>
+                  <SelectItem value="booking_confirmation">Booking Confirmation</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Input value={docNotes} onChange={e => setDocNotes(e.target.value)}
+                placeholder="Notes (e.g., expires March 2027)"
+                className="bg-secondary border-border text-foreground font-body text-xs" />
+
+              {/* Camera capture */}
+              <div className="grid grid-cols-2 gap-2">
+                <label className="flex items-center gap-2 cursor-pointer border border-dashed border-border rounded-lg p-3 justify-center hover:bg-secondary/50 min-h-[44px]">
+                  <Camera className="w-4 h-4 text-muted-foreground" />
+                  <span className="font-body text-xs text-muted-foreground">Take Photo</span>
+                  <input type="file" accept="image/*" capture="environment" className="hidden"
                     onChange={e => { if (e.target.files?.[0]) uploadDocument(e.target.files[0]); }} />
                 </label>
-                {documents.map((doc: any) => (
-                  <div key={doc.id} className="border border-border rounded-lg overflow-hidden">
-                    <img src={doc.image_url} alt="Document" className="w-full max-h-64 object-contain bg-secondary" />
-                    <div className="flex justify-between items-center p-2">
-                      <span className="font-body text-xs text-muted-foreground">
-                        {doc.document_type} · {format(new Date(doc.created_at), 'MMM d, yyyy')}
-                      </span>
-                      <Button size="sm" variant="ghost" onClick={() => deleteDocument(doc)}>
-                        <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                      </Button>
-                    </div>
+
+                {/* File upload */}
+                <label className="flex items-center gap-2 cursor-pointer border border-dashed border-border rounded-lg p-3 justify-center hover:bg-secondary/50 min-h-[44px]">
+                  <Upload className="w-4 h-4 text-muted-foreground" />
+                  <span className="font-body text-xs text-muted-foreground">Upload File</span>
+                  <input type="file" accept="image/*,application/pdf" className="hidden"
+                    onChange={e => { if (e.target.files?.[0]) uploadDocument(e.target.files[0]); }} />
+                </label>
+              </div>
+
+              {/* URL input toggle */}
+              {!showUrlInput ? (
+                <Button size="sm" variant="outline" onClick={() => setShowUrlInput(true)}
+                  className="w-full font-display text-xs tracking-wider min-h-[44px]">
+                  <LinkIcon className="w-3.5 h-3.5 mr-1" /> Add Document Link
+                </Button>
+              ) : (
+                <div className="flex gap-2">
+                  <Input value={docUrl} onChange={e => setDocUrl(e.target.value)}
+                    placeholder="https://..." className="bg-secondary border-border text-foreground font-body text-xs flex-1" />
+                  <Button size="sm" onClick={addDocumentUrl} disabled={!docUrl.trim()}
+                    className="font-display text-xs tracking-wider min-h-[44px]">
+                    <Plus className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setShowUrlInput(false); setDocUrl(''); }}
+                    className="font-display text-xs min-h-[44px]">✕</Button>
+                </div>
+              )}
+            </div>
+
+            {/* Document list */}
+            {documents.map((doc: any) => (
+              <div key={doc.id} className="border border-border rounded-lg overflow-hidden">
+                {doc.image_url && !doc.image_url.startsWith('http://') && doc.image_url.includes('guest-documents') ? (
+                  <img src={doc.image_url} alt="Document" className="w-full max-h-64 object-contain bg-secondary" />
+                ) : (
+                  <div className="p-3 bg-secondary flex items-center gap-2">
+                    <LinkIcon className="w-4 h-4 text-muted-foreground" />
+                    <span className="font-body text-xs text-foreground truncate">{doc.image_url}</span>
                   </div>
-                ))}
-              </>
-            )}
+                )}
+                <div className="flex justify-between items-center p-2">
+                  <div className="flex-1 min-w-0">
+                    <span className="font-body text-xs text-muted-foreground">
+                      {doc.document_type?.replace('_', ' ')} · {format(new Date(doc.created_at), 'MMM d, yyyy')}
+                    </span>
+                    {doc.notes && <p className="font-body text-xs text-foreground mt-0.5 truncate">{doc.notes}</p>}
+                  </div>
+                  <div className="flex gap-1">
+                    <a href={doc.image_url} target="_blank" rel="noopener noreferrer">
+                      <Button size="sm" variant="ghost"><Download className="w-3.5 h-3.5 text-foreground" /></Button>
+                    </a>
+                    <Button size="sm" variant="ghost" onClick={() => deleteDocument(doc)}>
+                      <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {documents.length === 0 && <p className="font-body text-sm text-muted-foreground text-center py-2">No documents yet</p>}
           </div>
         )}
 
@@ -599,57 +718,63 @@ const RoomsDashboard = () => {
           </div>
         )}
 
-        {/* TOURS */}
+        {/* TOURS - always available */}
         {detailTab === 'tours' && (
           <div className="space-y-3">
-            {currentBooking ? (
-              <div className="border border-border rounded-lg p-3 space-y-2">
-                <Input value={tourName} onChange={e => setTourName(e.target.value)} placeholder="Tour name"
-                  className="bg-secondary border-border text-foreground font-body text-sm" />
-                <div className="grid grid-cols-3 gap-2">
-                  <Input type="date" value={tourDate} onChange={e => setTourDate(e.target.value)}
-                    className="bg-secondary border-border text-foreground font-body text-xs" />
-                  <Input value={tourPax} onChange={e => setTourPax(e.target.value)} placeholder="Pax"
-                    className="bg-secondary border-border text-foreground font-body text-xs" type="number" />
-                  <Input value={tourPrice} onChange={e => setTourPrice(e.target.value)} placeholder="₱ Price"
-                    className="bg-secondary border-border text-foreground font-body text-xs" type="number" />
-                </div>
-                <Button size="sm" onClick={addTour} disabled={!tourName.trim() || !tourDate}
-                  className="font-display text-xs tracking-wider w-full">
-                  <Plus className="w-3.5 h-3.5 mr-1" /> Add Tour
-                </Button>
+            <div className="border border-border rounded-lg p-3 space-y-2">
+              <Input value={tourName} onChange={e => setTourName(e.target.value)} placeholder="Tour name *"
+                className="bg-secondary border-border text-foreground font-body text-sm" />
+              <div className="grid grid-cols-2 gap-2">
+                <Input value={tourProvider} onChange={e => setTourProvider(e.target.value)} placeholder="Provider / vendor"
+                  className="bg-secondary border-border text-foreground font-body text-xs" />
+                <Input value={tourPickupTime} onChange={e => setTourPickupTime(e.target.value)} placeholder="Pickup time"
+                  className="bg-secondary border-border text-foreground font-body text-xs" />
               </div>
-            ) : (
-              <div className="border border-dashed border-border rounded-lg p-6 text-center space-y-2">
-                <p className="font-body text-sm text-muted-foreground">No guest checked in</p>
-                <p className="font-body text-xs text-muted-foreground">Check in a guest first to add tours.</p>
-                <Button size="sm" variant="outline" onClick={() => { setDetailTab('info'); setShowCheckInForm(true); }}
-                  className="font-display text-xs tracking-wider">
-                  <LogIn className="w-3.5 h-3.5 mr-1" /> Go to Check-In
-                </Button>
+              <div className="grid grid-cols-3 gap-2">
+                <Input type="date" value={tourDate} onChange={e => setTourDate(e.target.value)}
+                  className="bg-secondary border-border text-foreground font-body text-xs" />
+                <Input value={tourPax} onChange={e => setTourPax(e.target.value)} placeholder="Pax"
+                  className="bg-secondary border-border text-foreground font-body text-xs" type="number" />
+                <Input value={tourPrice} onChange={e => setTourPrice(e.target.value)} placeholder="₱ Price"
+                  className="bg-secondary border-border text-foreground font-body text-xs" type="number" />
               </div>
-            )}
+              <Textarea value={tourNotes} onChange={e => setTourNotes(e.target.value)}
+                placeholder="Notes / instructions"
+                className="bg-secondary border-border text-foreground font-body text-xs min-h-[50px]" />
+              <Button size="sm" onClick={addTour} disabled={!tourName.trim() || !tourDate}
+                className="font-display text-xs tracking-wider w-full">
+                <Plus className="w-3.5 h-3.5 mr-1" /> Add Tour
+              </Button>
+            </div>
+
             {tours.map((tour: any) => (
               <div key={tour.id} className="border border-border rounded-lg p-3">
                 <div className="flex justify-between items-start">
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <p className="font-display text-sm text-foreground">{tour.tour_name}</p>
                     <p className="font-body text-xs text-muted-foreground">
                       {format(new Date(tour.tour_date + 'T00:00:00'), 'MMM d, yyyy')} · {tour.pax} pax · ₱{Number(tour.price).toLocaleString()}
                     </p>
+                    {tour.provider && <p className="font-body text-xs text-muted-foreground">Provider: {tour.provider}</p>}
+                    {tour.pickup_time && <p className="font-body text-xs text-muted-foreground">Pickup: {tour.pickup_time}</p>}
+                    {tour.notes && <p className="font-body text-xs text-muted-foreground mt-1">{tour.notes}</p>}
                   </div>
-                  <Select value={tour.status} onValueChange={v => updateTourStatus(tour.id, v)}>
-                    <SelectTrigger className="w-28 bg-secondary border-border text-foreground font-body text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="booked">Booked</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="flex flex-col gap-1 items-end">
+                    <Select value={tour.status} onValueChange={v => updateTourStatus(tour.id, v)}>
+                      <SelectTrigger className="w-28 bg-secondary border-border text-foreground font-body text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="booked">Booked</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button size="sm" variant="ghost" onClick={() => deleteTour(tour.id)}>
+                      <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                    </Button>
+                  </div>
                 </div>
-                {tour.notes && <p className="font-body text-xs text-muted-foreground mt-1">{tour.notes}</p>}
               </div>
             ))}
             {tours.length === 0 && <p className="font-body text-sm text-muted-foreground text-center py-2">No tours booked</p>}

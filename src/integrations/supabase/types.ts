@@ -361,26 +361,29 @@ export type Database = {
         Row: {
           created_at: string
           document_type: string
-          guest_id: string
+          guest_id: string | null
           id: string
           image_url: string
           notes: string | null
+          unit_name: string
         }
         Insert: {
           created_at?: string
           document_type?: string
-          guest_id: string
+          guest_id?: string | null
           id?: string
           image_url: string
           notes?: string | null
+          unit_name?: string
         }
         Update: {
           created_at?: string
           document_type?: string
-          guest_id?: string
+          guest_id?: string | null
           id?: string
           image_url?: string
           notes?: string | null
+          unit_name?: string
         }
         Relationships: [
           {
@@ -437,10 +440,13 @@ export type Database = {
           id: string
           notes: string | null
           pax: number
+          pickup_time: string
           price: number
+          provider: string
           status: string
           tour_date: string
           tour_name: string
+          unit_name: string
         }
         Insert: {
           booking_id?: string | null
@@ -448,10 +454,13 @@ export type Database = {
           id?: string
           notes?: string | null
           pax?: number
+          pickup_time?: string
           price?: number
+          provider?: string
           status?: string
           tour_date?: string
           tour_name?: string
+          unit_name?: string
         }
         Update: {
           booking_id?: string | null
@@ -459,10 +468,13 @@ export type Database = {
           id?: string
           notes?: string | null
           pax?: number
+          pickup_time?: string
           price?: number
+          provider?: string
           status?: string
           tour_date?: string
           tour_name?: string
+          unit_name?: string
         }
         Relationships: [
           {
@@ -1011,6 +1023,7 @@ export type Database = {
           adults: number
           check_in: string
           check_out: string
+          children: number
           commission_applied: number
           created_at: string
           guest_id: string | null
@@ -1020,6 +1033,7 @@ export type Database = {
           platform: string
           room_rate: number
           sirvoy_booking_id: number | null
+          special_requests: string
           unit_id: string | null
         }
         Insert: {
@@ -1027,6 +1041,7 @@ export type Database = {
           adults?: number
           check_in: string
           check_out: string
+          children?: number
           commission_applied?: number
           created_at?: string
           guest_id?: string | null
@@ -1036,6 +1051,7 @@ export type Database = {
           platform?: string
           room_rate?: number
           sirvoy_booking_id?: number | null
+          special_requests?: string
           unit_id?: string | null
         }
         Update: {
@@ -1043,6 +1059,7 @@ export type Database = {
           adults?: number
           check_in?: string
           check_out?: string
+          children?: number
           commission_applied?: number
           created_at?: string
           guest_id?: string | null
@@ -1052,6 +1069,7 @@ export type Database = {
           platform?: string
           room_rate?: number
           sirvoy_booking_id?: number | null
+          special_requests?: string
           unit_id?: string | null
         }
         Relationships: [
