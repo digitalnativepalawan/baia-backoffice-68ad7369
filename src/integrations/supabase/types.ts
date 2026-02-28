@@ -1452,6 +1452,53 @@ export type Database = {
         }
         Relationships: []
       }
+      time_entries: {
+        Row: {
+          clock_in: string
+          clock_out: string | null
+          created_at: string
+          employee_id: string
+          entry_date: string
+          id: string
+          is_paid: boolean
+          paid_amount: number | null
+          paid_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          clock_in?: string
+          clock_out?: string | null
+          created_at?: string
+          employee_id: string
+          entry_date?: string
+          id?: string
+          is_paid?: boolean
+          paid_amount?: number | null
+          paid_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          clock_in?: string
+          clock_out?: string | null
+          created_at?: string
+          employee_id?: string
+          entry_date?: string
+          id?: string
+          is_paid?: boolean
+          paid_amount?: number | null
+          paid_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_entries_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       units: {
         Row: {
           active: boolean
@@ -1504,6 +1551,44 @@ export type Database = {
             columns: ["vibe_record_id"]
             isOneToOne: false
             referencedRelation: "guest_vibe_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      weekly_schedules: {
+        Row: {
+          created_at: string
+          employee_id: string
+          id: string
+          schedule_date: string
+          time_in: string
+          time_out: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          employee_id: string
+          id?: string
+          schedule_date: string
+          time_in: string
+          time_out: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string
+          id?: string
+          schedule_date?: string
+          time_in?: string
+          time_out?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_schedules_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
             referencedColumns: ["id"]
           },
         ]

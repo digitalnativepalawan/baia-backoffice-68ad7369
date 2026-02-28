@@ -26,6 +26,8 @@ import StaffAccessManager from '@/components/admin/StaffAccessManager';
 import EmployeeContactConfig from '@/components/admin/EmployeeContactConfig';
 import RoomsDashboard from '@/components/admin/RoomsDashboard';
 import AdminLoginGate from '@/components/admin/AdminLoginGate';
+import TimesheetDashboard from '@/components/admin/TimesheetDashboard';
+import WeeklyScheduleManager from '@/components/admin/WeeklyScheduleManager';
 
 import { deductInventoryForOrder } from '@/lib/inventoryDeduction';
 
@@ -394,6 +396,8 @@ const AdminPage = () => {
             <TabsTrigger value="payroll" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">HR</TabsTrigger>
             <TabsTrigger value="resort-ops" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Resort Ops</TabsTrigger>
             <TabsTrigger value="rooms" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Rooms</TabsTrigger>
+            <TabsTrigger value="timesheet" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Timesheet</TabsTrigger>
+            <TabsTrigger value="schedules" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Schedules</TabsTrigger>
           </TabsList>
 
           {/* SETTINGS TAB */}
@@ -759,6 +763,16 @@ const AdminPage = () => {
           {/* ROOMS TAB */}
           <TabsContent value="rooms">
             <RoomsDashboard />
+          </TabsContent>
+
+          {/* TIMESHEET TAB */}
+          <TabsContent value="timesheet">
+            <TimesheetDashboard />
+          </TabsContent>
+
+          {/* SCHEDULES TAB */}
+          <TabsContent value="schedules">
+            <WeeklyScheduleManager />
           </TabsContent>
         </Tabs>
       </div>
