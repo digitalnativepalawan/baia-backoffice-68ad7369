@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -9,9 +9,11 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { toast } from 'sonner';
 import { format, startOfWeek, addDays, isToday } from 'date-fns';
-import { Plus, Pencil, Trash2, Calendar as CalIcon, Clock, Users } from 'lucide-react';
+import { Plus, Pencil, Trash2, Calendar as CalIcon, Clock, Copy, UserPlus, ChevronLeft, ChevronRight } from 'lucide-react';
 
 type Employee = { id: string; name: string };
 type Schedule = {
@@ -19,7 +21,17 @@ type Schedule = {
   time_in: string; time_out: string; created_at: string; updated_at: string;
 };
 
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const TIMELINE_START = 5; // 5 AM
+const TIMELINE_END = 22; // 10 PM
+const TIMELINE_HOURS = TIMELINE_END - TIMELINE_START; // 17 hours
+
+const HOURS = Array.from({ length: TIMELINE_HOURS + 1 }, (_, i) => TIMELINE_START + i);
+
+const fmtHour = (h: number) => {
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${h12}${ampm}`;
+};
 
 const fmtTime = (t: string) => {
   try {
@@ -36,17 +48,51 @@ const PRESETS = [
   { label: 'Maintenance', time_in: '08:00', time_out: '17:00' },
 ];
 
+const inferShiftType = (time_in: string, time_out: string): string => {
+  const tin = time_in.slice(0, 5);
+  const tout = time_out.slice(0, 5);
+  if (tin === '07:00' && tout === '16:00') return 'Morning';
+  if (tin === '12:00' && tout === '21:00') return 'Evening';
+  if (tin === '08:00' && tout === '17:00') return 'Maintenance';
+  if ((tin === '07:00' && tout === '11:00') || (tin === '17:00' && tout === '21:00')) return 'Broken';
+  return 'Custom';
+};
+
+const SHIFT_COLORS: Record<string, string> = {
+  Morning: 'bg-blue-500/30 border-blue-500/50',
+  Evening: 'bg-purple-500/30 border-purple-500/50',
+  Maintenance: 'bg-green-500/30 border-green-500/50',
+  Broken: 'bg-orange-500/30 border-orange-500/50',
+  Custom: 'bg-accent/20 border-accent/40',
+};
+
+const SHIFT_TEXT_COLORS: Record<string, string> = {
+  Morning: 'text-blue-300',
+  Evening: 'text-purple-300',
+  Maintenance: 'text-green-300',
+  Broken: 'text-orange-300',
+  Custom: 'text-accent',
+};
+
+const timeToPercent = (t: string): number => {
+  const [h, m] = t.split(':').map(Number);
+  const totalMinutes = (h - TIMELINE_START) * 60 + m;
+  const totalRange = TIMELINE_HOURS * 60;
+  return Math.max(0, Math.min(100, (totalMinutes / totalRange) * 100));
+};
+
 const WeeklyScheduleManager = () => {
   const isMobile = useIsMobile();
   const qc = useQueryClient();
 
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 0 }));
   const weekDates = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
+  const [selectedDayIdx, setSelectedDayIdx] = useState(() => new Date().getDay());
 
   const [shiftModal, setShiftModal] = useState<{ mode: 'add' | 'edit'; schedule?: Schedule; date?: string; empId?: string } | null>(null);
   const [shiftForm, setShiftForm] = useState({ employee_id: '', schedule_date: '', time_in: '07:00', time_out: '16:00' });
-  const [empWeekModal, setEmpWeekModal] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [contextSheet, setContextSheet] = useState<Schedule | null>(null);
 
   const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ['employees-schedule'],
@@ -79,16 +125,6 @@ const WeeklyScheduleManager = () => {
     return () => { supabase.removeChannel(ch); };
   }, [qc]);
 
-  const scheduleMap = useMemo(() => {
-    const m: Record<string, Schedule[]> = {};
-    schedules.forEach(s => {
-      const key = `${s.employee_id}_${s.schedule_date}`;
-      if (!m[key]) m[key] = [];
-      m[key].push(s);
-    });
-    return m;
-  }, [schedules]);
-
   const empMap = useMemo(() => {
     const m: Record<string, Employee> = {};
     employees.forEach(e => { m[e.id] = e; });
@@ -96,7 +132,7 @@ const WeeklyScheduleManager = () => {
   }, [employees]);
 
   const openAdd = (date?: string, empId?: string) => {
-    setShiftForm({ employee_id: empId || employees[0]?.id || '', schedule_date: date || format(new Date(), 'yyyy-MM-dd'), time_in: '07:00', time_out: '16:00' });
+    setShiftForm({ employee_id: empId || employees[0]?.id || '', schedule_date: date || format(weekDates[selectedDayIdx], 'yyyy-MM-dd'), time_in: '07:00', time_out: '16:00' });
     setShiftModal({ mode: 'add', date, empId });
   };
 
@@ -105,8 +141,22 @@ const WeeklyScheduleManager = () => {
     setShiftModal({ mode: 'edit', schedule: s });
   };
 
+  const checkOverlap = useCallback((empId: string, date: string, timeIn: string, timeOut: string, excludeId?: string) => {
+    return schedules.filter(s =>
+      s.employee_id === empId && s.schedule_date === date && s.id !== excludeId
+    ).some(s => {
+      const sIn = s.time_in.slice(0, 5);
+      const sOut = s.time_out.slice(0, 5);
+      return timeIn < sOut && timeOut > sIn;
+    });
+  }, [schedules]);
+
   const saveShift = async () => {
     if (!shiftForm.employee_id || !shiftForm.schedule_date) return;
+    const excludeId = shiftModal?.mode === 'edit' ? shiftModal.schedule?.id : undefined;
+    if (checkOverlap(shiftForm.employee_id, shiftForm.schedule_date, shiftForm.time_in, shiftForm.time_out, excludeId)) {
+      toast.warning('This shift overlaps with an existing shift for this employee');
+    }
     if (shiftModal?.mode === 'edit' && shiftModal.schedule) {
       await supabase.from('weekly_schedules').update({
         employee_id: shiftForm.employee_id, schedule_date: shiftForm.schedule_date,
@@ -143,237 +193,340 @@ const WeeklyScheduleManager = () => {
     toast.success('Shift deleted');
   };
 
-  const goCurrentWeek = () => setWeekStart(startOfWeek(new Date(), { weekStartsOn: 0 }));
+  const duplicateShift = async (s: Schedule) => {
+    const nextDate = format(addDays(new Date(s.schedule_date + 'T00:00:00'), 1), 'yyyy-MM-dd');
+    await supabase.from('weekly_schedules').insert({
+      employee_id: s.employee_id, schedule_date: nextDate,
+      time_in: s.time_in.slice(0, 5), time_out: s.time_out.slice(0, 5),
+    });
+    toast.success('Shift duplicated to next day');
+    qc.invalidateQueries({ queryKey: ['weekly-schedules'] });
+  };
 
-  const todayStr = format(new Date(), 'yyyy-MM-dd');
-  const todaySchedules = schedules.filter(s => s.schedule_date === todayStr);
+  const copyPreviousWeek = async () => {
+    const prevStart = format(addDays(weekStart, -7), 'yyyy-MM-dd');
+    const prevEnd = format(addDays(weekStart, -1), 'yyyy-MM-dd');
+    const { data: prevSchedules } = await supabase.from('weekly_schedules').select('*')
+      .gte('schedule_date', prevStart).lte('schedule_date', prevEnd);
+    if (!prevSchedules?.length) { toast.error('No shifts found in previous week'); return; }
+    const newShifts = prevSchedules.map(s => ({
+      employee_id: s.employee_id,
+      schedule_date: format(addDays(new Date(s.schedule_date + 'T00:00:00'), 7), 'yyyy-MM-dd'),
+      time_in: s.time_in.slice(0, 5), time_out: s.time_out.slice(0, 5),
+    }));
+    await supabase.from('weekly_schedules').insert(newShifts);
+    toast.success(`Copied ${newShifts.length} shifts from previous week`);
+    qc.invalidateQueries({ queryKey: ['weekly-schedules'] });
+  };
 
-  // MOBILE VIEW — full week stacked cards
-  if (isMobile) {
-    // Group schedules by date for mobile
-    const schedulesByDate = (dateStr: string) =>
-      schedules.filter(s => s.schedule_date === dateStr);
+  const goCurrentWeek = () => {
+    setWeekStart(startOfWeek(new Date(), { weekStartsOn: 0 }));
+    setSelectedDayIdx(new Date().getDay());
+  };
 
-    return (
-      <div className="space-y-4">
-        {/* Header with week nav */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="font-display text-lg tracking-wider text-foreground">Weekly Schedule</h2>
-            <Button size="sm" variant="outline" className="font-display text-xs h-10 min-w-[44px]" onClick={() => openAdd()}>
-              <Plus className="h-3.5 w-3.5 mr-1" /> Add Shift
-            </Button>
-          </div>
-          <div className="flex items-center justify-between gap-2">
-            <Button size="sm" variant="outline" className="h-10 w-10 p-0" onClick={() => setWeekStart(addDays(weekStart, -7))}>
-              <span className="text-lg">‹</span>
-            </Button>
-            <div className="flex-1 text-center">
-              <span className="font-body text-xs text-accent">
-                {format(weekStart, 'MMM d')} – {format(addDays(weekStart, 6), 'MMM d')}
-              </span>
+  // Get shifts for a specific date
+  const getDateShifts = (dateStr: string) => schedules.filter(s => s.schedule_date === dateStr);
+
+  // Shift Block Component
+  const ShiftBlock = ({ s, compact = false }: { s: Schedule; compact?: boolean }) => {
+    const type = inferShiftType(s.time_in, s.time_out);
+    const left = timeToPercent(s.time_in.slice(0, 5));
+    const right = timeToPercent(s.time_out.slice(0, 5));
+    const width = right - left;
+    const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const handleTouchStart = () => {
+      longPressRef.current = setTimeout(() => {
+        setContextSheet(s);
+      }, 500);
+    };
+    const handleTouchEnd = () => {
+      if (longPressRef.current) clearTimeout(longPressRef.current);
+    };
+
+    const block = (
+      <div
+        className={`absolute top-0.5 bottom-0.5 rounded border ${SHIFT_COLORS[type]} cursor-pointer
+          transition-all hover:shadow-lg hover:shadow-background/20 hover:scale-[1.02] hover:z-10
+          flex items-center overflow-hidden group/block`}
+        style={{ left: `${left}%`, width: `${width}%`, minWidth: compact ? '30px' : '40px' }}
+        onClick={() => openEdit(s)}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
+      >
+        <div className={`px-1 flex items-center gap-0.5 w-full min-h-[40px] ${compact ? 'min-h-[36px]' : 'min-h-[44px]'}`}>
+          <div className="flex-1 min-w-0">
+            <div className={`text-[10px] font-body font-semibold ${SHIFT_TEXT_COLORS[type]} truncate`}>
+              {empMap[s.employee_id]?.name || '?'}
             </div>
-            <Button size="sm" variant="outline" className="h-10 w-10 p-0" onClick={() => setWeekStart(addDays(weekStart, 7))}>
-              <span className="text-lg">›</span>
+            {!compact && (
+              <div className="text-[9px] font-body text-foreground/60 truncate">
+                {fmtTime(s.time_in)} – {fmtTime(s.time_out)}
+              </div>
+            )}
+            <span className={`text-[8px] font-display ${SHIFT_TEXT_COLORS[type]} opacity-80`}>{type}</span>
+          </div>
+          {/* Desktop hover actions */}
+          <div className="hidden group-hover/block:flex gap-0.5 shrink-0">
+            <button onClick={(e) => { e.stopPropagation(); openEdit(s); }} className="p-0.5 rounded hover:bg-background/30 text-foreground/60 hover:text-accent">
+              <Pencil className="h-3 w-3" />
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); setDeleteId(s.id); }} className="p-0.5 rounded hover:bg-background/30 text-foreground/60 hover:text-destructive">
+              <Trash2 className="h-3 w-3" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+
+    // Desktop: wrap in context menu
+    if (!isMobile) {
+      return (
+        <ContextMenu>
+          <ContextMenuTrigger asChild>{block}</ContextMenuTrigger>
+          <ContextMenuContent className="bg-card border-border">
+            <ContextMenuItem className="font-body text-sm" onClick={() => openEdit(s)}>
+              <Pencil className="h-3.5 w-3.5 mr-2" /> Edit
+            </ContextMenuItem>
+            <ContextMenuItem className="font-body text-sm" onClick={() => duplicateShift(s)}>
+              <Copy className="h-3.5 w-3.5 mr-2" /> Duplicate to Next Day
+            </ContextMenuItem>
+            <ContextMenuItem className="font-body text-sm text-destructive" onClick={() => setDeleteId(s.id)}>
+              <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
+      );
+    }
+
+    return block;
+  };
+
+  // Timeline Row for one employee on one date
+  const TimelineRow = ({ emp, dateStr, compact = false }: { emp: Employee; dateStr: string; compact?: boolean }) => {
+    const shifts = getDateShifts(dateStr).filter(s => s.employee_id === emp.id);
+    return (
+      <div className="flex items-stretch border-b border-border last:border-b-0">
+        <div className={`shrink-0 ${compact ? 'w-16' : 'w-28'} p-1.5 font-body text-xs font-semibold text-foreground border-r border-border flex items-center`}>
+          <span className="truncate">{emp.name}</span>
+        </div>
+        <div className="flex-1 relative" style={{ minHeight: compact ? '40px' : '48px' }}>
+          {/* Hour grid lines */}
+          {HOURS.map((h, i) => (
+            <div key={h} className="absolute top-0 bottom-0 border-r border-border/30"
+              style={{ left: `${(i / TIMELINE_HOURS) * 100}%` }} />
+          ))}
+          {/* Shift blocks */}
+          {shifts.map(s => <ShiftBlock key={s.id} s={s} compact={compact} />)}
+          {/* Click empty area to add */}
+          <div className="absolute inset-0 z-0" onClick={() => openAdd(dateStr, emp.id)} />
+        </div>
+        <div className="shrink-0 w-8 flex items-center justify-center border-l border-border">
+          <button onClick={() => openAdd(dateStr, emp.id)} className="text-muted-foreground hover:text-accent p-1">
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // Timeline header with hour labels
+  const TimelineHeader = ({ compact = false }: { compact?: boolean }) => (
+    <div className="flex border-b border-border">
+      <div className={`shrink-0 ${compact ? 'w-16' : 'w-28'} border-r border-border`} />
+      <div className="flex-1 relative" style={{ height: '24px' }}>
+        {HOURS.map((h, i) => (
+          <div key={h} className="absolute top-0 bottom-0 flex items-center"
+            style={{ left: `${(i / TIMELINE_HOURS) * 100}%` }}>
+            <span className={`font-body ${compact ? 'text-[8px]' : 'text-[10px]'} text-muted-foreground whitespace-nowrap pl-0.5`}>
+              {fmtHour(h)}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="shrink-0 w-8 border-l border-border" />
+    </div>
+  );
+
+  // MOBILE VIEW — stacked day cards with scrollable timeline
+  if (isMobile) {
+    return (
+      <div className="space-y-3">
+        {/* Header */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h2 className="font-display text-lg tracking-wider text-foreground">Schedule</h2>
+            <div className="flex gap-1">
+              <Button size="sm" variant="outline" className="font-display text-[10px] h-9 px-2" onClick={copyPreviousWeek}>
+                <Copy className="h-3 w-3 mr-1" /> Copy Week
+              </Button>
+              <Button size="sm" variant="outline" className="font-display text-xs h-9" onClick={() => openAdd()}>
+                <Plus className="h-3.5 w-3.5 mr-1" /> Add
+              </Button>
+            </div>
+          </div>
+          {/* Week nav */}
+          <div className="flex items-center gap-1">
+            <Button size="sm" variant="outline" className="h-9 w-9 p-0" onClick={() => setWeekStart(addDays(weekStart, -7))}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button size="sm" variant="outline" className="flex-1 font-body text-xs h-9" onClick={goCurrentWeek}>
+              {format(weekStart, 'MMM d')} – {format(addDays(weekStart, 6), 'MMM d')}
+            </Button>
+            <Button size="sm" variant="outline" className="h-9 w-9 p-0" onClick={() => setWeekStart(addDays(weekStart, 7))}>
+              <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
-          <Button size="sm" variant="outline" className="w-full font-display text-xs h-10" onClick={goCurrentWeek}>
-            Current Week
-          </Button>
+          {/* Day selector */}
+          <div className="flex gap-1 overflow-x-auto scrollbar-hide">
+            {weekDates.map((d, i) => {
+              const today = isToday(d);
+              const active = selectedDayIdx === i;
+              return (
+                <button key={i} onClick={() => setSelectedDayIdx(i)}
+                  className={`shrink-0 flex flex-col items-center px-2.5 py-1.5 rounded font-body text-xs transition-colors
+                    ${active ? 'bg-accent text-accent-foreground' : today ? 'bg-accent/20 text-accent' : 'bg-secondary text-foreground hover:bg-secondary/80'}`}>
+                  <span className="text-[10px]">{format(d, 'EEE')}</span>
+                  <span className="font-semibold">{format(d, 'd')}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        {/* 7 stacked day cards */}
-        {weekDates.map(d => {
-          const dateStr = format(d, 'yyyy-MM-dd');
-          const dayShifts = schedulesByDate(dateStr);
-          const today = isToday(d);
-          return (
-            <Card key={dateStr} className={`border-border ${today ? 'border-accent/50 bg-accent/5' : 'bg-card'}`}>
-              <CardContent className="p-3 space-y-2">
-                {/* Day header */}
-                <div className="flex items-center justify-between">
-                  <div className={`font-display text-sm tracking-wider ${today ? 'text-accent' : 'text-foreground'}`}>
-                    {format(d, 'EEE, MMM d')}
-                    {today && <span className="ml-2 font-body text-[10px] text-accent">(Today)</span>}
-                  </div>
-                  <Button size="sm" variant="outline" className="h-10 w-10 p-0" onClick={() => openAdd(dateStr)}>
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                {/* Shifts for this day */}
-                {dayShifts.length === 0 && (
-                  <p className="font-body text-xs text-muted-foreground py-2">No shifts</p>
-                )}
-                {dayShifts.map(s => (
-                  <div key={s.id} className="flex items-center justify-between bg-secondary rounded-md p-2">
-                    <div className="flex-1 min-w-0" onClick={() => setEmpWeekModal(s.employee_id)}>
-                      <div className="font-body text-sm font-semibold text-foreground truncate">{empMap[s.employee_id]?.name || 'Unknown'}</div>
-                      <div className="flex items-center gap-1 font-body text-xs text-muted-foreground mt-0.5">
-                        <Clock className="h-3 w-3 shrink-0" />
-                        {fmtTime(s.time_in)} – {fmtTime(s.time_out)}
-                      </div>
-                    </div>
-                    <div className="flex gap-1 shrink-0 ml-2">
-                      <Button size="sm" variant="outline" className="h-10 w-10 p-0" onClick={() => openEdit(s)}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button size="sm" variant="outline" className="h-10 w-10 p-0 text-destructive" onClick={() => setDeleteId(s.id)}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          );
-        })}
-
-        {/* Employee Week Modal */}
-        <Dialog open={!!empWeekModal} onOpenChange={() => setEmpWeekModal(null)}>
-          <DialogContent className="bg-card border-border max-w-md max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="font-display text-foreground">{empWeekModal ? empMap[empWeekModal]?.name : ''} — Week Schedule</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-2">
-              {weekDates.map(d => {
-                const dateStr = format(d, 'yyyy-MM-dd');
-                const dayScheds = scheduleMap[`${empWeekModal}_${dateStr}`] || [];
-                return (
-                  <Card key={dateStr} className="bg-secondary border-border">
-                    <CardContent className="p-3">
-                      <div className="font-body text-xs font-semibold text-foreground mb-1">{format(d, 'EEE, MMM d')}</div>
-                      {dayScheds.length === 0 && <div className="font-body text-xs text-muted-foreground">Off</div>}
-                      {dayScheds.map(s => (
-                        <div key={s.id} className="flex items-center gap-1 font-body text-xs text-foreground">
-                          <Clock className="h-3 w-3 text-muted-foreground" />
-                          {fmtTime(s.time_in)} – {fmtTime(s.time_out)}
-                        </div>
-                      ))}
-                    </CardContent>
-                  </Card>
-                );
-              })}
+        {/* Timeline for selected day */}
+        <Card className="bg-card border-border">
+          <CardContent className="p-0 overflow-x-auto scrollbar-hide">
+            <div style={{ minWidth: '600px' }}>
+              <TimelineHeader compact />
+              {employees.map(emp => (
+                <TimelineRow key={emp.id} emp={emp} dateStr={format(weekDates[selectedDayIdx], 'yyyy-MM-dd')} compact />
+              ))}
+              {employees.length === 0 && (
+                <div className="p-4 text-center font-body text-xs text-muted-foreground">No employees found</div>
+              )}
             </div>
-          </DialogContent>
-        </Dialog>
+          </CardContent>
+        </Card>
+
+        {/* Mobile context menu sheet */}
+        <Sheet open={!!contextSheet} onOpenChange={() => setContextSheet(null)}>
+          <SheetContent side="bottom" className="bg-card border-border">
+            <SheetHeader>
+              <SheetTitle className="font-display text-foreground">
+                {contextSheet ? empMap[contextSheet.employee_id]?.name : ''} — {contextSheet ? fmtTime(contextSheet.time_in) + ' – ' + fmtTime(contextSheet.time_out) : ''}
+              </SheetTitle>
+            </SheetHeader>
+            <div className="space-y-2 pt-3">
+              <Button variant="outline" className="w-full justify-start font-body h-11" onClick={() => { if (contextSheet) openEdit(contextSheet); setContextSheet(null); }}>
+                <Pencil className="h-4 w-4 mr-3" /> Edit Shift
+              </Button>
+              <Button variant="outline" className="w-full justify-start font-body h-11" onClick={() => { if (contextSheet) duplicateShift(contextSheet); setContextSheet(null); }}>
+                <Copy className="h-4 w-4 mr-3" /> Duplicate to Next Day
+              </Button>
+              <Button variant="outline" className="w-full justify-start font-body text-destructive h-11" onClick={() => { if (contextSheet) setDeleteId(contextSheet.id); setContextSheet(null); }}>
+                <Trash2 className="h-4 w-4 mr-3" /> Delete Shift
+              </Button>
+            </div>
+          </SheetContent>
+        </Sheet>
 
         {/* Shift Modal */}
         <ShiftModal shiftModal={shiftModal} shiftForm={shiftForm} setShiftForm={setShiftForm}
           employees={employees} saveShift={saveShift} addBrokenShift={addBrokenShift}
-          onClose={() => setShiftModal(null)} />
+          onClose={() => setShiftModal(null)} onDuplicate={shiftModal?.mode === 'edit' && shiftModal.schedule ? () => { duplicateShift(shiftModal.schedule!); setShiftModal(null); } : undefined} />
 
-        {/* Delete confirmation */}
         <DeleteConfirm deleteId={deleteId} setDeleteId={setDeleteId} onConfirm={confirmDelete} />
       </div>
     );
   }
 
-  // DESKTOP VIEW — calendar grid matching screenshot
+  // DESKTOP VIEW — full timeline with day tabs
+  const selectedDate = weekDates[selectedDayIdx];
+  const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
+
   return (
     <div className="space-y-4">
       {/* Header */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2 flex-grow">
           <CalIcon className="h-5 w-5 text-muted-foreground" />
-          <h2 className="font-display text-lg tracking-wider text-foreground">Weekly Schedule Manager</h2>
+          <h2 className="font-display text-lg tracking-wider text-foreground">Schedule Timeline</h2>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="font-body text-xs text-muted-foreground">Start Week:</span>
-          <Input type="date" value={format(weekStart, 'yyyy-MM-dd')}
-            onChange={e => { if (e.target.value) setWeekStart(startOfWeek(new Date(e.target.value + 'T00:00:00'), { weekStartsOn: 0 })); }}
-            className="bg-secondary border-border text-foreground font-body text-xs h-9 w-40" />
-        </div>
+        <Button size="sm" variant="outline" className="font-display text-xs h-9" onClick={copyPreviousWeek}>
+          <Copy className="h-3.5 w-3.5 mr-1.5" /> Copy Previous Week
+        </Button>
+        <Button size="sm" variant="outline" className="font-display text-xs h-9" onClick={() => openAdd()}>
+          <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Shift
+        </Button>
+      </div>
+
+      {/* Week navigation */}
+      <div className="flex items-center gap-3">
+        <Button size="sm" variant="outline" className="h-9 w-9 p-0" onClick={() => setWeekStart(addDays(weekStart, -7))}>
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <span className="font-body text-sm text-accent">
+          {format(weekStart, 'MMM d')} – {format(addDays(weekStart, 6), 'MMM d, yyyy')}
+        </span>
+        <Button size="sm" variant="outline" className="h-9 w-9 p-0" onClick={() => setWeekStart(addDays(weekStart, 7))}>
+          <ChevronRight className="h-4 w-4" />
+        </Button>
         <Button size="sm" variant="outline" className="font-display text-xs h-9" onClick={goCurrentWeek}>
           Current Week
         </Button>
-        <span className="font-body text-xs text-accent">
-          Week of {format(weekStart, 'MMM d')} - {format(addDays(weekStart, 6), 'MMM d')}
-        </span>
       </div>
 
-      {/* Calendar Grid */}
-      <Card className="bg-card border-border overflow-x-auto">
-        <CardContent className="p-0">
-          <table className="w-full text-xs border-collapse">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="text-center p-3 font-display text-muted-foreground min-w-[100px] border-r border-border">
-                  <div className="flex flex-col items-center gap-0.5">
-                    <Users className="h-4 w-4" />
-                    <span>Employee</span>
-                  </div>
-                </th>
-                {weekDates.map((d, i) => (
-                  <th key={i} className={`text-center p-3 font-display min-w-[110px] border-r border-border last:border-r-0 ${isToday(d) ? 'text-accent bg-accent/5' : 'text-foreground'}`}>
-                    <div>{DAYS[i]}</div>
-                    <div className="text-[10px] text-muted-foreground font-body">{format(d, 'd')}</div>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {employees.map(emp => (
-                <tr key={emp.id} className="border-b border-border last:border-b-0">
-                  <td className="p-3 font-body text-foreground font-semibold text-sm border-r border-border align-top">
-                    {emp.name}
-                  </td>
-                  {weekDates.map((d, i) => {
-                    const dateStr = format(d, 'yyyy-MM-dd');
-                    const dayScheds = scheduleMap[`${emp.id}_${dateStr}`] || [];
-                    return (
-                      <td key={i} className={`p-2 text-center align-top border-r border-border last:border-r-0 group ${isToday(d) ? 'bg-accent/5' : ''}`}>
-                        <div className="space-y-1.5 min-h-[48px] flex flex-col items-center justify-start">
-                          {dayScheds.map(s => (
-                            <div key={s.id} className="relative bg-secondary rounded-md px-2 py-2 text-left w-full group/shift">
-                              <div className="flex items-start gap-1">
-                                <Clock className="h-3 w-3 text-muted-foreground mt-0.5 shrink-0" />
-                                <div className="font-body text-[11px] text-foreground leading-tight">
-                                  <div className="font-semibold">{fmtTime(s.time_in)}</div>
-                                  <div className="text-muted-foreground">-</div>
-                                  <div className="font-semibold">{fmtTime(s.time_out)}</div>
-                                </div>
-                              </div>
-                              <div className="absolute top-1 right-1 hidden group-hover/shift:flex gap-0.5">
-                                <button onClick={() => openEdit(s)} className="p-1 rounded hover:bg-background/50 text-muted-foreground hover:text-accent transition-colors">
-                                  <Pencil className="h-3 w-3" />
-                                </button>
-                                <button onClick={() => setDeleteId(s.id)} className="p-1 rounded hover:bg-background/50 text-muted-foreground hover:text-destructive transition-colors">
-                                  <Trash2 className="h-3 w-3" />
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                          <button onClick={() => openAdd(dateStr, emp.id)}
-                            className="text-muted-foreground hover:text-accent opacity-0 group-hover:opacity-100 transition-opacity p-1">
-                            <Plus className="h-4 w-4 mx-auto" />
-                          </button>
-                        </div>
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Day tabs */}
+      <div className="flex gap-1">
+        {weekDates.map((d, i) => {
+          const today = isToday(d);
+          const active = selectedDayIdx === i;
+          const dayShiftCount = getDateShifts(format(d, 'yyyy-MM-dd')).length;
+          return (
+            <button key={i} onClick={() => setSelectedDayIdx(i)}
+              className={`flex-1 flex flex-col items-center px-3 py-2 rounded font-body text-sm transition-colors
+                ${active ? 'bg-accent text-accent-foreground' : today ? 'bg-accent/15 text-accent' : 'bg-secondary text-foreground hover:bg-secondary/80'}`}>
+              <span className="text-xs">{format(d, 'EEE')}</span>
+              <span className="font-semibold text-base">{format(d, 'd')}</span>
+              {dayShiftCount > 0 && (
+                <span className={`text-[10px] ${active ? 'text-accent-foreground/70' : 'text-muted-foreground'}`}>{dayShiftCount} shifts</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Timeline Grid */}
+      <Card className="bg-card border-border">
+        <CardContent className="p-0 overflow-x-auto">
+          <div style={{ minWidth: '900px' }}>
+            <TimelineHeader />
+            {employees.map(emp => (
+              <TimelineRow key={emp.id} emp={emp} dateStr={selectedDateStr} />
+            ))}
+            {employees.length === 0 && (
+              <div className="p-6 text-center font-body text-sm text-muted-foreground">No active employees found</div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
       {/* Shift Modal */}
       <ShiftModal shiftModal={shiftModal} shiftForm={shiftForm} setShiftForm={setShiftForm}
         employees={employees} saveShift={saveShift} addBrokenShift={addBrokenShift}
-        onClose={() => setShiftModal(null)} />
+        onClose={() => setShiftModal(null)} onDuplicate={shiftModal?.mode === 'edit' && shiftModal.schedule ? () => { duplicateShift(shiftModal.schedule!); setShiftModal(null); } : undefined} />
 
-      {/* Delete confirmation */}
       <DeleteConfirm deleteId={deleteId} setDeleteId={setDeleteId} onConfirm={confirmDelete} />
     </div>
   );
 };
 
 // Shift Add/Edit Modal
-const ShiftModal = ({ shiftModal, shiftForm, setShiftForm, employees, saveShift, addBrokenShift, onClose }: {
+const ShiftModal = ({ shiftModal, shiftForm, setShiftForm, employees, saveShift, addBrokenShift, onClose, onDuplicate }: {
   shiftModal: any; shiftForm: any; setShiftForm: any; employees: Employee[];
-  saveShift: () => void; addBrokenShift: () => void; onClose: () => void;
+  saveShift: () => void; addBrokenShift: () => void; onClose: () => void; onDuplicate?: () => void;
 }) => (
   <Dialog open={!!shiftModal} onOpenChange={() => onClose()}>
     <DialogContent className="bg-card border-border max-w-sm">
@@ -408,21 +561,31 @@ const ShiftModal = ({ shiftModal, shiftForm, setShiftForm, employees, saveShift,
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-1">
-          {PRESETS.map(p => (
-            <Button key={p.label} size="sm" variant="outline" className="font-display text-[10px] h-8"
-              onClick={() => setShiftForm((f: any) => ({ ...f, time_in: p.time_in, time_out: p.time_out }))}>
-              {p.label}
+        {/* Shift type presets */}
+        <div>
+          <Label className="font-body text-xs text-muted-foreground mb-1 block">Shift Type</Label>
+          <div className="flex flex-wrap gap-1">
+            {PRESETS.map(p => (
+              <Button key={p.label} size="sm" variant="outline" className="font-display text-[10px] h-8"
+                onClick={() => setShiftForm((f: any) => ({ ...f, time_in: p.time_in, time_out: p.time_out }))}>
+                {p.label}
+              </Button>
+            ))}
+            <Button size="sm" variant="outline" className="font-display text-[10px] h-8" onClick={addBrokenShift}>
+              Broken Shift
             </Button>
-          ))}
-          <Button size="sm" variant="outline" className="font-display text-[10px] h-8" onClick={addBrokenShift}>
-            Broken Shift
-          </Button>
+          </div>
         </div>
 
         <Button onClick={saveShift} className="w-full font-display tracking-wider">
           {shiftModal?.mode === 'edit' ? 'Update Shift' : 'Add Shift'}
         </Button>
+
+        {onDuplicate && (
+          <Button variant="outline" onClick={onDuplicate} className="w-full font-body text-xs">
+            <Copy className="h-3.5 w-3.5 mr-1.5" /> Duplicate to Next Day
+          </Button>
+        )}
       </div>
     </DialogContent>
   </Dialog>
