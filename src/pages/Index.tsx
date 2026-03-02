@@ -103,11 +103,24 @@ const Index = () => {
         return;
       }
 
+      // Resolve room name to resort_ops_units (bookings reference that table)
+      const { data: opsUnit } = await supabase
+        .from('resort_ops_units')
+        .select('id')
+        .ilike('name', guestRoom.trim())
+        .maybeSingle();
+
+      if (!opsUnit) {
+        toast.error('Room not found in booking system');
+        setGuestLoading(false);
+        return;
+      }
+
       // Find active booking for this unit with matching guest name
       const { data: bookings } = await supabase
         .from('resort_ops_bookings')
         .select('id, guest_id, check_in, check_out, resort_ops_guests(id, full_name)')
-        .eq('unit_id', unit.id)
+        .eq('unit_id', opsUnit.id)
         .lte('check_in', today)
         .gte('check_out', today);
 
