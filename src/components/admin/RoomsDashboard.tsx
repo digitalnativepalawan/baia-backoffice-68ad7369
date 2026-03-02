@@ -541,6 +541,12 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true }: { readOnl
                       <p className="font-body text-sm text-foreground">₱{Number(booking.room_rate).toLocaleString()}</p>
                     </div>
                   </div>
+                  {(booking as any).room_password && (
+                    <div className="mt-2 p-2 border border-primary/30 rounded bg-primary/5">
+                      <p className="font-body text-xs text-muted-foreground">Room Password (for guest ordering)</p>
+                      <p className="font-display text-lg tracking-[0.3em] text-primary">{(booking as any).room_password}</p>
+                    </div>
+                  )}
                   {booking.notes && (
                     <div>
                       <p className="font-body text-xs text-muted-foreground">Booking Notes</p>
