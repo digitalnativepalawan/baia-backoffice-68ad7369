@@ -41,11 +41,11 @@ const Index = () => {
   const [guestNameInput, setGuestNameInput] = useState('');
   const [guestLoading, setGuestLoading] = useState(false);
 
-  // Fetch occupied units for guest ordering
-  const { data: occupiedUnits = [] } = useQuery({
-    queryKey: ['occupied-units-landing'],
+  // Fetch all active units for guest ordering room selection
+  const { data: allUnits = [] } = useQuery({
+    queryKey: ['active-units-landing'],
     queryFn: async () => {
-      const { data } = await supabase.from('units').select('id, unit_name').eq('status', 'occupied').eq('active', true).order('unit_name');
+      const { data } = await supabase.from('units').select('id, unit_name').eq('active', true).order('unit_name');
       return data || [];
     },
   });
@@ -96,7 +96,7 @@ const Index = () => {
     setGuestLoading(true);
     try {
       const today = new Date().toISOString().split('T')[0];
-      const unit = occupiedUnits.find(u => u.unit_name === guestRoom);
+      const unit = allUnits.find(u => u.unit_name === guestRoom);
       if (!unit) {
         toast.error('Room not found');
         setGuestLoading(false);
@@ -289,7 +289,7 @@ const Index = () => {
                     <SelectValue placeholder="Select your room" />
                   </SelectTrigger>
                   <SelectContent className="bg-card border-border">
-                    {occupiedUnits.map(u => (
+                    {allUnits.map(u => (
                       <SelectItem key={u.id} value={u.unit_name} className="text-foreground font-body">
                         {u.unit_name}
                       </SelectItem>
