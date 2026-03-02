@@ -71,6 +71,74 @@ export type Database = {
         }
         Relationships: []
       }
+      cleaning_package_items: {
+        Row: {
+          created_at: string
+          default_quantity: number
+          id: string
+          ingredient_id: string
+          package_id: string
+        }
+        Insert: {
+          created_at?: string
+          default_quantity?: number
+          id?: string
+          ingredient_id: string
+          package_id: string
+        }
+        Update: {
+          created_at?: string
+          default_quantity?: number
+          id?: string
+          ingredient_id?: string
+          package_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cleaning_package_items_ingredient_id_fkey"
+            columns: ["ingredient_id"]
+            isOneToOne: false
+            referencedRelation: "ingredients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cleaning_package_items_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "cleaning_packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cleaning_packages: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          room_type_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name?: string
+          room_type_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          room_type_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cleaning_packages_room_type_id_fkey"
+            columns: ["room_type_id"]
+            isOneToOne: false
+            referencedRelation: "room_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_bonuses: {
         Row: {
           amount: number
@@ -608,6 +676,104 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      housekeeping_checklists: {
+        Row: {
+          count_expected: number | null
+          created_at: string
+          id: string
+          is_required: boolean
+          item_label: string
+          room_type_id: string
+          sort_order: number
+        }
+        Insert: {
+          count_expected?: number | null
+          created_at?: string
+          id?: string
+          is_required?: boolean
+          item_label: string
+          room_type_id: string
+          sort_order?: number
+        }
+        Update: {
+          count_expected?: number | null
+          created_at?: string
+          id?: string
+          is_required?: boolean
+          item_label?: string
+          room_type_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "housekeeping_checklists_room_type_id_fkey"
+            columns: ["room_type_id"]
+            isOneToOne: false
+            referencedRelation: "room_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      housekeeping_orders: {
+        Row: {
+          assigned_to: string | null
+          cleaning_completed_at: string | null
+          cleaning_notes: string
+          created_at: string
+          damage_notes: string
+          id: string
+          inspection_completed_at: string | null
+          inspection_data: Json | null
+          room_type_id: string | null
+          status: string
+          supplies_used: Json | null
+          unit_name: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          cleaning_completed_at?: string | null
+          cleaning_notes?: string
+          created_at?: string
+          damage_notes?: string
+          id?: string
+          inspection_completed_at?: string | null
+          inspection_data?: Json | null
+          room_type_id?: string | null
+          status?: string
+          supplies_used?: Json | null
+          unit_name?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          cleaning_completed_at?: string | null
+          cleaning_notes?: string
+          created_at?: string
+          damage_notes?: string
+          id?: string
+          inspection_completed_at?: string | null
+          inspection_data?: Json | null
+          room_type_id?: string | null
+          status?: string
+          supplies_used?: Json | null
+          unit_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "housekeeping_orders_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "housekeeping_orders_room_type_id_fkey"
+            columns: ["room_type_id"]
+            isOneToOne: false
+            referencedRelation: "room_types"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ingredients: {
         Row: {
@@ -1392,6 +1558,24 @@ export type Database = {
         }
         Relationships: []
       }
+      room_types: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       settings: {
         Row: {
           breakfast_end_time: string | null
@@ -1504,21 +1688,35 @@ export type Database = {
           active: boolean
           created_at: string
           id: string
+          room_type_id: string | null
+          status: string
           unit_name: string
         }
         Insert: {
           active?: boolean
           created_at?: string
           id?: string
+          room_type_id?: string | null
+          status?: string
           unit_name: string
         }
         Update: {
           active?: boolean
           created_at?: string
           id?: string
+          room_type_id?: string | null
+          status?: string
           unit_name?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "units_room_type_id_fkey"
+            columns: ["room_type_id"]
+            isOneToOne: false
+            referencedRelation: "room_types"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vibe_updates: {
         Row: {

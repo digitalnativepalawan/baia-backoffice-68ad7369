@@ -28,6 +28,7 @@ import RoomsDashboard from '@/components/admin/RoomsDashboard';
 import AdminLoginGate from '@/components/admin/AdminLoginGate';
 import TimesheetDashboard from '@/components/admin/TimesheetDashboard';
 import WeeklyScheduleManager from '@/components/admin/WeeklyScheduleManager';
+import HousekeepingConfig from '@/components/admin/HousekeepingConfig';
 
 import { deductInventoryForOrder } from '@/lib/inventoryDeduction';
 
@@ -525,6 +526,7 @@ const AdminPage = () => {
                 </div>
               </div>
             </section>
+            <HousekeepingConfig />
             <StaffAccessManager />
             <EmployeeContactConfig />
           </TabsContent>

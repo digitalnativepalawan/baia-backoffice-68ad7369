@@ -12,6 +12,9 @@ const GRANULAR_PERMISSIONS = [
   { key: 'payroll', label: 'Payroll' },
   { key: 'resort_ops', label: 'Resort Ops' },
   { key: 'rooms', label: 'Rooms' },
+  { key: 'schedules', label: 'Schedules' },
+  { key: 'setup', label: 'Setup' },
+  { key: 'timesheet', label: 'Timesheet' },
 ] as const;
 
 const LEVEL_LABELS: Record<PermissionLevel, string> = {
