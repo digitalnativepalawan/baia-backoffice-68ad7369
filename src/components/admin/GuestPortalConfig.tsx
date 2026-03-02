@@ -172,13 +172,15 @@ const ToursSection = ({ tours, qc }: { tours: any[]; qc: any }) => {
 };
 
 // --- Transport ---
+const LOCATIONS = ['San Vicente', 'Port Barton', 'Puerto Princesa', 'El Nido', 'Other'];
+
 const TransportSection = ({ items, qc }: { items: any[]; qc: any }) => {
-  const [form, setForm] = useState({ type: '', price: '', description: '' });
+  const [form, setForm] = useState({ origin: 'San Vicente', destination: '', price: '', description: '' });
 
   const save = async () => {
-    if (!form.type.trim()) return;
-    await supabase.from('transport_rates').insert({ type: form.type, price: parseFloat(form.price) || 0, description: form.description, sort_order: items.length });
-    setForm({ type: '', price: '', description: '' });
+    if (!form.destination.trim()) return;
+    await supabase.from('transport_rates').insert({ type: `${form.origin} → ${form.destination}`, origin: form.origin, destination: form.destination, price: parseFloat(form.price) || 0, description: form.description, sort_order: items.length });
+    setForm({ origin: 'San Vicente', destination: '', price: '', description: '' });
     qc.invalidateQueries({ queryKey: ['transport-rates'] });
     toast.success('Saved');
   };
@@ -195,11 +197,11 @@ const TransportSection = ({ items, qc }: { items: any[]; qc: any }) => {
 
   return (
     <div className="space-y-3">
-      <h4 className="font-display text-sm text-foreground tracking-wider">Transport Rates</h4>
+      <h4 className="font-display text-sm text-foreground tracking-wider">Transport Routes</h4>
       {items.map((t: any) => (
         <div key={t.id} className="bg-secondary p-3 rounded flex items-center justify-between">
           <div>
-            <span className="font-body text-sm text-foreground">{t.type} — ₱{t.price}</span>
+            <span className="font-body text-sm text-foreground">{t.origin} → {t.destination} — ₱{t.price}</span>
             {t.description && <p className="font-body text-xs text-muted-foreground">{t.description}</p>}
           </div>
           <div className="flex items-center gap-2">
@@ -209,12 +211,21 @@ const TransportSection = ({ items, qc }: { items: any[]; qc: any }) => {
         </div>
       ))}
       <div className="bg-card p-3 rounded space-y-2 border border-border">
-        <Input value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} placeholder="Type (e.g. Airport Transfer)" className="bg-secondary text-foreground h-10" />
+        <p className="font-body text-xs text-muted-foreground">Add Route</p>
+        <div className="grid grid-cols-2 gap-2">
+          <select value={form.origin} onChange={e => setForm(f => ({ ...f, origin: e.target.value }))} className="bg-secondary text-foreground h-10 rounded px-2 font-body text-sm border border-border">
+            {LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
+          </select>
+          <select value={form.destination} onChange={e => setForm(f => ({ ...f, destination: e.target.value }))} className="bg-secondary text-foreground h-10 rounded px-2 font-body text-sm border border-border">
+            <option value="">To...</option>
+            {LOCATIONS.filter(l => l !== form.origin).map(l => <option key={l} value={l}>{l}</option>)}
+          </select>
+        </div>
         <div className="grid grid-cols-2 gap-2">
           <Input value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} placeholder="Price" type="number" className="bg-secondary text-foreground h-10" />
           <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Description" className="bg-secondary text-foreground h-10" />
         </div>
-        <Button onClick={save} size="sm" className="w-full"><Plus className="w-3.5 h-3.5 mr-1" />Add</Button>
+        <Button onClick={save} size="sm" className="w-full" disabled={!form.destination}><Plus className="w-3.5 h-3.5 mr-1" />Add Route</Button>
       </div>
     </div>
   );

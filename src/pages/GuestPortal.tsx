@@ -267,16 +267,21 @@ const TransportView = ({ session, qc }: { session: GuestPortalSession; qc: any }
       return data || [];
     },
   });
+  const [selectedRate, setSelectedRate] = useState<any>(null);
+  const [pickupDate, setPickupDate] = useState(new Date().toISOString().split('T')[0]);
+  const [pickupTime, setPickupTime] = useState('08:00');
   const [submitting, setSubmitting] = useState(false);
 
-  const book = async (rate: any) => {
+  const book = async () => {
+    if (!selectedRate) return;
     setSubmitting(true);
+    const label = `${selectedRate.origin} → ${selectedRate.destination}`;
     await supabase.from('guest_requests').insert({
       booking_id: session.booking_id,
       room_id: session.room_id,
       guest_name: session.guest_name,
       request_type: 'Transport',
-      details: `${rate.type} — ₱${rate.price}`,
+      details: `${label} — ₱${selectedRate.price} — ${pickupDate} ${pickupTime}`,
       status: 'pending',
     });
     await (supabase.from('room_transactions') as any).insert({
@@ -285,16 +290,17 @@ const TransportView = ({ session, qc }: { session: GuestPortalSession; qc: any }
       booking_id: session.booking_id,
       guest_name: session.guest_name,
       transaction_type: 'charge',
-      amount: rate.price,
+      amount: selectedRate.price,
       tax_amount: 0,
       service_charge_amount: 0,
-      total_amount: rate.price,
+      total_amount: selectedRate.price,
       payment_method: 'Charge to Room',
       staff_name: 'Guest Portal',
-      notes: `Transport: ${rate.type}`,
+      notes: `Transport: ${label} on ${pickupDate} ${pickupTime}`,
     });
     qc.invalidateQueries({ queryKey: ['guest-requests-admin'] });
     toast.success('Transport booked and charged to room!');
+    setSelectedRate(null);
     setSubmitting(false);
   };
 
@@ -302,16 +308,27 @@ const TransportView = ({ session, qc }: { session: GuestPortalSession; qc: any }
     <div className="space-y-3">
       <h2 className="font-display text-lg text-foreground">Request Transport</h2>
       {rates.map((r: any) => (
-        <div key={r.id} className="bg-card border border-border rounded-lg p-4 flex justify-between items-center">
-          <div>
-            <p className="font-body text-sm text-foreground">{r.type}</p>
-            {r.description && <p className="font-body text-xs text-muted-foreground">{r.description}</p>}
+        <div key={r.id} onClick={() => setSelectedRate(r)} className={`bg-card border rounded-lg p-4 cursor-pointer transition-colors ${selectedRate?.id === r.id ? 'border-accent' : 'border-border hover:border-muted-foreground'}`}>
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="font-body text-sm text-foreground">{r.origin} → {r.destination}</p>
+              {r.description && <p className="font-body text-xs text-muted-foreground">{r.description}</p>}
+            </div>
+            <span className="font-body text-sm text-accent font-medium">₱{r.price}</span>
           </div>
-          <Button onClick={() => book(r)} disabled={submitting} size="sm" variant="outline" className="font-body text-xs">
-            ₱{r.price} <ChevronRight className="w-3.5 h-3.5 ml-1" />
-          </Button>
         </div>
       ))}
+      {selectedRate && (
+        <div className="bg-secondary p-4 rounded-lg space-y-3">
+          <p className="font-body text-sm text-foreground">{selectedRate.origin} → {selectedRate.destination}</p>
+          <div className="grid grid-cols-2 gap-2">
+            <Input type="date" value={pickupDate} onChange={e => setPickupDate(e.target.value)} className="bg-card text-foreground h-10" />
+            <Input type="time" value={pickupTime} onChange={e => setPickupTime(e.target.value)} className="bg-card text-foreground h-10" />
+          </div>
+          <p className="font-body text-sm text-foreground text-right">Total: ₱{selectedRate.price}</p>
+          <Button onClick={book} disabled={submitting} className="w-full">{submitting ? 'Booking...' : 'Book & Charge to Room'}</Button>
+        </div>
+      )}
       {rates.length === 0 && <p className="font-body text-sm text-muted-foreground">No transport options available.</p>}
     </div>
   );

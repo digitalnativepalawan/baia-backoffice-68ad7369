@@ -2255,7 +2255,9 @@ export type Database = {
           active: boolean
           created_at: string
           description: string
+          destination: string
           id: string
+          origin: string
           price: number
           sort_order: number
           type: string
@@ -2264,7 +2266,9 @@ export type Database = {
           active?: boolean
           created_at?: string
           description?: string
+          destination?: string
           id?: string
+          origin?: string
           price?: number
           sort_order?: number
           type: string
@@ -2273,7 +2277,9 @@ export type Database = {
           active?: boolean
           created_at?: string
           description?: string
+          destination?: string
           id?: string
+          origin?: string
           price?: number
           sort_order?: number
           type?: string
