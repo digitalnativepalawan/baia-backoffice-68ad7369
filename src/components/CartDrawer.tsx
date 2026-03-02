@@ -288,7 +288,7 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
               </p>
             </div>
             <DrawerFooter className="pt-0 gap-2">
-              <Button onClick={() => { setSubmitted(false); }} className="font-display tracking-wider py-6 w-full">
+              <Button onClick={() => { setSubmitted(false); setSelectedOrderType(''); setSelectedLocation(''); setPaymentType(''); setGuestName(''); setScheduleMode('asap'); }} className="font-display tracking-wider py-6 w-full">
                 Place Another Order
               </Button>
               <Button variant="outline" onClick={() => handleClose(false)} className="font-display tracking-wider py-6 w-full">
