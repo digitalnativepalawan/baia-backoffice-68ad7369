@@ -232,8 +232,8 @@ const MenuPage = () => {
               <div className="flex flex-col gap-1">
                 {filteredItems.map((item, idx) => {
                   const status = stockStatus[item.id];
-                  const isSoldOut = status?.soldOut || false;
-                  const isLowStock = status?.lowStock || false;
+                  const isSoldOut = !isBrowseOnly && (status?.soldOut || false);
+                  const isLowStock = !isBrowseOnly && (status?.lowStock || false);
                   return (
                     <button
                       key={item.id}
