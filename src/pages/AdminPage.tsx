@@ -32,6 +32,7 @@ import HousekeepingConfig from '@/components/admin/HousekeepingConfig';
 import DeviceManager from '@/components/admin/DeviceManager';
 import BillingConfigForm from '@/components/admin/BillingConfigForm';
 import AuditLogView from '@/components/admin/AuditLogView';
+import OrderArchive from '@/components/admin/OrderArchive';
 
 import { deductInventoryForOrder } from '@/lib/inventoryDeduction';
 
@@ -405,6 +406,7 @@ const AdminPage = () => {
             <TabsTrigger value="timesheet" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Timesheet</TabsTrigger>
             <TabsTrigger value="schedules" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Schedules</TabsTrigger>
             <TabsTrigger value="audit" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Audit Log</TabsTrigger>
+            <TabsTrigger value="archive" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Archive</TabsTrigger>
           </TabsList>
 
           {/* SETTINGS TAB */}
@@ -814,6 +816,11 @@ const AdminPage = () => {
           {/* AUDIT LOG TAB */}
           <TabsContent value="audit">
             <AuditLogView />
+          </TabsContent>
+
+          {/* ORDER ARCHIVE TAB */}
+          <TabsContent value="archive">
+            <OrderArchive />
           </TabsContent>
         </Tabs>
       </div>

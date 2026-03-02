@@ -39,6 +39,7 @@ const Index = () => {
   const [showGuestOrder, setShowGuestOrder] = useState(false);
   const [guestRoom, setGuestRoom] = useState('');
   const [guestNameInput, setGuestNameInput] = useState('');
+  const [guestPassword, setGuestPassword] = useState('');
   const [guestLoading, setGuestLoading] = useState(false);
 
   // Fetch all active units for guest ordering room selection
@@ -92,10 +93,9 @@ const Index = () => {
   };
 
   const handleGuestVerify = async () => {
-    if (!guestRoom || !guestNameInput.trim()) return;
+    if (!guestRoom || !guestNameInput.trim() || !guestPassword.trim()) return;
     setGuestLoading(true);
     try {
-      const today = new Date().toISOString().split('T')[0];
       const unit = allUnits.find(u => u.unit_name === guestRoom);
       if (!unit) {
         toast.error('Room not found');
@@ -116,21 +116,25 @@ const Index = () => {
         return;
       }
 
-      // Find active booking for this unit with matching guest name
-      const { data: bookings } = await supabase
+      // Find booking with matching password
+      const { data: booking } = await supabase
         .from('resort_ops_bookings')
-        .select('id, guest_id, check_in, check_out, resort_ops_guests(id, full_name)')
+        .select('id, guest_id, check_in, check_out, room_password, password_expires_at, resort_ops_guests(id, full_name)')
         .eq('unit_id', opsUnit.id)
-        .lte('check_in', today)
-        .gte('check_out', today);
+        .eq('room_password', guestPassword.trim())
+        .gte('password_expires_at', new Date().toISOString())
+        .maybeSingle();
 
-      const match = (bookings || []).find((b: any) => {
-        const guestName = b.resort_ops_guests?.full_name;
-        return guestName && guestName.toLowerCase().trim() === guestNameInput.toLowerCase().trim();
-      });
+      if (!booking) {
+        toast.error('Invalid room password');
+        setGuestLoading(false);
+        return;
+      }
 
-      if (!match) {
-        toast.error('Guest name does not match our records for this room');
+      // Verify guest name matches
+      const guestName = (booking as any).resort_ops_guests?.full_name;
+      if (!guestName || guestName.toLowerCase().trim() !== guestNameInput.toLowerCase().trim()) {
+        toast.error('Guest name does not match our records');
         setGuestLoading(false);
         return;
       }
@@ -138,8 +142,8 @@ const Index = () => {
       setGuestSession({
         room_id: unit.id,
         room_name: unit.unit_name,
-        guest_name: (match as any).resort_ops_guests.full_name,
-        booking_id: match.id,
+        guest_name: guestName,
+        booking_id: booking.id,
       });
 
       toast.success(`Welcome, ${guestNameInput.trim()}!`);
@@ -314,17 +318,29 @@ const Index = () => {
                   onChange={e => setGuestNameInput(e.target.value)}
                   placeholder="Your full name"
                   className="bg-secondary border-border text-foreground font-body text-center text-lg h-12"
+                  onKeyDown={e => { if (e.key === 'Enter') document.getElementById('guest-password')?.focus(); }}
+                />
+                <Input
+                  id="guest-password"
+                  type="tel"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  value={guestPassword}
+                  onChange={e => setGuestPassword(e.target.value.replace(/\D/g, ''))}
+                  placeholder="Room Password"
+                  className="bg-secondary border-border text-foreground font-body text-center text-2xl tracking-[0.5em] h-14"
                   onKeyDown={e => { if (e.key === 'Enter') handleGuestVerify(); }}
                 />
                 <Button
                   onClick={handleGuestVerify}
-                  disabled={guestLoading || !guestRoom || !guestNameInput.trim()}
+                  disabled={guestLoading || !guestRoom || !guestNameInput.trim() || !guestPassword.trim()}
                   className="w-full font-display text-sm tracking-wider h-12"
                 >
                   {guestLoading ? 'Verifying...' : 'Start Ordering'}
                 </Button>
                 <button
-                  onClick={() => { setShowGuestOrder(false); setGuestRoom(''); setGuestNameInput(''); }}
+                  onClick={() => { setShowGuestOrder(false); setGuestRoom(''); setGuestNameInput(''); setGuestPassword(''); }}
                   className="w-full font-body text-xs text-cream-dim/40 hover:text-cream-dim/60 py-2 transition-colors"
                 >
                   Cancel

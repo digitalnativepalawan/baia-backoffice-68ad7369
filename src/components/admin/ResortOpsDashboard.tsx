@@ -79,6 +79,128 @@ const EMPTY_EXPENSE = {
   expense_date: '',
 };
 
+const fmtDecStatic = (n: number) => n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+type ExpenseData = typeof EMPTY_EXPENSE;
+
+const ExpenseFormFields = ({ data, onChange, scannedFields, scanningReceipt, onScanReceipt }: {
+  data: ExpenseData;
+  onChange: (d: ExpenseData) => void;
+  scannedFields: Set<string>;
+  scanningReceipt: boolean;
+  onScanReceipt: (file: File) => void;
+}) => {
+  const inputCls = "bg-secondary border-border text-foreground font-body text-sm";
+  const highlightCls = (field: string) => scannedFields.has(field) ? 'ring-2 ring-primary/50' : '';
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <label className="flex-1 cursor-pointer">
+          <input type="file" accept="image/*" capture="environment" className="hidden" disabled={scanningReceipt}
+            onChange={(e) => { const file = e.target.files?.[0]; if (file) onScanReceipt(file); e.target.value = ''; }} />
+          <div className={`flex items-center justify-center gap-2 h-10 px-4 rounded-md border border-dashed border-primary/50 bg-primary/5 text-primary hover:bg-primary/10 transition-colors font-body text-sm ${scanningReceipt ? 'opacity-50 pointer-events-none' : ''}`}>
+            {scanningReceipt ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanLine className="w-4 h-4" />}
+            {scanningReceipt ? 'Scanning receipt...' : '📷 Scan Receipt (AI)'}
+          </div>
+        </label>
+      </div>
+      {scannedFields.size > 0 && (
+        <div className="px-2 py-1.5 rounded bg-primary/10 border border-primary/20 font-body text-xs text-primary">
+          ✨ AI extracted {scannedFields.size} fields (highlighted). Review and confirm before saving.
+        </div>
+      )}
+      <Input placeholder="Supplier Name *" value={data.name} onChange={e => onChange({...data, name: e.target.value})} className={`${inputCls} ${highlightCls('name')}`} />
+      <div className="grid grid-cols-2 gap-2">
+        <Input placeholder="Supplier TIN" value={data.supplier_tin} onChange={e => onChange({...data, supplier_tin: e.target.value})} className={`${inputCls} ${highlightCls('supplier_tin')}`} />
+        <Select value={data.vat_status} onValueChange={v => onChange({...data, vat_status: v})}>
+          <SelectTrigger className={inputCls}><SelectValue placeholder="VAT Status *" /></SelectTrigger>
+          <SelectContent>{VAT_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+        </Select>
+      </div>
+      {data.vat_status === 'VAT' && !data.supplier_tin && (
+        <p className="font-body text-xs text-destructive">⚠ Supplier TIN required for VAT status</p>
+      )}
+      <div className="grid grid-cols-2 gap-2">
+        <Input placeholder="Invoice #" value={data.invoice_number} onChange={e => onChange({...data, invoice_number: e.target.value})} className={`${inputCls} ${highlightCls('invoice_number')}`} />
+        <Input placeholder="OR #" value={data.official_receipt_number} onChange={e => onChange({...data, official_receipt_number: e.target.value})} className={`${inputCls} ${highlightCls('official_receipt_number')}`} />
+      </div>
+      <Select value={data.category} onValueChange={v => onChange({...data, category: v})}>
+        <SelectTrigger className={inputCls}><SelectValue placeholder="Category *" /></SelectTrigger>
+        <SelectContent>{EXPENSE_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+      </Select>
+      <Input placeholder="Description" value={data.description} onChange={e => onChange({...data, description: e.target.value})} className={`${inputCls} ${highlightCls('description')}`} />
+      <div className="grid grid-cols-2 gap-2">
+        <Input placeholder="Total Amount *" type="number" inputMode="decimal" value={data.amount} onChange={e => onChange({...data, amount: e.target.value})} className={`${inputCls} ${highlightCls('amount')}`} />
+        <Input type="date" value={data.expense_date} onChange={e => onChange({...data, expense_date: e.target.value})} className={`${inputCls} ${highlightCls('expense_date')}`} />
+      </div>
+      {data.amount && parseFloat(data.amount) > 0 && (
+        <div className="px-2 py-1.5 rounded bg-muted/50 border border-border font-body text-xs text-muted-foreground space-y-0.5">
+          {(() => {
+            const vf = computeVatFields(data.vat_status, parseFloat(data.amount));
+            return <>
+              {vf.vatable_sale > 0 && <p>VATable Sale: <span className="text-foreground">₱{fmtDecStatic(vf.vatable_sale)}</span></p>}
+              {vf.vat_amount > 0 && <p>VAT (12%): <span className="text-foreground">₱{fmtDecStatic(vf.vat_amount)}</span></p>}
+              {vf.vat_exempt_amount > 0 && <p>VAT-Exempt: <span className="text-foreground">₱{fmtDecStatic(vf.vat_exempt_amount)}</span></p>}
+              {vf.zero_rated_amount > 0 && <p>Zero-Rated: <span className="text-foreground">₱{fmtDecStatic(vf.zero_rated_amount)}</span></p>}
+            </>;
+          })()}
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-2">
+        <Input placeholder="Withholding Tax" type="number" inputMode="decimal" value={data.withholding_tax} onChange={e => onChange({...data, withholding_tax: e.target.value})} className={inputCls} />
+        <Select value={data.payment_method} onValueChange={v => onChange({...data, payment_method: v})}>
+          <SelectTrigger className={inputCls}><SelectValue placeholder="Payment Method" /></SelectTrigger>
+          <SelectContent>{PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
+        </Select>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <Input placeholder="Project / Unit" value={data.project_unit} onChange={e => onChange({...data, project_unit: e.target.value})} className={inputCls} />
+        <div className="flex items-center gap-2 px-2">
+          <Checkbox checked={data.is_paid} onCheckedChange={v => onChange({...data, is_paid: !!v})} />
+          <label className="font-body text-xs text-foreground">Paid</label>
+        </div>
+      </div>
+      <Textarea placeholder="Notes (optional)" value={data.notes} onChange={e => onChange({...data, notes: e.target.value})} className="bg-secondary border-border text-foreground font-body text-sm min-h-[60px]" />
+      <div className="space-y-1.5">
+        <div className="flex gap-2">
+          <Input placeholder="Image/Receipt URL (optional)" value={data.image_url} onChange={e => onChange({...data, image_url: e.target.value})} className={`${inputCls} flex-1`} />
+          <label className="cursor-pointer">
+            <input type="file" accept="image/*" capture="environment" className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                if (file.size > 5 * 1024 * 1024) { toast.error('Image must be under 5MB'); return; }
+                const ext = file.name.split('.').pop() || 'jpg';
+                const path = `expenses/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+                toast.loading('Uploading receipt...', { id: 'receipt-upload' });
+                const { error } = await supabase.storage.from('receipts').upload(path, file);
+                if (error) { toast.error(`Upload failed: ${error.message}`, { id: 'receipt-upload' }); return; }
+                const { data: urlData } = supabase.storage.from('receipts').getPublicUrl(path);
+                onChange({...data, image_url: urlData.publicUrl});
+                toast.success('Receipt uploaded', { id: 'receipt-upload' });
+              }}
+            />
+            <div className="flex items-center justify-center h-10 px-3 rounded-md border border-border bg-secondary text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+              <Camera className="w-4 h-4" />
+            </div>
+          </label>
+        </div>
+        {data.image_url && (
+          <div className="flex items-center gap-2 px-2 py-1 rounded bg-muted/50 border border-border">
+            <Image className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+            <a href={data.image_url} target="_blank" rel="noopener noreferrer" className="font-body text-xs text-primary hover:underline truncate flex-1">
+              {data.image_url.includes('receipts/') ? 'View uploaded receipt' : data.image_url}
+            </a>
+            <Button size="icon" variant="ghost" className="h-5 w-5 flex-shrink-0" onClick={() => onChange({...data, image_url: ''})}>
+              <X className="w-3 h-3" />
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
   const qc = useQueryClient();
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -490,135 +612,10 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
     }
   };
 
-  // ── Expense Form Component (shared between Add and Edit) ──
-  const ExpenseFormFields = ({ data, onChange }: { data: typeof EMPTY_EXPENSE; onChange: (d: typeof EMPTY_EXPENSE) => void }) => {
-    const inputCls = "bg-secondary border-border text-foreground font-body text-sm";
-    const highlightCls = (field: string) => scannedFields.has(field) ? 'ring-2 ring-primary/50' : '';
-    return (
-      <div className="space-y-2">
-        {/* Scan Receipt Button */}
-        <div className="flex gap-2">
-          <label className="flex-1 cursor-pointer">
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              disabled={scanningReceipt}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleScanReceipt(file, data, onChange);
-                e.target.value = '';
-              }}
-            />
-            <div className={`flex items-center justify-center gap-2 h-10 px-4 rounded-md border border-dashed border-primary/50 bg-primary/5 text-primary hover:bg-primary/10 transition-colors font-body text-sm ${scanningReceipt ? 'opacity-50 pointer-events-none' : ''}`}>
-              {scanningReceipt ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanLine className="w-4 h-4" />}
-              {scanningReceipt ? 'Scanning receipt...' : '📷 Scan Receipt (AI)'}
-            </div>
-          </label>
-        </div>
-        {scannedFields.size > 0 && (
-          <div className="px-2 py-1.5 rounded bg-primary/10 border border-primary/20 font-body text-xs text-primary">
-            ✨ AI extracted {scannedFields.size} fields (highlighted). Review and confirm before saving.
-          </div>
-        )}
-        <Input placeholder="Supplier Name *" value={data.name} onChange={e => onChange({...data, name: e.target.value})} className={`${inputCls} ${highlightCls('name')}`} />
-        <div className="grid grid-cols-2 gap-2">
-          <Input placeholder="Supplier TIN" value={data.supplier_tin} onChange={e => onChange({...data, supplier_tin: e.target.value})} className={`${inputCls} ${highlightCls('supplier_tin')}`} />
-          <Select value={data.vat_status} onValueChange={v => onChange({...data, vat_status: v})}>
-            <SelectTrigger className={inputCls}><SelectValue placeholder="VAT Status *" /></SelectTrigger>
-            <SelectContent>{VAT_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-          </Select>
-        </div>
-        {data.vat_status === 'VAT' && !data.supplier_tin && (
-          <p className="font-body text-xs text-destructive">⚠ Supplier TIN required for VAT status</p>
-        )}
-        <div className="grid grid-cols-2 gap-2">
-          <Input placeholder="Invoice #" value={data.invoice_number} onChange={e => onChange({...data, invoice_number: e.target.value})} className={`${inputCls} ${highlightCls('invoice_number')}`} />
-          <Input placeholder="OR #" value={data.official_receipt_number} onChange={e => onChange({...data, official_receipt_number: e.target.value})} className={`${inputCls} ${highlightCls('official_receipt_number')}`} />
-        </div>
-        <Select value={data.category} onValueChange={v => onChange({...data, category: v})}>
-          <SelectTrigger className={inputCls}><SelectValue placeholder="Category *" /></SelectTrigger>
-          <SelectContent>{EXPENSE_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-        </Select>
-        <Input placeholder="Description" value={data.description} onChange={e => onChange({...data, description: e.target.value})} className={`${inputCls} ${highlightCls('description')}`} />
-        <div className="grid grid-cols-2 gap-2">
-          <Input placeholder="Total Amount *" type="number" value={data.amount} onChange={e => onChange({...data, amount: e.target.value})} className={`${inputCls} ${highlightCls('amount')}`} />
-          <Input type="date" value={data.expense_date} onChange={e => onChange({...data, expense_date: e.target.value})} className={`${inputCls} ${highlightCls('expense_date')}`} />
-        </div>
-        {/* Computed VAT breakdown (read-only display) */}
-        {data.amount && parseFloat(data.amount) > 0 && (
-          <div className="px-2 py-1.5 rounded bg-muted/50 border border-border font-body text-xs text-muted-foreground space-y-0.5">
-            {(() => {
-              const vf = computeVatFields(data.vat_status, parseFloat(data.amount));
-              return <>
-                {vf.vatable_sale > 0 && <p>VATable Sale: <span className="text-foreground">₱{fmtDec(vf.vatable_sale)}</span></p>}
-                {vf.vat_amount > 0 && <p>VAT (12%): <span className="text-foreground">₱{fmtDec(vf.vat_amount)}</span></p>}
-                {vf.vat_exempt_amount > 0 && <p>VAT-Exempt: <span className="text-foreground">₱{fmtDec(vf.vat_exempt_amount)}</span></p>}
-                {vf.zero_rated_amount > 0 && <p>Zero-Rated: <span className="text-foreground">₱{fmtDec(vf.zero_rated_amount)}</span></p>}
-              </>;
-            })()}
-          </div>
-        )}
-        <div className="grid grid-cols-2 gap-2">
-          <Input placeholder="Withholding Tax" type="number" value={data.withholding_tax} onChange={e => onChange({...data, withholding_tax: e.target.value})} className={inputCls} />
-          <Select value={data.payment_method} onValueChange={v => onChange({...data, payment_method: v})}>
-            <SelectTrigger className={inputCls}><SelectValue placeholder="Payment Method" /></SelectTrigger>
-            <SelectContent>{PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
-          </Select>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <Input placeholder="Project / Unit" value={data.project_unit} onChange={e => onChange({...data, project_unit: e.target.value})} className={inputCls} />
-          <div className="flex items-center gap-2 px-2">
-            <Checkbox checked={data.is_paid} onCheckedChange={v => onChange({...data, is_paid: !!v})} />
-            <label className="font-body text-xs text-foreground">Paid</label>
-          </div>
-        </div>
-        <Textarea placeholder="Notes (optional)" value={data.notes} onChange={e => onChange({...data, notes: e.target.value})} className="bg-secondary border-border text-foreground font-body text-sm min-h-[60px]" />
-        {/* Receipt image: URL input OR camera/file upload */}
-        <div className="space-y-1.5">
-          <div className="flex gap-2">
-            <Input placeholder="Image/Receipt URL (optional)" value={data.image_url} onChange={e => onChange({...data, image_url: e.target.value})} className={`${inputCls} flex-1`} />
-            <label className="cursor-pointer">
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  if (file.size > 5 * 1024 * 1024) { toast.error('Image must be under 5MB'); return; }
-                  const ext = file.name.split('.').pop() || 'jpg';
-                  const path = `expenses/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-                  toast.loading('Uploading receipt...', { id: 'receipt-upload' });
-                  const { error } = await supabase.storage.from('receipts').upload(path, file);
-                  if (error) { toast.error(`Upload failed: ${error.message}`, { id: 'receipt-upload' }); return; }
-                  const { data: urlData } = supabase.storage.from('receipts').getPublicUrl(path);
-                  onChange({...data, image_url: urlData.publicUrl});
-                  toast.success('Receipt uploaded', { id: 'receipt-upload' });
-                }}
-              />
-              <div className="flex items-center justify-center h-10 px-3 rounded-md border border-border bg-secondary text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
-                <Camera className="w-4 h-4" />
-              </div>
-            </label>
-          </div>
-          {data.image_url && (
-            <div className="flex items-center gap-2 px-2 py-1 rounded bg-muted/50 border border-border">
-              <Image className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-              <a href={data.image_url} target="_blank" rel="noopener noreferrer" className="font-body text-xs text-primary hover:underline truncate flex-1">
-                {data.image_url.includes('receipts/') ? 'View uploaded receipt' : data.image_url}
-              </a>
-              <Button size="icon" variant="ghost" className="h-5 w-5 flex-shrink-0" onClick={() => onChange({...data, image_url: ''})}>
-                <X className="w-3 h-3" />
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
+  // ExpenseFormFields is now extracted outside the component — see below
+  const renderExpenseFormFields = (data: typeof EMPTY_EXPENSE, onChange: (d: typeof EMPTY_EXPENSE) => void) => (
+    <ExpenseFormFields data={data} onChange={onChange} scannedFields={scannedFields} scanningReceipt={scanningReceipt} onScanReceipt={(file) => handleScanReceipt(file, data, onChange)} />
+  );
 
   const inputCls = "bg-secondary border-border text-foreground font-body text-sm";
 
@@ -974,7 +971,7 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
               return filtered.map((e: any) => (
                 editingExpense?.id === e.id ? (
                   <div key={e.id} className="p-3 rounded border border-primary/50 space-y-2">
-                    <ExpenseFormFields data={editingExpense} onChange={setEditingExpense} />
+                    {renderExpenseFormFields(editingExpense, setEditingExpense)}
                     <div className="flex justify-end"><SaveCancelBtns onSave={saveExpense} onCancel={() => setEditingExpense(null)} /></div>
                   </div>
                 ) : (
@@ -1030,7 +1027,7 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
           {/* Add Expense Form */}
           {showAddExpenseForm ? (
             <div className="p-3 rounded border border-border space-y-2">
-              <ExpenseFormFields data={newExpense} onChange={setNewExpense} />
+              {renderExpenseFormFields(newExpense, setNewExpense)}
               <div className="flex gap-2">
                 <Button size="sm" onClick={addExpense} className="flex-1"><Check className="w-4 h-4 mr-1" /> Save</Button>
                 <Button size="sm" variant="outline" onClick={() => { setShowAddExpenseForm(false); setNewExpense({ ...EMPTY_EXPENSE }); setScannedFields(new Set()); }}>Cancel</Button>

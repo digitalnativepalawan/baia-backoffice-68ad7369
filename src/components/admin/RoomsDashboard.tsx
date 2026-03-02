@@ -344,7 +344,12 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true }: { readOnl
         qc.invalidateQueries({ queryKey: ['resort-ops-units'] });
       }
 
-      // 3. Insert booking
+      // 3. Generate room password
+      const roomPassword = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = new Date(checkInForm.checkOut);
+      expiresAt.setDate(expiresAt.getDate() + 1);
+
+      // 4. Insert booking with password
       const { error: bErr } = await from('resort_ops_bookings').insert({
         guest_id: gId,
         unit_id: resortUnit.id,
@@ -356,13 +361,15 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true }: { readOnl
         room_rate: parseFloat(checkInForm.roomRate) || 0,
         notes: checkInForm.notes || '',
         special_requests: checkInForm.specialRequests || '',
+        room_password: roomPassword,
+        password_expires_at: expiresAt.toISOString(),
       });
       if (bErr) throw new Error(bErr.message);
 
-      // 4. Set unit status to occupied
+      // 5. Set unit status to occupied
       await supabase.from('units').update({ status: 'occupied' } as any).eq('id', selectedUnit.id);
 
-      // 5. Refresh
+      // 6. Refresh
       qc.invalidateQueries({ queryKey: ['rooms-bookings'] });
       qc.invalidateQueries({ queryKey: ['rooms-units'] });
       setShowCheckInForm(false);
@@ -371,7 +378,7 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true }: { readOnl
         checkIn: new Date().toISOString().split('T')[0],
         checkOut: '', adults: '1', children: '0', platform: 'Direct', roomRate: '0', notes: '', specialRequests: '',
       });
-      toast.success(`${checkInForm.guestName.trim()} checked in to ${selectedUnit.name}`);
+      toast.success(`${checkInForm.guestName.trim()} checked in to ${selectedUnit.name}. Room password: ${roomPassword}`, { duration: 10000 });
     } catch (err: any) {
       toast.error(err.message || 'Check-in failed');
     } finally {

@@ -1401,7 +1401,9 @@ export type Database = {
           id: string
           notes: string | null
           paid_amount: number
+          password_expires_at: string | null
           platform: string
+          room_password: string | null
           room_rate: number
           sirvoy_booking_id: number | null
           special_requests: string
@@ -1419,7 +1421,9 @@ export type Database = {
           id?: string
           notes?: string | null
           paid_amount?: number
+          password_expires_at?: string | null
           platform?: string
+          room_password?: string | null
           room_rate?: number
           sirvoy_booking_id?: number | null
           special_requests?: string
@@ -1437,7 +1441,9 @@ export type Database = {
           id?: string
           notes?: string | null
           paid_amount?: number
+          password_expires_at?: string | null
           platform?: string
+          room_password?: string | null
           room_rate?: number
           sirvoy_booking_id?: number | null
           special_requests?: string
