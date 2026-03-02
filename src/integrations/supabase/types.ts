@@ -71,6 +71,84 @@ export type Database = {
         }
         Relationships: []
       }
+      billing_config: {
+        Row: {
+          allow_room_charging: boolean
+          city_tax_name: string
+          city_tax_rate: number
+          created_at: string
+          default_payment_method: string
+          enable_city_tax: boolean
+          enable_service_charge: boolean
+          enable_tax: boolean
+          id: string
+          notify_charges_above: number
+          receipt_footer: string
+          receipt_header: string
+          require_deposit: boolean
+          require_signature_above: number
+          service_charge_name: string
+          service_charge_rate: number
+          show_itemized_taxes: boolean
+          show_payment_on_receipt: boolean
+          show_room_on_receipt: boolean
+          show_staff_on_receipt: boolean
+          tax_name: string
+          tax_rate: number
+          updated_at: string
+        }
+        Insert: {
+          allow_room_charging?: boolean
+          city_tax_name?: string
+          city_tax_rate?: number
+          created_at?: string
+          default_payment_method?: string
+          enable_city_tax?: boolean
+          enable_service_charge?: boolean
+          enable_tax?: boolean
+          id?: string
+          notify_charges_above?: number
+          receipt_footer?: string
+          receipt_header?: string
+          require_deposit?: boolean
+          require_signature_above?: number
+          service_charge_name?: string
+          service_charge_rate?: number
+          show_itemized_taxes?: boolean
+          show_payment_on_receipt?: boolean
+          show_room_on_receipt?: boolean
+          show_staff_on_receipt?: boolean
+          tax_name?: string
+          tax_rate?: number
+          updated_at?: string
+        }
+        Update: {
+          allow_room_charging?: boolean
+          city_tax_name?: string
+          city_tax_rate?: number
+          created_at?: string
+          default_payment_method?: string
+          enable_city_tax?: boolean
+          enable_service_charge?: boolean
+          enable_tax?: boolean
+          id?: string
+          notify_charges_above?: number
+          receipt_footer?: string
+          receipt_header?: string
+          require_deposit?: boolean
+          require_signature_above?: number
+          service_charge_name?: string
+          service_charge_rate?: number
+          show_itemized_taxes?: boolean
+          show_payment_on_receipt?: boolean
+          show_room_on_receipt?: boolean
+          show_staff_on_receipt?: boolean
+          tax_name?: string
+          tax_rate?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       cleaning_package_items: {
         Row: {
           created_at: string
@@ -1064,16 +1142,20 @@ export type Database = {
           bar_status: string
           closed_at: string | null
           created_at: string
+          guest_name: string
           id: string
           items: Json
           kitchen_status: string
           location_detail: string | null
           order_type: string
           payment_type: string | null
+          room_id: string | null
           scheduled_for: string | null
           service_charge: number
+          staff_name: string
           status: string
           tab_id: string | null
+          tax_details: Json
           total: number
           updated_at: string | null
         }
@@ -1081,16 +1163,20 @@ export type Database = {
           bar_status?: string
           closed_at?: string | null
           created_at?: string
+          guest_name?: string
           id?: string
           items?: Json
           kitchen_status?: string
           location_detail?: string | null
           order_type?: string
           payment_type?: string | null
+          room_id?: string | null
           scheduled_for?: string | null
           service_charge?: number
+          staff_name?: string
           status?: string
           tab_id?: string | null
+          tax_details?: Json
           total?: number
           updated_at?: string | null
         }
@@ -1098,20 +1184,31 @@ export type Database = {
           bar_status?: string
           closed_at?: string | null
           created_at?: string
+          guest_name?: string
           id?: string
           items?: Json
           kitchen_status?: string
           location_detail?: string | null
           order_type?: string
           payment_type?: string | null
+          room_id?: string | null
           scheduled_for?: string | null
           service_charge?: number
+          staff_name?: string
           status?: string
           tab_id?: string | null
+          tax_details?: Json
           total?: number
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "orders_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "orders_tab_id_fkey"
             columns: ["tab_id"]
@@ -1120,6 +1217,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      payment_methods: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          requires_approval: boolean
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          requires_approval?: boolean
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          requires_approval?: boolean
+          sort_order?: number
+        }
+        Relationships: []
       }
       payroll_payments: {
         Row: {
@@ -1602,6 +1726,82 @@ export type Database = {
           table_name?: string
         }
         Relationships: []
+      }
+      room_transactions: {
+        Row: {
+          amount: number
+          booking_id: string | null
+          created_at: string
+          guest_name: string | null
+          id: string
+          notes: string | null
+          order_id: string | null
+          payment_method: string
+          service_charge_amount: number
+          staff_name: string
+          tax_amount: number
+          total_amount: number
+          transaction_type: string
+          unit_id: string | null
+          unit_name: string
+        }
+        Insert: {
+          amount?: number
+          booking_id?: string | null
+          created_at?: string
+          guest_name?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          payment_method?: string
+          service_charge_amount?: number
+          staff_name?: string
+          tax_amount?: number
+          total_amount?: number
+          transaction_type?: string
+          unit_id?: string | null
+          unit_name?: string
+        }
+        Update: {
+          amount?: number
+          booking_id?: string | null
+          created_at?: string
+          guest_name?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          payment_method?: string
+          service_charge_amount?: number
+          staff_name?: string
+          tax_amount?: number
+          total_amount?: number
+          transaction_type?: string
+          unit_id?: string | null
+          unit_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_transactions_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "resort_ops_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_transactions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_transactions_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       room_types: {
         Row: {

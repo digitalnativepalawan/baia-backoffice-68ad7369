@@ -10,6 +10,8 @@ import { toast } from 'sonner';
 import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import { generateInvoicePdf, buildInvoiceWhatsAppText } from '@/lib/generateInvoicePdf';
+import { useBillingConfig } from '@/hooks/useBillingConfig';
+import { usePaymentMethods } from '@/hooks/usePaymentMethods';
 
 interface TabInvoiceProps {
   tabId: string;
@@ -40,6 +42,9 @@ const TabInvoice = ({ tabId, onClose }: TabInvoiceProps) => {
   const qc = useQueryClient();
   const { data: profile } = useResortProfile();
   const { data: invoiceSettings } = useInvoiceSettings();
+  const { data: billingConfig } = useBillingConfig();
+  const { data: paymentMethodsList = [] } = usePaymentMethods();
+  const activePaymentMethods = paymentMethodsList.filter(m => m.is_active);
   const brandName = profile?.resort_name || 'Resort';
   const [paymentMethod, setPaymentMethod] = useState('');
   const [closing, setClosing] = useState(false);
@@ -110,7 +115,7 @@ const TabInvoice = ({ tabId, onClose }: TabInvoiceProps) => {
 
   if (!tab) return null;
 
-  const scPct = invoiceSettings?.service_charge_pct ?? 10;
+  const scPct = billingConfig?.enable_service_charge ? (billingConfig.service_charge_rate ?? 10) : (invoiceSettings?.service_charge_pct ?? 10);
   const subtotal = orders.reduce((s, o) => s + Number(o.total), 0);
   const totalServiceCharge = orders.reduce((s, o) => s + Number(o.service_charge || 0), 0);
   const grandTotal = subtotal + totalServiceCharge;
@@ -420,9 +425,9 @@ const TabInvoice = ({ tabId, onClose }: TabInvoiceProps) => {
               <SelectValue placeholder="Select payment method" />
             </SelectTrigger>
             <SelectContent className="bg-card border-border">
-              <SelectItem value="Cash" className="text-foreground font-body">Cash</SelectItem>
-              <SelectItem value="Card" className="text-foreground font-body">Card</SelectItem>
-              <SelectItem value="Charge to Room" className="text-foreground font-body">Charge to Room</SelectItem>
+              {activePaymentMethods.map(m => (
+                <SelectItem key={m.id} value={m.name} className="text-foreground font-body">{m.name}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Button onClick={handleCloseTab} disabled={closing} className="font-display tracking-wider w-full py-5" variant="default">

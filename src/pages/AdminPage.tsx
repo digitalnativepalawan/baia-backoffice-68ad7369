@@ -30,6 +30,7 @@ import TimesheetDashboard from '@/components/admin/TimesheetDashboard';
 import WeeklyScheduleManager from '@/components/admin/WeeklyScheduleManager';
 import HousekeepingConfig from '@/components/admin/HousekeepingConfig';
 import DeviceManager from '@/components/admin/DeviceManager';
+import BillingConfigForm from '@/components/admin/BillingConfigForm';
 
 import { deductInventoryForOrder } from '@/lib/inventoryDeduction';
 
@@ -352,7 +353,7 @@ const AdminPage = () => {
     if (!addingToOrder || addCartTotal === 0) return;
     const newItems = Object.entries(addCart).map(([, c]) => ({ name: c.name, price: c.price, qty: c.qty }));
     const newTotal = newItems.reduce((s, i) => s + i.price * i.qty, 0);
-    const newServiceCharge = Math.round(newTotal * 0.1);
+    const newServiceCharge = Math.round(newTotal * 0.1); // TODO: use billing config
     await supabase.from('orders').insert({
       items: newItems,
       total: newTotal,
@@ -425,6 +426,8 @@ const AdminPage = () => {
             </section>
 
             <InvoiceSettingsForm />
+
+            <BillingConfigForm />
 
             <section>
               <h3 className="font-display text-sm tracking-wider text-foreground mb-4">Units / Rooms</h3>

@@ -12,6 +12,8 @@ import { Minus, Plus, Trash2, Send, CheckCircle2, AlertTriangle, Clock } from 'l
 import { toast } from 'sonner';
 import { Separator } from '@/components/ui/separator';
 import { checkStock, type Shortage } from '@/lib/stockCheck';
+import { useBillingConfig } from '@/hooks/useBillingConfig';
+import { usePaymentMethods } from '@/hooks/usePaymentMethods';
 
 interface CartDrawerProps {
   open: boolean;
@@ -46,9 +48,14 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
     setSelectedLocation(initialLocation);
   }, [initialOrderType, initialLocation]);
 
+  const { data: billingConfig } = useBillingConfig();
+  const { data: paymentMethodsList = [] } = usePaymentMethods();
+  const activePaymentMethods = paymentMethodsList.filter(m => m.is_active);
+
   const isStaff = mode === 'staff';
   const subtotal = cart.total();
-  const serviceCharge = Math.round(subtotal * 0.10);
+  const scRate = billingConfig?.enable_service_charge ? (billingConfig.service_charge_rate || 0) : 0;
+  const serviceCharge = Math.round(subtotal * (scRate / 100));
   const grandTotal = subtotal + serviceCharge;
 
   // Fetch order types for guest selection
@@ -314,10 +321,12 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
                       <span className="text-cream-dim">Subtotal</span>
                       <span className="text-foreground">₱{subtotal.toLocaleString()}</span>
                     </div>
-                    <div className="flex justify-between font-body text-sm">
-                      <span className="text-cream-dim">Service Charge (10%)</span>
-                      <span className="text-foreground">₱{serviceCharge.toLocaleString()}</span>
-                    </div>
+                    {scRate > 0 && (
+                      <div className="flex justify-between font-body text-sm">
+                        <span className="text-cream-dim">{billingConfig?.service_charge_name || 'Service Charge'} ({scRate}%)</span>
+                        <span className="text-foreground">₱{serviceCharge.toLocaleString()}</span>
+                      </div>
+                    )}
                     <Separator className="my-2" />
                     <div className="flex justify-between font-display text-lg tracking-wider">
                       <span className="text-foreground">Total</span>
@@ -379,9 +388,9 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
                           <SelectValue placeholder="Select payment type" />
                         </SelectTrigger>
                         <SelectContent className="bg-card border-border">
-                          <SelectItem value="Charge to Room" className="text-foreground font-body">Charge to Room</SelectItem>
-                          <SelectItem value="Cash" className="text-foreground font-body">Cash</SelectItem>
-                          <SelectItem value="Card" className="text-foreground font-body">Card</SelectItem>
+                          {activePaymentMethods.map(m => (
+                            <SelectItem key={m.id} value={m.name} className="text-foreground font-body">{m.name}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
