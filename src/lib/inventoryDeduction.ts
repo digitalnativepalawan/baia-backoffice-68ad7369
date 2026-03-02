@@ -9,7 +9,7 @@ export async function deductInventoryForOrder(orderId: string, items: Array<{ na
   const itemNames = items.map(i => i.name);
   const { data: menuItems } = await supabase
     .from('menu_items')
-    .select('id, name')
+    .select('id, name, department')
     .in('name', itemNames);
 
   if (!menuItems || menuItems.length === 0) return;
@@ -25,10 +25,13 @@ export async function deductInventoryForOrder(orderId: string, items: Array<{ na
 
   // Build a map of menu_item_id -> order qty
   const qtyMap: Record<string, number> = {};
+  // Build a map of menu_item_id -> department
+  const deptMap: Record<string, string> = {};
   for (const item of items) {
     const match = menuItems.find(m => m.name === item.name);
     if (match) {
       qtyMap[match.id] = (qtyMap[match.id] || 0) + item.qty;
+      deptMap[match.id] = match.department || 'kitchen';
     }
   }
 
@@ -49,12 +52,13 @@ export async function deductInventoryForOrder(orderId: string, items: Array<{ na
       .update({ current_stock: newStock })
       .eq('id', ri.ingredient_id);
 
-    // Log the deduction
+    // Log the deduction with department
     await supabase.from('inventory_logs').insert({
       ingredient_id: ri.ingredient_id,
       change_qty: -deduction,
       reason: 'order_deduction',
       order_id: orderId,
+      department: ing.department || deptMap[ri.menu_item_id] || 'kitchen',
     });
   }
 }

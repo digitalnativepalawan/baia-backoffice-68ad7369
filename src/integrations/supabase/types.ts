@@ -891,6 +891,7 @@ export type Database = {
           cost_per_unit: number
           created_at: string
           current_stock: number
+          department: string
           id: string
           low_stock_threshold: number
           name: string
@@ -900,6 +901,7 @@ export type Database = {
           cost_per_unit?: number
           created_at?: string
           current_stock?: number
+          department?: string
           id?: string
           low_stock_threshold?: number
           name: string
@@ -909,6 +911,7 @@ export type Database = {
           cost_per_unit?: number
           created_at?: string
           current_stock?: number
+          department?: string
           id?: string
           low_stock_threshold?: number
           name?: string
@@ -952,6 +955,7 @@ export type Database = {
         Row: {
           change_qty: number
           created_at: string
+          department: string
           id: string
           ingredient_id: string
           order_id: string | null
@@ -960,6 +964,7 @@ export type Database = {
         Insert: {
           change_qty?: number
           created_at?: string
+          department?: string
           id?: string
           ingredient_id: string
           order_id?: string | null
@@ -968,6 +973,7 @@ export type Database = {
         Update: {
           change_qty?: number
           created_at?: string
+          department?: string
           id?: string
           ingredient_id?: string
           order_id?: string | null

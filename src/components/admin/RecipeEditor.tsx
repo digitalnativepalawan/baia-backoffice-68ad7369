@@ -3,9 +3,17 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectGroup, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
+
+const DEPT_LABELS: Record<string, string> = {
+  kitchen: '🍳 Kitchen',
+  bar: '🍸 Bar',
+  gardens: '🌿 Gardens',
+  housekeeping: '🏨 Housekeeping',
+};
 
 interface RecipeEditorProps {
   menuItemId: string;
@@ -96,6 +104,14 @@ const RecipeEditor = ({ menuItemId, onFoodCostUpdate, hasOverride }: RecipeEdito
     (i: any) => !recipeIngredients.some((ri: any) => ri.ingredient_id === i.id)
   );
 
+  // Group available ingredients by department
+  const groupedAvailable = availableIngredients.reduce((acc: Record<string, any[]>, ing: any) => {
+    const dept = ing.department || 'kitchen';
+    if (!acc[dept]) acc[dept] = [];
+    acc[dept].push(ing);
+    return acc;
+  }, {});
+
   const hasRecipe = recipeIngredients.length > 0;
 
   if (isLoading) return <p className="font-body text-xs text-cream-dim">Loading recipe...</p>;
@@ -139,11 +155,13 @@ const RecipeEditor = ({ menuItemId, onFoodCostUpdate, hasOverride }: RecipeEdito
       {recipeIngredients.map((ri: any) => {
         const ing = ri.ingredients;
         if (!ing) return null;
-        const lineCost = ri.quantity * ing.cost_per_unit;
         return (
           <div key={ri.id} className="grid grid-cols-[1fr_60px_60px_60px_28px] gap-1 items-center">
-            <span className="font-body text-xs text-foreground truncate">
+            <span className="font-body text-xs text-foreground truncate flex items-center gap-1">
               {ing.name}
+              <Badge variant="outline" className="text-[8px] py-0 px-1 border-muted-foreground/30 shrink-0">
+                {DEPT_LABELS[ing.department] || ing.department}
+              </Badge>
             </span>
             <span className="font-body text-[10px] text-cream-dim">
               {ing.unit}
@@ -174,7 +192,7 @@ const RecipeEditor = ({ menuItemId, onFoodCostUpdate, hasOverride }: RecipeEdito
         </div>
       )}
 
-      {/* Add new ingredient */}
+      {/* Add new ingredient — grouped by department */}
       {availableIngredients.length > 0 && (
         <div className="flex items-end gap-2 pt-2 border-t border-border">
           <div className="flex-1">
@@ -183,10 +201,15 @@ const RecipeEditor = ({ menuItemId, onFoodCostUpdate, hasOverride }: RecipeEdito
                 <SelectValue placeholder="Ingredient..." />
               </SelectTrigger>
               <SelectContent className="bg-card border-border max-h-48">
-                {availableIngredients.map((i: any) => (
-                  <SelectItem key={i.id} value={i.id} className="font-body text-xs text-foreground">
-                    {i.name} ({i.unit}) — ₱{i.cost_per_unit}/{i.unit}
-                  </SelectItem>
+                {Object.entries(groupedAvailable).map(([dept, ings]) => (
+                  <SelectGroup key={dept}>
+                    <SelectLabel className="font-display text-[10px] text-cream-dim">{DEPT_LABELS[dept] || dept}</SelectLabel>
+                    {(ings as any[]).map((i: any) => (
+                      <SelectItem key={i.id} value={i.id} className="font-body text-xs text-foreground">
+                        {i.name} ({i.unit}) — ₱{i.cost_per_unit}/{i.unit}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 ))}
               </SelectContent>
             </Select>
