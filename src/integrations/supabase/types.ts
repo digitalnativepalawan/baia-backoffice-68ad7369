@@ -648,6 +648,102 @@ export type Database = {
           },
         ]
       }
+      guest_requests: {
+        Row: {
+          booking_id: string | null
+          created_at: string
+          details: string
+          guest_name: string
+          id: string
+          request_type: string
+          room_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          booking_id?: string | null
+          created_at?: string
+          details?: string
+          guest_name?: string
+          id?: string
+          request_type?: string
+          room_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          booking_id?: string | null
+          created_at?: string
+          details?: string
+          guest_name?: string
+          id?: string
+          request_type?: string
+          room_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guest_requests_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "resort_ops_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guest_requests_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      guest_reviews: {
+        Row: {
+          booking_id: string | null
+          comments: string
+          created_at: string
+          guest_name: string
+          id: string
+          ratings: Json
+          room_id: string | null
+        }
+        Insert: {
+          booking_id?: string | null
+          comments?: string
+          created_at?: string
+          guest_name?: string
+          id?: string
+          ratings?: Json
+          room_id?: string | null
+        }
+        Update: {
+          booking_id?: string | null
+          comments?: string
+          created_at?: string
+          guest_name?: string
+          id?: string
+          ratings?: Json
+          room_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guest_reviews_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "resort_ops_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guest_reviews_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       guest_tours: {
         Row: {
           booking_id: string | null
@@ -1398,6 +1494,66 @@ export type Database = {
           },
         ]
       }
+      rental_rates: {
+        Row: {
+          active: boolean
+          created_at: string
+          description: string
+          id: string
+          item_type: string
+          price: number
+          rate_name: string
+          sort_order: number
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          description?: string
+          id?: string
+          item_type?: string
+          price?: number
+          rate_name: string
+          sort_order?: number
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          description?: string
+          id?: string
+          item_type?: string
+          price?: number
+          rate_name?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      request_categories: {
+        Row: {
+          active: boolean
+          created_at: string
+          icon: string
+          id: string
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          icon?: string
+          id?: string
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          icon?: string
+          id?: string
+          name?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
       resort_ops_assets: {
         Row: {
           balance: number
@@ -1435,7 +1591,9 @@ export type Database = {
           commission_applied: number
           created_at: string
           guest_id: string | null
+          guest_login_count: number
           id: string
+          last_guest_login: string | null
           notes: string | null
           paid_amount: number
           password_expires_at: string | null
@@ -1455,7 +1613,9 @@ export type Database = {
           commission_applied?: number
           created_at?: string
           guest_id?: string | null
+          guest_login_count?: number
           id?: string
+          last_guest_login?: string | null
           notes?: string | null
           paid_amount?: number
           password_expires_at?: string | null
@@ -1475,7 +1635,9 @@ export type Database = {
           commission_applied?: number
           created_at?: string
           guest_id?: string | null
+          guest_login_count?: number
           id?: string
+          last_guest_login?: string | null
           notes?: string | null
           paid_amount?: number
           password_expires_at?: string | null
@@ -1770,6 +1932,30 @@ export type Database = {
         }
         Relationships: []
       }
+      review_settings: {
+        Row: {
+          active: boolean
+          category_name: string
+          created_at: string
+          id: string
+          sort_order: number
+        }
+        Insert: {
+          active?: boolean
+          category_name: string
+          created_at?: string
+          id?: string
+          sort_order?: number
+        }
+        Update: {
+          active?: boolean
+          category_name?: string
+          created_at?: string
+          id?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
       room_transactions: {
         Row: {
           amount: number
@@ -1970,6 +2156,129 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      tour_bookings: {
+        Row: {
+          booking_id: string | null
+          created_at: string
+          guest_name: string
+          id: string
+          pax: number
+          price: number
+          room_id: string | null
+          status: string
+          tour_date: string
+          tour_name: string
+        }
+        Insert: {
+          booking_id?: string | null
+          created_at?: string
+          guest_name?: string
+          id?: string
+          pax?: number
+          price?: number
+          room_id?: string | null
+          status?: string
+          tour_date?: string
+          tour_name?: string
+        }
+        Update: {
+          booking_id?: string | null
+          created_at?: string
+          guest_name?: string
+          id?: string
+          pax?: number
+          price?: number
+          room_id?: string | null
+          status?: string
+          tour_date?: string
+          tour_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tour_bookings_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "resort_ops_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tour_bookings_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tours_config: {
+        Row: {
+          active: boolean
+          created_at: string
+          description: string
+          duration: string
+          id: string
+          max_pax: number
+          name: string
+          price: number
+          schedule: string
+          sort_order: number
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          description?: string
+          duration?: string
+          id?: string
+          max_pax?: number
+          name: string
+          price?: number
+          schedule?: string
+          sort_order?: number
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          description?: string
+          duration?: string
+          id?: string
+          max_pax?: number
+          name?: string
+          price?: number
+          schedule?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      transport_rates: {
+        Row: {
+          active: boolean
+          created_at: string
+          description: string
+          id: string
+          price: number
+          sort_order: number
+          type: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          description?: string
+          id?: string
+          price?: number
+          sort_order?: number
+          type: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          description?: string
+          id?: string
+          price?: number
+          sort_order?: number
+          type?: string
+        }
+        Relationships: []
       }
       units: {
         Row: {

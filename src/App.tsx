@@ -14,6 +14,7 @@ import KitchenPage from "./pages/KitchenPage";
 import BarPage from "./pages/BarPage";
 import NotFound from "./pages/NotFound";
 import HousekeeperPage from "./pages/HousekeeperPage";
+import GuestPortalPage from "./pages/GuestPortal";
 import RequireAuth from "./components/RequireAuth";
 
 
@@ -36,6 +37,7 @@ const App = () => (
           <Route path="/kitchen" element={<RequireAuth><KitchenPage /></RequireAuth>} />
           <Route path="/bar" element={<RequireAuth><BarPage /></RequireAuth>} />
           <Route path="/housekeeper" element={<RequireAuth><HousekeeperPage /></RequireAuth>} />
+          <Route path="/guest-portal" element={<GuestPortalPage />} />
           
           <Route path="*" element={<NotFound />} />
         </Routes>

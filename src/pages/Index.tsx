@@ -7,7 +7,7 @@ import { setGuestSession } from '@/hooks/useGuestSession';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { LogIn, LogOut, UtensilsCrossed } from 'lucide-react';
+import { LogIn, LogOut, UtensilsCrossed, DoorOpen } from 'lucide-react';
 import { toast } from 'sonner';
 
 const STAFF_SESSION_KEY = 'staff_home_session';
@@ -177,7 +177,13 @@ const Index = () => {
       <div className="mb-12" />
 
       <div className="flex flex-col gap-4 w-full max-w-xs">
-        {/* Always visible */}
+        <button
+          onClick={() => navigate('/guest-portal')}
+          className="flex items-center justify-center gap-2 font-display text-base tracking-wider py-4 border border-accent/30 text-accent hover:bg-accent/5 transition-colors"
+        >
+          <DoorOpen className="w-4 h-4" />
+          Guest Portal
+        </button>
         <button
           onClick={() => navigate('/menu?mode=guest')}
           className="font-display text-base tracking-wider py-4 border border-foreground/30 text-foreground hover:bg-foreground/5 transition-colors"
