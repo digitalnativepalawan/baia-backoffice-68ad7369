@@ -651,6 +651,7 @@ export type Database = {
       guest_requests: {
         Row: {
           booking_id: string | null
+          confirmed_by: string
           created_at: string
           details: string
           guest_name: string
@@ -662,6 +663,7 @@ export type Database = {
         }
         Insert: {
           booking_id?: string | null
+          confirmed_by?: string
           created_at?: string
           details?: string
           guest_name?: string
@@ -673,6 +675,7 @@ export type Database = {
         }
         Update: {
           booking_id?: string | null
+          confirmed_by?: string
           created_at?: string
           details?: string
           guest_name?: string
@@ -703,6 +706,7 @@ export type Database = {
         Row: {
           booking_id: string | null
           comments: string
+          confirmed_by: string
           created_at: string
           guest_name: string
           id: string
@@ -712,6 +716,7 @@ export type Database = {
         Insert: {
           booking_id?: string | null
           comments?: string
+          confirmed_by?: string
           created_at?: string
           guest_name?: string
           id?: string
@@ -721,6 +726,7 @@ export type Database = {
         Update: {
           booking_id?: string | null
           comments?: string
+          confirmed_by?: string
           created_at?: string
           guest_name?: string
           id?: string
@@ -747,6 +753,7 @@ export type Database = {
       guest_tours: {
         Row: {
           booking_id: string | null
+          confirmed_by: string
           created_at: string
           id: string
           notes: string | null
@@ -761,6 +768,7 @@ export type Database = {
         }
         Insert: {
           booking_id?: string | null
+          confirmed_by?: string
           created_at?: string
           id?: string
           notes?: string | null
@@ -775,6 +783,7 @@ export type Database = {
         }
         Update: {
           booking_id?: string | null
+          confirmed_by?: string
           created_at?: string
           id?: string
           notes?: string | null
@@ -2160,10 +2169,13 @@ export type Database = {
       tour_bookings: {
         Row: {
           booking_id: string | null
+          confirmed_by: string
           created_at: string
           guest_name: string
           id: string
+          notes: string
           pax: number
+          pickup_time: string
           price: number
           room_id: string | null
           status: string
@@ -2172,10 +2184,13 @@ export type Database = {
         }
         Insert: {
           booking_id?: string | null
+          confirmed_by?: string
           created_at?: string
           guest_name?: string
           id?: string
+          notes?: string
           pax?: number
+          pickup_time?: string
           price?: number
           room_id?: string | null
           status?: string
@@ -2184,10 +2199,13 @@ export type Database = {
         }
         Update: {
           booking_id?: string | null
+          confirmed_by?: string
           created_at?: string
           guest_name?: string
           id?: string
+          notes?: string
           pax?: number
+          pickup_time?: string
           price?: number
           room_id?: string | null
           status?: string

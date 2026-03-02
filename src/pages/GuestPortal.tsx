@@ -7,8 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { LogOut, UtensilsCrossed, MapPin, Car, Bike, MessageSquare, Star, Receipt, ArrowLeft, ChevronRight, ClipboardList } from 'lucide-react';
+import { LogOut, UtensilsCrossed, MapPin, Car, Bike, MessageSquare, Star, Receipt, ArrowLeft, ChevronRight, ClipboardList, Calendar, Clock, Users, StickyNote } from 'lucide-react';
 import { setGuestSession } from '@/hooks/useGuestSession';
 
 const GUEST_PORTAL_KEY = 'guest_portal_session';
@@ -82,7 +84,6 @@ const GuestPortal = () => {
         return;
       }
 
-      // Update login tracking
       await (supabase.from('resort_ops_bookings') as any).update({
         last_guest_login: new Date().toISOString(),
         guest_login_count: (booking as any).guest_login_count ? (booking as any).guest_login_count + 1 : 1,
@@ -185,7 +186,7 @@ const Tile = ({ icon, label, onClick, className = '' }: { icon: React.ReactNode;
   </button>
 );
 
-// --- Tours ---
+// --- Tours (Enhanced: pickup time, notes, pending status) ---
 const ToursView = ({ session, qc }: { session: GuestPortalSession; qc: any }) => {
   const { data: tours = [] } = useQuery({
     queryKey: ['tours-guest'],
@@ -197,13 +198,16 @@ const ToursView = ({ session, qc }: { session: GuestPortalSession; qc: any }) =>
   const [selectedTour, setSelectedTour] = useState<any>(null);
   const [pax, setPax] = useState('1');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [pickupTime, setPickupTime] = useState('07:00');
+  const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const book = async () => {
     if (!selectedTour) return;
     setSubmitting(true);
     const totalPrice = selectedTour.price * (parseInt(pax) || 1);
-    await supabase.from('tour_bookings').insert({
+    // Create pending booking — NO room charge yet
+    await (supabase.from('tour_bookings') as any).insert({
       booking_id: session.booking_id,
       guest_name: session.guest_name,
       tour_name: selectedTour.name,
@@ -211,31 +215,22 @@ const ToursView = ({ session, qc }: { session: GuestPortalSession; qc: any }) =>
       pax: parseInt(pax) || 1,
       price: totalPrice,
       room_id: session.room_id,
-    });
-    // Charge to room
-    await (supabase.from('room_transactions') as any).insert({
-      unit_id: session.room_id,
-      unit_name: session.room_name,
-      booking_id: session.booking_id,
-      guest_name: session.guest_name,
-      transaction_type: 'charge',
-      amount: totalPrice,
-      tax_amount: 0,
-      service_charge_amount: 0,
-      total_amount: totalPrice,
-      payment_method: 'Charge to Room',
-      staff_name: 'Guest Portal',
-      notes: `Tour: ${selectedTour.name} (${pax} pax)`,
+      status: 'pending',
+      pickup_time: pickupTime,
+      notes: notes.trim(),
     });
     qc.invalidateQueries({ queryKey: ['tour-bookings-admin'] });
-    toast.success('Tour booked and charged to room!');
+    toast.success('Tour request submitted! Staff will confirm shortly.');
     setSelectedTour(null);
+    setNotes('');
+    setPickupTime('07:00');
     setSubmitting(false);
   };
 
   return (
     <div className="space-y-3">
       <h2 className="font-display text-lg text-foreground">Book a Tour</h2>
+      <p className="font-body text-xs text-muted-foreground">Select a tour below. Staff will confirm your booking.</p>
       {tours.map((t: any) => (
         <div key={t.id} onClick={() => setSelectedTour(t)} className={`bg-card border rounded-lg p-4 cursor-pointer transition-colors ${selectedTour?.id === t.id ? 'border-accent' : 'border-border hover:border-muted-foreground'}`}>
           <div className="flex justify-between items-start">
@@ -250,13 +245,28 @@ const ToursView = ({ session, qc }: { session: GuestPortalSession; qc: any }) =>
       ))}
       {selectedTour && (
         <div className="bg-secondary p-4 rounded-lg space-y-3">
-          <p className="font-body text-sm text-foreground">Booking: {selectedTour.name}</p>
+          <p className="font-body text-sm text-foreground font-medium">{selectedTour.name}</p>
           <div className="grid grid-cols-2 gap-2">
-            <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="bg-card text-foreground h-10" />
-            <Input type="number" value={pax} onChange={e => setPax(e.target.value)} min="1" max={selectedTour.max_pax} placeholder="Pax" className="bg-card text-foreground h-10" />
+            <div className="space-y-1">
+              <Label className="font-body text-xs text-muted-foreground flex items-center gap-1"><Calendar className="w-3 h-3" /> Date</Label>
+              <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="bg-card text-foreground h-10" />
+            </div>
+            <div className="space-y-1">
+              <Label className="font-body text-xs text-muted-foreground flex items-center gap-1"><Users className="w-3 h-3" /> Pax</Label>
+              <Input type="number" value={pax} onChange={e => setPax(e.target.value)} min="1" max={selectedTour.max_pax} className="bg-card text-foreground h-10" />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label className="font-body text-xs text-muted-foreground flex items-center gap-1"><Clock className="w-3 h-3" /> Pickup Time</Label>
+            <Input type="time" value={pickupTime} onChange={e => setPickupTime(e.target.value)} className="bg-card text-foreground h-10" />
+          </div>
+          <div className="space-y-1">
+            <Label className="font-body text-xs text-muted-foreground flex items-center gap-1"><StickyNote className="w-3 h-3" /> Special Requests</Label>
+            <Textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g. Vegetarian lunch, need snorkel gear..." className="bg-card text-foreground min-h-[60px]" />
           </div>
           <p className="font-body text-sm text-foreground text-right">Total: ₱{selectedTour.price * (parseInt(pax) || 1)}</p>
-          <Button onClick={book} disabled={submitting} className="w-full">{submitting ? 'Booking...' : 'Book & Charge to Room'}</Button>
+          <Button onClick={book} disabled={submitting} className="w-full">{submitting ? 'Submitting...' : 'Request Tour Booking'}</Button>
+          <p className="font-body text-xs text-muted-foreground text-center">Staff will confirm and charge to your room</p>
         </div>
       )}
       {tours.length === 0 && <p className="font-body text-sm text-muted-foreground">No tours available at the moment.</p>}
@@ -264,7 +274,7 @@ const ToursView = ({ session, qc }: { session: GuestPortalSession; qc: any }) =>
   );
 };
 
-// --- Transport ---
+// --- Transport (Now pending, no auto-charge) ---
 const TransportView = ({ session, qc }: { session: GuestPortalSession; qc: any }) => {
   const { data: rates = [] } = useQuery({
     queryKey: ['transport-guest'],
@@ -282,6 +292,7 @@ const TransportView = ({ session, qc }: { session: GuestPortalSession; qc: any }
     if (!selectedRate) return;
     setSubmitting(true);
     const label = `${selectedRate.origin} → ${selectedRate.destination}`;
+    // Create pending request — NO room charge yet
     await supabase.from('guest_requests').insert({
       booking_id: session.booking_id,
       room_id: session.room_id,
@@ -290,22 +301,8 @@ const TransportView = ({ session, qc }: { session: GuestPortalSession; qc: any }
       details: `${label} — ₱${selectedRate.price} — ${pickupDate} ${pickupTime}`,
       status: 'pending',
     });
-    await (supabase.from('room_transactions') as any).insert({
-      unit_id: session.room_id,
-      unit_name: session.room_name,
-      booking_id: session.booking_id,
-      guest_name: session.guest_name,
-      transaction_type: 'charge',
-      amount: selectedRate.price,
-      tax_amount: 0,
-      service_charge_amount: 0,
-      total_amount: selectedRate.price,
-      payment_method: 'Charge to Room',
-      staff_name: 'Guest Portal',
-      notes: `Transport: ${label} on ${pickupDate} ${pickupTime}`,
-    });
     qc.invalidateQueries({ queryKey: ['guest-requests-admin'] });
-    toast.success('Transport booked and charged to room!');
+    toast.success('Transport request submitted! Staff will confirm shortly.');
     setSelectedRate(null);
     setSubmitting(false);
   };
@@ -313,6 +310,7 @@ const TransportView = ({ session, qc }: { session: GuestPortalSession; qc: any }
   return (
     <div className="space-y-3">
       <h2 className="font-display text-lg text-foreground">Request Transport</h2>
+      <p className="font-body text-xs text-muted-foreground">Select a route. Staff will confirm and charge to your room.</p>
       {rates.map((r: any) => (
         <div key={r.id} onClick={() => setSelectedRate(r)} className={`bg-card border rounded-lg p-4 cursor-pointer transition-colors ${selectedRate?.id === r.id ? 'border-accent' : 'border-border hover:border-muted-foreground'}`}>
           <div className="flex justify-between items-center">
@@ -328,11 +326,18 @@ const TransportView = ({ session, qc }: { session: GuestPortalSession; qc: any }
         <div className="bg-secondary p-4 rounded-lg space-y-3">
           <p className="font-body text-sm text-foreground">{selectedRate.origin} → {selectedRate.destination}</p>
           <div className="grid grid-cols-2 gap-2">
-            <Input type="date" value={pickupDate} onChange={e => setPickupDate(e.target.value)} className="bg-card text-foreground h-10" />
-            <Input type="time" value={pickupTime} onChange={e => setPickupTime(e.target.value)} className="bg-card text-foreground h-10" />
+            <div className="space-y-1">
+              <Label className="font-body text-xs text-muted-foreground flex items-center gap-1"><Calendar className="w-3 h-3" /> Date</Label>
+              <Input type="date" value={pickupDate} onChange={e => setPickupDate(e.target.value)} className="bg-card text-foreground h-10" />
+            </div>
+            <div className="space-y-1">
+              <Label className="font-body text-xs text-muted-foreground flex items-center gap-1"><Clock className="w-3 h-3" /> Time</Label>
+              <Input type="time" value={pickupTime} onChange={e => setPickupTime(e.target.value)} className="bg-card text-foreground h-10" />
+            </div>
           </div>
           <p className="font-body text-sm text-foreground text-right">Total: ₱{selectedRate.price}</p>
-          <Button onClick={book} disabled={submitting} className="w-full">{submitting ? 'Booking...' : 'Book & Charge to Room'}</Button>
+          <Button onClick={book} disabled={submitting} className="w-full">{submitting ? 'Submitting...' : 'Request Transport'}</Button>
+          <p className="font-body text-xs text-muted-foreground text-center">Staff will confirm and charge to your room</p>
         </div>
       )}
       {rates.length === 0 && <p className="font-body text-sm text-muted-foreground">No transport options available.</p>}
@@ -340,7 +345,7 @@ const TransportView = ({ session, qc }: { session: GuestPortalSession; qc: any }
   );
 };
 
-// --- Rentals ---
+// --- Rentals (Enhanced: duration selection, date, qty, notes, pending) ---
 const RentalsView = ({ session, qc }: { session: GuestPortalSession; qc: any }) => {
   const { data: rates = [] } = useQuery({
     queryKey: ['rentals-guest'],
@@ -349,52 +354,118 @@ const RentalsView = ({ session, qc }: { session: GuestPortalSession; qc: any }) 
       return data || [];
     },
   });
+
+  // Group rates by item_type
+  const itemTypes = [...new Set(rates.map((r: any) => r.item_type))];
+  const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [selectedRate, setSelectedRate] = useState<any>(null);
+  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [qty, setQty] = useState('1');
+  const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const book = async (rate: any) => {
+  const typeRates = rates.filter((r: any) => r.item_type === selectedType);
+  const totalPrice = selectedRate ? selectedRate.price * (parseInt(qty) || 1) : 0;
+
+  const ITEM_ICONS: Record<string, string> = {
+    'Scooter': '🛵',
+    'Bicycle': '🚲',
+    'Kayak': '🛶',
+    'Surfboard': '🏄',
+    'Snorkel': '🤿',
+  };
+
+  const book = async () => {
+    if (!selectedRate) return;
     setSubmitting(true);
+    const detail = `${selectedType} — ${selectedRate.rate_name} × ${qty} — ₱${totalPrice} — Start: ${startDate}${notes.trim() ? ` — Notes: ${notes.trim()}` : ''}`;
+    // Create pending request — NO room charge yet
     await supabase.from('guest_requests').insert({
       booking_id: session.booking_id,
       room_id: session.room_id,
       guest_name: session.guest_name,
       request_type: 'Rental',
-      details: `${rate.item_type} — ${rate.rate_name} — ₱${rate.price}`,
+      details: detail,
       status: 'pending',
     });
-    await (supabase.from('room_transactions') as any).insert({
-      unit_id: session.room_id,
-      unit_name: session.room_name,
-      booking_id: session.booking_id,
-      guest_name: session.guest_name,
-      transaction_type: 'charge',
-      amount: rate.price,
-      tax_amount: 0,
-      service_charge_amount: 0,
-      total_amount: rate.price,
-      payment_method: 'Charge to Room',
-      staff_name: 'Guest Portal',
-      notes: `Rental: ${rate.item_type} (${rate.rate_name})`,
-    });
     qc.invalidateQueries({ queryKey: ['guest-requests-admin'] });
-    toast.success('Rental booked and charged to room!');
+    toast.success('Rental request submitted! Staff will confirm shortly.');
+    setSelectedType(null);
+    setSelectedRate(null);
+    setNotes('');
+    setQty('1');
     setSubmitting(false);
   };
 
   return (
     <div className="space-y-3">
       <h2 className="font-display text-lg text-foreground">Rent Equipment</h2>
-      {rates.map((r: any) => (
-        <div key={r.id} className="bg-card border border-border rounded-lg p-4 flex justify-between items-center">
-          <div>
-            <p className="font-body text-sm text-foreground">{r.item_type} — {r.rate_name}</p>
-            {r.description && <p className="font-body text-xs text-muted-foreground">{r.description}</p>}
-          </div>
-          <Button onClick={() => book(r)} disabled={submitting} size="sm" variant="outline" className="font-body text-xs">
-            ₱{r.price} <ChevronRight className="w-3.5 h-3.5 ml-1" />
-          </Button>
+      <p className="font-body text-xs text-muted-foreground">Choose what you'd like to rent. Staff will confirm availability.</p>
+
+      {!selectedType ? (
+        <div className="grid grid-cols-2 gap-3">
+          {itemTypes.map(type => (
+            <button key={type} onClick={() => setSelectedType(type)} className="bg-card border border-border rounded-lg p-5 flex flex-col items-center gap-2 hover:border-accent transition-colors">
+              <span className="text-3xl">{ITEM_ICONS[type] || '🏷️'}</span>
+              <span className="font-body text-sm text-foreground font-medium">{type}</span>
+              <span className="font-body text-xs text-muted-foreground">{rates.filter((r: any) => r.item_type === type).length} options</span>
+            </button>
+          ))}
+          {itemTypes.length === 0 && <p className="font-body text-sm text-muted-foreground col-span-2">No rentals available.</p>}
         </div>
-      ))}
-      {rates.length === 0 && <p className="font-body text-sm text-muted-foreground">No rentals available.</p>}
+      ) : (
+        <div className="space-y-3">
+          <button onClick={() => { setSelectedType(null); setSelectedRate(null); }} className="flex items-center gap-1 text-muted-foreground hover:text-foreground font-body text-xs">
+            <ArrowLeft className="w-3 h-3" /> All equipment
+          </button>
+
+          <h3 className="font-body text-sm text-foreground font-medium">{ITEM_ICONS[selectedType] || '🏷️'} {selectedType} — Choose Duration</h3>
+
+          <RadioGroup value={selectedRate?.id || ''} onValueChange={id => setSelectedRate(typeRates.find((r: any) => r.id === id))}>
+            {typeRates.map((r: any) => (
+              <div key={r.id} className={`bg-card border rounded-lg p-4 cursor-pointer transition-colors ${selectedRate?.id === r.id ? 'border-accent' : 'border-border'}`}>
+                <div className="flex items-center gap-3">
+                  <RadioGroupItem value={r.id} id={r.id} />
+                  <Label htmlFor={r.id} className="flex-1 cursor-pointer">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="font-body text-sm text-foreground">{r.rate_name}</p>
+                        {r.description && <p className="font-body text-xs text-muted-foreground">{r.description}</p>}
+                      </div>
+                      <span className="font-body text-sm text-accent font-medium">₱{r.price}</span>
+                    </div>
+                  </Label>
+                </div>
+              </div>
+            ))}
+          </RadioGroup>
+
+          {selectedRate && (
+            <div className="bg-secondary p-4 rounded-lg space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="font-body text-xs text-muted-foreground flex items-center gap-1"><Calendar className="w-3 h-3" /> Start Date</Label>
+                  <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-card text-foreground h-10" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="font-body text-xs text-muted-foreground">Quantity</Label>
+                  <Input type="number" value={qty} onChange={e => setQty(e.target.value)} min="1" max="5" className="bg-card text-foreground h-10" />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="font-body text-xs text-muted-foreground flex items-center gap-1"><StickyNote className="w-3 h-3" /> Preferences</Label>
+                <Textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g. Automatic scooter preferred, need helmet..." className="bg-card text-foreground min-h-[60px]" />
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="font-body text-xs text-muted-foreground">{selectedRate.rate_name} × {qty}</span>
+                <span className="font-body text-sm text-foreground font-medium">Total: ₱{totalPrice}</span>
+              </div>
+              <Button onClick={book} disabled={submitting} className="w-full">{submitting ? 'Submitting...' : 'Request Rental'}</Button>
+              <p className="font-body text-xs text-muted-foreground text-center">Staff will confirm availability and charge to your room</p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -523,7 +594,6 @@ const OrdersView = ({ session }: { session: GuestPortalSession }) => {
     },
   });
 
-  // Realtime subscription for order updates
   useEffect(() => {
     const channel = supabase
       .channel('guest-order-updates')

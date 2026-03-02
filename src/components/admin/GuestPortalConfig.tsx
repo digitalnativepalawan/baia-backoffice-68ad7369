@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { Plus, Trash2, Save } from 'lucide-react';
+import { Plus, Trash2, Save, Check, X, Eye } from 'lucide-react';
 
 const GuestPortalConfig = () => {
   const qc = useQueryClient();
@@ -19,7 +19,6 @@ const GuestPortalConfig = () => {
     },
   });
 
-  // Transport rates
   const { data: transport = [] } = useQuery({
     queryKey: ['transport-rates'],
     queryFn: async () => {
@@ -28,7 +27,6 @@ const GuestPortalConfig = () => {
     },
   });
 
-  // Rental rates
   const { data: rentals = [] } = useQuery({
     queryKey: ['rental-rates'],
     queryFn: async () => {
@@ -37,7 +35,6 @@ const GuestPortalConfig = () => {
     },
   });
 
-  // Request categories
   const { data: requestCats = [] } = useQuery({
     queryKey: ['request-categories'],
     queryFn: async () => {
@@ -46,7 +43,6 @@ const GuestPortalConfig = () => {
     },
   });
 
-  // Review settings
   const { data: reviewCats = [] } = useQuery({
     queryKey: ['review-settings'],
     queryFn: async () => {
@@ -55,7 +51,6 @@ const GuestPortalConfig = () => {
     },
   });
 
-  // Guest requests
   const { data: guestRequests = [] } = useQuery({
     queryKey: ['guest-requests-admin'],
     queryFn: async () => {
@@ -64,7 +59,6 @@ const GuestPortalConfig = () => {
     },
   });
 
-  // Guest reviews
   const { data: guestReviews = [] } = useQuery({
     queryKey: ['guest-reviews-admin'],
     queryFn: async () => {
@@ -73,11 +67,10 @@ const GuestPortalConfig = () => {
     },
   });
 
-  // Tour bookings
   const { data: tourBookings = [] } = useQuery({
     queryKey: ['tour-bookings-admin'],
     queryFn: async () => {
-      const { data } = await supabase.from('tour_bookings').select('*').order('created_at', { ascending: false }).limit(50);
+      const { data } = await (supabase.from('tour_bookings') as any).select('*').order('created_at', { ascending: false }).limit(50);
       return data || [];
     },
   });
@@ -407,46 +400,184 @@ const ReviewSettingsSection = ({ items, qc }: { items: any[]; qc: any }) => {
   );
 };
 
-// --- Activity Feed ---
+// --- Activity Feed (Enhanced: staff confirm/cancel with room charge) ---
 const ActivitySection = ({ requests, reviews, tourBookings, qc }: { requests: any[]; reviews: any[]; tourBookings: any[]; qc: any }) => {
-  const updateRequestStatus = async (id: string, status: string) => {
-    await supabase.from('guest_requests').update({ status, updated_at: new Date().toISOString() }).eq('id', id);
+  const staffName = localStorage.getItem('staff_name') || 'Admin';
+
+  // Helper: parse price from details string like "... — ₱500 — ..."
+  const parsePriceFromDetails = (details: string): number => {
+    const match = details.match(/₱([\d,]+)/);
+    return match ? parseFloat(match[1].replace(',', '')) : 0;
+  };
+
+  // Helper: get room info from request's room_id
+  const getRoomInfo = async (roomId: string) => {
+    const { data } = await supabase.from('units').select('id, unit_name').eq('id', roomId).maybeSingle();
+    return data;
+  };
+
+  // --- Confirm a guest request (Transport/Rental) ---
+  const confirmRequest = async (r: any) => {
+    const price = parsePriceFromDetails(r.details);
+    // Update request: confirmed
+    await supabase.from('guest_requests').update({
+      status: 'confirmed',
+      confirmed_by: staffName,
+      updated_at: new Date().toISOString(),
+    } as any).eq('id', r.id);
+
+    // Create room charge if there's a price
+    if (price > 0 && r.room_id) {
+      const room = await getRoomInfo(r.room_id);
+      await (supabase.from('room_transactions') as any).insert({
+        unit_id: r.room_id,
+        unit_name: room?.unit_name || '',
+        booking_id: r.booking_id,
+        guest_name: r.guest_name,
+        transaction_type: 'charge',
+        amount: price,
+        tax_amount: 0,
+        service_charge_amount: 0,
+        total_amount: price,
+        payment_method: 'Charge to Room',
+        staff_name: staffName,
+        notes: `${r.request_type}: ${r.details}`,
+      });
+    }
     qc.invalidateQueries({ queryKey: ['guest-requests-admin'] });
-    toast.success(`Request ${status}`);
+    toast.success(`Confirmed by ${staffName} — charged ₱${price} to room`);
+  };
+
+  const cancelRequest = async (id: string) => {
+    await supabase.from('guest_requests').update({
+      status: 'cancelled',
+      confirmed_by: staffName,
+      updated_at: new Date().toISOString(),
+    } as any).eq('id', id);
+    qc.invalidateQueries({ queryKey: ['guest-requests-admin'] });
+    toast.success('Request cancelled');
+  };
+
+  const completeRequest = async (id: string) => {
+    await supabase.from('guest_requests').update({
+      status: 'completed',
+      updated_at: new Date().toISOString(),
+    }).eq('id', id);
+    qc.invalidateQueries({ queryKey: ['guest-requests-admin'] });
+    toast.success('Request completed');
+  };
+
+  // --- Confirm a tour booking ---
+  const confirmTour = async (b: any) => {
+    // Update tour: confirmed
+    await (supabase.from('tour_bookings') as any).update({
+      status: 'confirmed',
+      confirmed_by: staffName,
+    }).eq('id', b.id);
+
+    // Create room charge
+    if (b.price > 0 && b.room_id) {
+      const room = await getRoomInfo(b.room_id);
+      await (supabase.from('room_transactions') as any).insert({
+        unit_id: b.room_id,
+        unit_name: room?.unit_name || '',
+        booking_id: b.booking_id,
+        guest_name: b.guest_name,
+        transaction_type: 'charge',
+        amount: b.price,
+        tax_amount: 0,
+        service_charge_amount: 0,
+        total_amount: b.price,
+        payment_method: 'Charge to Room',
+        staff_name: staffName,
+        notes: `Tour: ${b.tour_name} (${b.pax} pax) on ${b.tour_date}${b.pickup_time ? ` pickup ${b.pickup_time}` : ''}`,
+      });
+    }
+    qc.invalidateQueries({ queryKey: ['tour-bookings-admin'] });
+    toast.success(`Tour confirmed by ${staffName} — charged ₱${b.price} to room`);
+  };
+
+  const cancelTour = async (id: string) => {
+    await (supabase.from('tour_bookings') as any).update({
+      status: 'cancelled',
+      confirmed_by: staffName,
+    }).eq('id', id);
+    qc.invalidateQueries({ queryKey: ['tour-bookings-admin'] });
+    toast.success('Tour cancelled');
+  };
+
+  // --- Acknowledge review ---
+  const acknowledgeReview = async (id: string) => {
+    await supabase.from('guest_reviews').update({
+      confirmed_by: staffName,
+    } as any).eq('id', id);
+    qc.invalidateQueries({ queryKey: ['guest-reviews-admin'] });
+    toast.success(`Reviewed by ${staffName}`);
   };
 
   return (
     <div className="space-y-4">
+      {/* Guest Requests */}
       <h4 className="font-display text-sm text-foreground tracking-wider">Guest Requests</h4>
       {requests.length === 0 && <p className="font-body text-xs text-muted-foreground">No requests yet</p>}
       {requests.map((r: any) => (
         <div key={r.id} className="bg-secondary p-3 rounded space-y-1">
           <div className="flex items-center justify-between">
             <span className="font-body text-sm text-foreground">{r.request_type} — {r.guest_name}</span>
-            <span className={`font-body text-xs px-2 py-0.5 rounded ${r.status === 'pending' ? 'bg-amber-500/20 text-amber-400' : r.status === 'completed' ? 'bg-green-500/20 text-green-400' : 'bg-muted text-muted-foreground'}`}>{r.status}</span>
+            <span className={`font-body text-xs px-2 py-0.5 rounded ${
+              r.status === 'pending' ? 'bg-amber-500/20 text-amber-400' :
+              r.status === 'confirmed' ? 'bg-green-500/20 text-green-400' :
+              r.status === 'cancelled' ? 'bg-destructive/20 text-destructive' :
+              r.status === 'completed' ? 'bg-green-500/20 text-green-400' :
+              'bg-muted text-muted-foreground'
+            }`}>{r.status}</span>
           </div>
           <p className="font-body text-xs text-muted-foreground">{r.details}</p>
-          {r.status === 'pending' && (
+          {(r as any).confirmed_by && <p className="font-body text-xs text-accent">Confirmed by: {(r as any).confirmed_by}</p>}
+          {r.status === 'pending' && (r.request_type === 'Transport' || r.request_type === 'Rental') && (
             <div className="flex gap-2 pt-1">
-              <button onClick={() => updateRequestStatus(r.id, 'in_progress')} className="font-body text-xs text-accent hover:underline">Accept</button>
-              <button onClick={() => updateRequestStatus(r.id, 'completed')} className="font-body text-xs text-green-400 hover:underline">Complete</button>
+              <button onClick={() => confirmRequest(r)} className="font-body text-xs text-green-400 hover:underline flex items-center gap-1"><Check className="w-3 h-3" /> Confirm & Charge</button>
+              <button onClick={() => cancelRequest(r.id)} className="font-body text-xs text-destructive hover:underline flex items-center gap-1"><X className="w-3 h-3" /> Cancel</button>
             </div>
           )}
-          {r.status === 'in_progress' && (
-            <button onClick={() => updateRequestStatus(r.id, 'completed')} className="font-body text-xs text-green-400 hover:underline">Mark Complete</button>
+          {r.status === 'pending' && r.request_type !== 'Transport' && r.request_type !== 'Rental' && (
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => completeRequest(r.id)} className="font-body text-xs text-green-400 hover:underline">Complete</button>
+            </div>
+          )}
+          {r.status === 'confirmed' && (
+            <button onClick={() => completeRequest(r.id)} className="font-body text-xs text-green-400 hover:underline">Mark Complete</button>
           )}
         </div>
       ))}
 
+      {/* Tour Bookings */}
       <h4 className="font-display text-sm text-foreground tracking-wider pt-4">Tour Bookings</h4>
       {tourBookings.length === 0 && <p className="font-body text-xs text-muted-foreground">No tour bookings yet</p>}
       {tourBookings.map((b: any) => (
-        <div key={b.id} className="bg-secondary p-3 rounded">
-          <span className="font-body text-sm text-foreground">{b.tour_name} — {b.guest_name} — {b.pax} pax — ₱{b.price}</span>
-          <p className="font-body text-xs text-muted-foreground">{b.tour_date} · {b.status}</p>
+        <div key={b.id} className="bg-secondary p-3 rounded space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="font-body text-sm text-foreground">{b.tour_name} — {b.guest_name}</span>
+            <span className={`font-body text-xs px-2 py-0.5 rounded ${
+              b.status === 'pending' ? 'bg-amber-500/20 text-amber-400' :
+              b.status === 'confirmed' ? 'bg-green-500/20 text-green-400' :
+              b.status === 'cancelled' ? 'bg-destructive/20 text-destructive' :
+              'bg-muted text-muted-foreground'
+            }`}>{b.status}</span>
+          </div>
+          <p className="font-body text-xs text-muted-foreground">{b.pax} pax · ₱{b.price} · {b.tour_date}{b.pickup_time ? ` · Pickup: ${b.pickup_time}` : ''}</p>
+          {b.notes && <p className="font-body text-xs text-muted-foreground italic">Notes: {b.notes}</p>}
+          {b.confirmed_by && <p className="font-body text-xs text-accent">Confirmed by: {b.confirmed_by}</p>}
+          {b.status === 'pending' && (
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => confirmTour(b)} className="font-body text-xs text-green-400 hover:underline flex items-center gap-1"><Check className="w-3 h-3" /> Confirm & Charge</button>
+              <button onClick={() => cancelTour(b.id)} className="font-body text-xs text-destructive hover:underline flex items-center gap-1"><X className="w-3 h-3" /> Cancel</button>
+            </div>
+          )}
         </div>
       ))}
 
+      {/* Guest Reviews */}
       <h4 className="font-display text-sm text-foreground tracking-wider pt-4">Guest Reviews</h4>
       {reviews.length === 0 && <p className="font-body text-xs text-muted-foreground">No reviews yet</p>}
       {reviews.map((r: any) => (
@@ -459,6 +590,11 @@ const ActivitySection = ({ requests, reviews, tourBookings, qc }: { requests: an
             </div>
           ))}
           {r.comments && <p className="font-body text-xs text-muted-foreground italic">"{r.comments}"</p>}
+          {(r as any).confirmed_by ? (
+            <p className="font-body text-xs text-accent">Reviewed by: {(r as any).confirmed_by}</p>
+          ) : (
+            <button onClick={() => acknowledgeReview(r.id)} className="font-body text-xs text-accent hover:underline flex items-center gap-1 pt-1"><Eye className="w-3 h-3" /> Mark as Reviewed</button>
+          )}
         </div>
       ))}
     </div>
