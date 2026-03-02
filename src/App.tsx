@@ -10,7 +10,10 @@ import AdminPage from "./pages/AdminPage";
 import EmployeePage from "./pages/EmployeePage";
 import EmployeePortal from "./pages/EmployeePortal";
 import ManagerPage from "./pages/ManagerPage";
+import KitchenPage from "./pages/KitchenPage";
+import BarPage from "./pages/BarPage";
 import NotFound from "./pages/NotFound";
+import RequireAuth from "./components/RequireAuth";
 
 
 const queryClient = new QueryClient();
@@ -23,12 +26,14 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
-          <Route path="/order-type" element={<OrderType />} />
           <Route path="/menu" element={<MenuPage />} />
-          <Route path="/admin" element={<AdminPage />} />
-          <Route path="/employee" element={<EmployeePage />} />
-          <Route path="/employee-portal" element={<EmployeePortal />} />
-          <Route path="/manager" element={<ManagerPage />} />
+          <Route path="/order-type" element={<RequireAuth><OrderType /></RequireAuth>} />
+          <Route path="/admin" element={<RequireAuth><AdminPage /></RequireAuth>} />
+          <Route path="/employee" element={<RequireAuth><EmployeePage /></RequireAuth>} />
+          <Route path="/employee-portal" element={<RequireAuth><EmployeePortal /></RequireAuth>} />
+          <Route path="/manager" element={<RequireAuth><ManagerPage /></RequireAuth>} />
+          <Route path="/kitchen" element={<RequireAuth><KitchenPage /></RequireAuth>} />
+          <Route path="/bar" element={<RequireAuth><BarPage /></RequireAuth>} />
           
           <Route path="*" element={<NotFound />} />
         </Routes>

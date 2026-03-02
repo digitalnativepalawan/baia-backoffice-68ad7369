@@ -29,6 +29,7 @@ import AdminLoginGate from '@/components/admin/AdminLoginGate';
 import TimesheetDashboard from '@/components/admin/TimesheetDashboard';
 import WeeklyScheduleManager from '@/components/admin/WeeklyScheduleManager';
 import HousekeepingConfig from '@/components/admin/HousekeepingConfig';
+import DeviceManager from '@/components/admin/DeviceManager';
 
 import { deductInventoryForOrder } from '@/lib/inventoryDeduction';
 
@@ -201,12 +202,12 @@ const AdminPage = () => {
   const [recipeCost, setRecipeCost] = useState(0);
   const defaultCategory = menuCategories.length > 0 ? menuCategories[0].name : '';
   const [itemForm, setItemForm] = useState({
-    name: '', category: defaultCategory, description: '', price: '', food_cost: '', sort_order: '0',
+    name: '', category: defaultCategory, description: '', price: '', food_cost: '', sort_order: '0', department: 'kitchen',
   });
 
   const openNewItem = () => {
     setEditItem('new');
-    setItemForm({ name: '', category: menuCategories.length > 0 ? menuCategories[0].name : '', description: '', price: '', food_cost: '', sort_order: '0' });
+    setItemForm({ name: '', category: menuCategories.length > 0 ? menuCategories[0].name : '', description: '', price: '', food_cost: '', sort_order: '0', department: 'kitchen' });
   };
 
   const openEditItem = (item: any) => {
@@ -214,6 +215,7 @@ const AdminPage = () => {
     setItemForm({
       name: item.name, category: item.category, description: item.description || '',
       price: String(item.price), food_cost: String(item.food_cost || ''), sort_order: String(item.sort_order),
+      department: (item as any).department || 'kitchen',
     });
   };
 
@@ -221,10 +223,11 @@ const AdminPage = () => {
     const overrideVal = parseFloat(itemForm.food_cost);
     const hasManualOverride = itemForm.food_cost && !isNaN(overrideVal) && overrideVal > 0;
     const foodCost = hasManualOverride ? overrideVal : recipeCost > 0 ? recipeCost : null;
-    const payload = {
+    const payload: any = {
       name: itemForm.name, category: itemForm.category, description: itemForm.description,
       price: parseFloat(itemForm.price) || 0, food_cost: foodCost,
       sort_order: parseInt(itemForm.sort_order) || 0,
+      department: itemForm.department,
     };
     if (editItem === 'new') {
       await supabase.from('menu_items').insert(payload);
@@ -511,13 +514,31 @@ const AdminPage = () => {
 
             <section>
               <h3 className="font-display text-sm tracking-wider text-foreground mb-4">Menu Categories</h3>
-              <div className="space-y-0">
+              <div className="space-y-2">
                 {menuCategories.map((cat: any) => (
-                  <EditableRow key={cat.id} id={cat.id} name={cat.name} active={cat.active}
-                    onRename={async (id, newName) => { await supabase.from('menu_categories').update({ name: newName }).eq('id', id); qc.invalidateQueries({ queryKey: ['menu-categories-admin'] }); toast.success('Category renamed'); }}
-                    onDelete={async (id) => { await supabase.from('menu_categories').delete().eq('id', id); qc.invalidateQueries({ queryKey: ['menu-categories-admin'] }); toast.success('Category deleted'); }}
-                    onToggle={async (id, checked) => { await supabase.from('menu_categories').update({ active: checked }).eq('id', id); qc.invalidateQueries({ queryKey: ['menu-categories-admin'] }); }}
-                  />
+                  <div key={cat.id} className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <EditableRow id={cat.id} name={cat.name} active={cat.active}
+                        onRename={async (id, newName) => { await supabase.from('menu_categories').update({ name: newName }).eq('id', id); qc.invalidateQueries({ queryKey: ['menu-categories-admin'] }); toast.success('Category renamed'); }}
+                        onDelete={async (id) => { await supabase.from('menu_categories').delete().eq('id', id); qc.invalidateQueries({ queryKey: ['menu-categories-admin'] }); toast.success('Category deleted'); }}
+                        onToggle={async (id, checked) => { await supabase.from('menu_categories').update({ active: checked }).eq('id', id); qc.invalidateQueries({ queryKey: ['menu-categories-admin'] }); }}
+                      />
+                    </div>
+                    <Select value={(cat as any).department || 'kitchen'} onValueChange={async (val) => {
+                      await supabase.from('menu_categories').update({ department: val } as any).eq('id', cat.id);
+                      qc.invalidateQueries({ queryKey: ['menu-categories-admin'] });
+                      toast.success('Department updated');
+                    }}>
+                      <SelectTrigger className="bg-secondary border-border text-foreground font-body text-xs h-8 w-24">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-card border-border">
+                        <SelectItem value="kitchen" className="text-foreground font-body text-xs">Kitchen</SelectItem>
+                        <SelectItem value="bar" className="text-foreground font-body text-xs">Bar</SelectItem>
+                        <SelectItem value="both" className="text-foreground font-body text-xs">Both</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 ))}
                 <div className="flex gap-2 mt-3">
                   <Input value={newCategory} onChange={e => setNewCategory(e.target.value)} placeholder="New category name"
@@ -526,6 +547,7 @@ const AdminPage = () => {
                 </div>
               </div>
             </section>
+            <DeviceManager />
             <HousekeepingConfig />
             <StaffAccessManager />
             <EmployeeContactConfig />
@@ -594,6 +616,13 @@ const AdminPage = () => {
                         <p className="font-display text-sm text-foreground">{item.name}</p>
                         <div className="flex items-center gap-2">
                           <p className="font-body text-xs text-cream-dim">{item.category}</p>
+                          <span className={`font-body text-[10px] px-1.5 py-0.5 rounded ${
+                            (item as any).department === 'bar' ? 'bg-purple-500/20 text-purple-400' :
+                            (item as any).department === 'both' ? 'bg-blue-500/20 text-blue-400' :
+                            'bg-orange-500/20 text-orange-400'
+                          }`}>
+                            {((item as any).department || 'kitchen')}
+                          </span>
                           {foodCost > 0 ? (
                             <span className="font-body text-xs text-cream-dim">
                               · Cost ₱{foodCost} · {margin}% margin
@@ -818,6 +847,19 @@ const AdminPage = () => {
               <label className="font-body text-xs text-cream-dim">Sort Order</label>
               <Input value={itemForm.sort_order} onChange={e => setItemForm(f => ({ ...f, sort_order: e.target.value }))}
                 type="number" className="bg-secondary border-border text-foreground font-body mt-1" />
+            </div>
+            <div>
+              <label className="font-body text-xs text-cream-dim">Department</label>
+              <Select value={itemForm.department} onValueChange={v => setItemForm(f => ({ ...f, department: v }))}>
+                <SelectTrigger className="bg-secondary border-border text-foreground font-body mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-border">
+                  <SelectItem value="kitchen" className="text-foreground font-body">Kitchen</SelectItem>
+                  <SelectItem value="bar" className="text-foreground font-body">Bar</SelectItem>
+                  <SelectItem value="both" className="text-foreground font-body">Both</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             {/* Recipe editor — only for existing items */}
             {editItem && editItem !== 'new' && (

@@ -5,6 +5,7 @@ export interface CartItem {
   name: string;
   price: number;
   quantity: number;
+  department?: string;
 }
 
 interface CartStore {
@@ -24,7 +25,7 @@ export const useCart = create<CartStore>((set, get) => ({
     if (existing) {
       return { items: state.items.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i) };
     }
-    return { items: [...state.items, { ...item, quantity: 1 }] };
+    return { items: [...state.items, { ...item, quantity: 1, department: item.department || 'kitchen' }] };
   }),
   removeItem: (id) => set((state) => ({ items: state.items.filter(i => i.id !== id) })),
   updateQuantity: (id, quantity) => set((state) => ({

@@ -165,7 +165,7 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
       const insertData: any = {
         order_type: selectedOrderType,
         location_detail: selectedLocation,
-        items: cart.items.map(i => ({ name: i.name, qty: i.quantity, price: i.price })),
+        items: cart.items.map(i => ({ name: i.name, qty: i.quantity, price: i.price, department: i.department || 'kitchen' })),
         total: subtotal,
         service_charge: serviceCharge,
         payment_type: isStaff ? paymentType : '',

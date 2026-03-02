@@ -114,6 +114,20 @@ const Index = () => {
             >
               Staff Order
             </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => navigate('/kitchen')}
+                className="font-display text-sm tracking-wider py-3 flex-1 border border-foreground/10 text-cream-dim hover:bg-foreground/5 transition-colors"
+              >
+                🍳 Kitchen
+              </button>
+              <button
+                onClick={() => navigate('/bar')}
+                className="font-display text-sm tracking-wider py-3 flex-1 border border-foreground/10 text-cream-dim hover:bg-foreground/5 transition-colors"
+              >
+                🍹 Bar
+              </button>
+            </div>
             {session.isAdmin && (
               <button
                 onClick={() => navigate('/admin')}

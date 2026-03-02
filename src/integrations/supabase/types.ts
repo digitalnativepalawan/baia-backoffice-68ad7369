@@ -139,6 +139,39 @@ export type Database = {
           },
         ]
       }
+      devices: {
+        Row: {
+          created_at: string
+          department: string
+          device_id: string
+          device_name: string
+          id: string
+          is_active: boolean
+          last_login_at: string | null
+          last_login_employee_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          department?: string
+          device_id: string
+          device_name: string
+          id?: string
+          is_active?: boolean
+          last_login_at?: string | null
+          last_login_employee_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          department?: string
+          device_id?: string
+          device_name?: string
+          id?: string
+          is_active?: boolean
+          last_login_at?: string | null
+          last_login_employee_id?: string | null
+        }
+        Relationships: []
+      }
       employee_bonuses: {
         Row: {
           amount: number
@@ -922,6 +955,7 @@ export type Database = {
         Row: {
           active: boolean
           created_at: string
+          department: string
           id: string
           name: string
           sort_order: number
@@ -929,6 +963,7 @@ export type Database = {
         Insert: {
           active?: boolean
           created_at?: string
+          department?: string
           id?: string
           name: string
           sort_order?: number
@@ -936,6 +971,7 @@ export type Database = {
         Update: {
           active?: boolean
           created_at?: string
+          department?: string
           id?: string
           name?: string
           sort_order?: number
@@ -947,6 +983,7 @@ export type Database = {
           available: boolean
           category: string
           created_at: string
+          department: string
           description: string | null
           featured: boolean
           food_cost: number | null
@@ -960,6 +997,7 @@ export type Database = {
           available?: boolean
           category?: string
           created_at?: string
+          department?: string
           description?: string | null
           featured?: boolean
           food_cost?: number | null
@@ -973,6 +1011,7 @@ export type Database = {
           available?: boolean
           category?: string
           created_at?: string
+          department?: string
           description?: string | null
           featured?: boolean
           food_cost?: number | null

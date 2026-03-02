@@ -104,10 +104,21 @@ const MenuPage = () => {
       )
     : menuItems.filter(i => i.category === activeCategory);
 
+  // Fetch menu items with department info for cart
+  const { data: menuItemsFull = [] } = useQuery({
+    queryKey: ['menu_items_full'],
+    queryFn: async () => {
+      const { data } = await supabase.from('menu_items').select('id, department').order('id');
+      return data || [];
+    },
+  });
+
   const handleAddToCart = () => {
     if (!selectedItem) return;
+    const fullItem = menuItemsFull.find((m: any) => m.id === selectedItem.id);
+    const department = (fullItem as any)?.department || 'kitchen';
     for (let i = 0; i < addQuantity; i++) {
-      cart.addItem({ id: selectedItem.id, name: selectedItem.name, price: selectedItem.price });
+      cart.addItem({ id: selectedItem.id, name: selectedItem.name, price: selectedItem.price, department });
     }
     setSelectedItem(null);
     setAddQuantity(1);
