@@ -56,7 +56,12 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
   const subtotal = cart.total();
   const scRate = billingConfig?.enable_service_charge ? (billingConfig.service_charge_rate || 0) : 0;
   const serviceCharge = Math.round(subtotal * (scRate / 100));
-  const grandTotal = subtotal + serviceCharge;
+  const vatRate = billingConfig?.enable_tax ? (billingConfig.tax_rate || 0) : 0;
+  const vatAmount = Math.round(subtotal * (vatRate / 100));
+  const grandTotal = subtotal + serviceCharge + vatAmount;
+
+  // Guest name for room orders
+  const [guestName, setGuestName] = useState('');
 
   // Fetch order types for guest selection
   const { data: orderTypes = [] } = useQuery({
@@ -174,6 +179,17 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
       const hasKitchen = orderItems.some(i => i.department === 'kitchen' || i.department === 'both');
       const hasBar = orderItems.some(i => i.department === 'bar' || i.department === 'both');
 
+      const staffName = localStorage.getItem('emp_name') || '';
+      const roomUnit = selectedOrderType === 'Room' ? units?.find(u => u.unit_name === selectedLocation) : null;
+      const taxDetails = {
+        tax_name: billingConfig?.tax_name || 'VAT',
+        tax_rate: vatRate,
+        tax_amount: vatAmount,
+        service_charge_name: billingConfig?.service_charge_name || 'Service Charge',
+        service_charge_rate: scRate,
+        service_charge_amount: serviceCharge,
+      };
+
       const insertData: any = {
         order_type: selectedOrderType,
         location_detail: selectedLocation,
@@ -183,13 +199,34 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
         payment_type: isStaff ? paymentType : '',
         status: 'New',
         tab_id: tabId,
-        // Set department statuses: 'pending' if dept has items, 'ready' if not (nothing to do)
         kitchen_status: hasKitchen ? 'pending' : 'ready',
         bar_status: hasBar ? 'pending' : 'ready',
+        guest_name: guestName || '',
+        room_id: roomUnit?.id || null,
+        tax_details: taxDetails,
+        staff_name: staffName,
       };
       if (scheduledFor) insertData.scheduled_for = scheduledFor;
 
-      await supabase.from('orders').insert(insertData);
+      const { data: orderRow } = await supabase.from('orders').insert(insertData).select('id').single();
+
+      // Auto-create room_transaction when "Charge to Room"
+      if (paymentType === 'Charge to Room' && roomUnit && orderRow) {
+        await (supabase.from('room_transactions' as any) as any).insert({
+          unit_id: roomUnit.id,
+          unit_name: selectedLocation,
+          guest_name: guestName || null,
+          transaction_type: 'room_charge',
+          order_id: orderRow.id,
+          amount: subtotal,
+          tax_amount: vatAmount,
+          service_charge_amount: serviceCharge,
+          total_amount: grandTotal,
+          payment_method: 'Charge to Room',
+          staff_name: staffName || 'Staff',
+          notes: `Order: ${orderItems.map(i => `${i.qty}x ${i.name}`).join(', ')}`,
+        });
+      }
 
       // Capture cart items before clearing for WhatsApp fallback
       const cartSnapshot = cart.items.map(i => ({ ...i }));
@@ -327,6 +364,12 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
                         <span className="text-foreground">₱{serviceCharge.toLocaleString()}</span>
                       </div>
                     )}
+                    {vatRate > 0 && (
+                      <div className="flex justify-between font-body text-sm">
+                        <span className="text-cream-dim">{billingConfig?.tax_name || 'VAT'} ({vatRate}%)</span>
+                        <span className="text-foreground">₱{vatAmount.toLocaleString()}</span>
+                      </div>
+                    )}
                     <Separator className="my-2" />
                     <div className="flex justify-between font-display text-lg tracking-wider">
                       <span className="text-foreground">Total</span>
@@ -393,6 +436,15 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
                           ))}
                         </SelectContent>
                       </Select>
+                    </div>
+                  )}
+
+                  {/* Guest name for Room orders */}
+                  {selectedOrderType === 'Room' && (
+                    <div className="mt-3">
+                      <label className="font-body text-xs text-cream-dim">Guest Name</label>
+                      <Input value={guestName} onChange={e => setGuestName(e.target.value)}
+                        placeholder="Guest name" className="bg-secondary border-border text-foreground font-body mt-1" />
                     </div>
                   )}
 

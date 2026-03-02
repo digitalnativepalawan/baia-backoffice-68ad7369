@@ -31,6 +31,7 @@ import WeeklyScheduleManager from '@/components/admin/WeeklyScheduleManager';
 import HousekeepingConfig from '@/components/admin/HousekeepingConfig';
 import DeviceManager from '@/components/admin/DeviceManager';
 import BillingConfigForm from '@/components/admin/BillingConfigForm';
+import AuditLogView from '@/components/admin/AuditLogView';
 
 import { deductInventoryForOrder } from '@/lib/inventoryDeduction';
 
@@ -403,6 +404,7 @@ const AdminPage = () => {
             <TabsTrigger value="rooms" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Rooms</TabsTrigger>
             <TabsTrigger value="timesheet" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Timesheet</TabsTrigger>
             <TabsTrigger value="schedules" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Schedules</TabsTrigger>
+            <TabsTrigger value="audit" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Audit Log</TabsTrigger>
           </TabsList>
 
           {/* SETTINGS TAB */}
@@ -807,6 +809,11 @@ const AdminPage = () => {
           {/* SCHEDULES TAB */}
           <TabsContent value="schedules">
             <WeeklyScheduleManager />
+          </TabsContent>
+
+          {/* AUDIT LOG TAB */}
+          <TabsContent value="audit">
+            <AuditLogView />
           </TabsContent>
         </Tabs>
       </div>

@@ -6,16 +6,17 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Upload, Trash2, Plus, Users, FileText, UtensilsCrossed, MapPin, StickyNote, Sparkles, LogIn, LogOut, Camera, Download, Link as LinkIcon, ClipboardCheck } from 'lucide-react';
+import { ArrowLeft, Upload, Trash2, Plus, Users, FileText, UtensilsCrossed, MapPin, StickyNote, Sparkles, LogIn, LogOut, Camera, Download, Link as LinkIcon, ClipboardCheck, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import VibeCheckInForm from './vibe/VibeCheckInForm';
 import VibeDetailView from './vibe/VibeDetailView';
 import HousekeepingInspection from './HousekeepingInspection';
+import RoomBillingTab from '@/components/rooms/RoomBillingTab';
 
 const from = (table: string) => supabase.from(table as any);
 
-type DetailTab = 'info' | 'orders' | 'documents' | 'notes' | 'tours' | 'vibe';
+type DetailTab = 'info' | 'orders' | 'documents' | 'notes' | 'tours' | 'vibe' | 'billing';
 
 const RoomsDashboard = ({ readOnly = false, canViewDocuments = true }: { readOnly?: boolean; canViewDocuments?: boolean }) => {
   const qc = useQueryClient();
@@ -484,6 +485,7 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true }: { readOnl
             { key: 'notes' as DetailTab, label: 'Notes', icon: StickyNote },
             { key: 'tours' as DetailTab, label: 'Tours', icon: MapPin },
             { key: 'vibe' as DetailTab, label: 'Vibe', icon: Sparkles },
+            { key: 'billing' as DetailTab, label: 'Billing', icon: DollarSign },
           ]).map(({ key, label, icon: Icon }) => (
             <Button key={key} size="sm" variant={detailTab === key ? 'default' : 'outline'}
               onClick={() => { setDetailTab(key); if (key === 'vibe') setVibeMode('list'); }}
@@ -911,7 +913,39 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true }: { readOnl
     );
   }
 
-  // ── ROOM STATUS BOARD + GRID VIEW ──
+  // ── BILLING TAB ──
+  if (selectedUnit && detailTab === 'billing') {
+    const booking = getActiveBooking(selectedUnit);
+    const guest = (booking as any)?.resort_ops_guests;
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Button size="sm" variant="ghost" onClick={() => { setSelectedUnit(null); }}>
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <h3 className="font-display text-lg tracking-wider text-foreground">{selectedUnit.name}</h3>
+        </div>
+        <div className="flex gap-1 flex-wrap">
+          {([
+            { key: 'info' as DetailTab, label: 'Guest', icon: Users },
+            { key: 'orders' as DetailTab, label: 'Orders', icon: UtensilsCrossed },
+            ...(canViewDocuments ? [{ key: 'documents' as DetailTab, label: 'Docs', icon: FileText }] : []),
+            { key: 'notes' as DetailTab, label: 'Notes', icon: StickyNote },
+            { key: 'tours' as DetailTab, label: 'Tours', icon: MapPin },
+            { key: 'vibe' as DetailTab, label: 'Vibe', icon: Sparkles },
+            { key: 'billing' as DetailTab, label: 'Billing', icon: DollarSign },
+          ]).map(({ key, label, icon: Icon }) => (
+            <Button key={key} size="sm" variant={detailTab === key ? 'default' : 'outline'}
+              onClick={() => { setDetailTab(key); if (key === 'vibe') setVibeMode('list'); }}
+              className="font-display text-xs tracking-wider gap-1">
+              <Icon className="w-3.5 h-3.5" /> {label}
+            </Button>
+          ))}
+        </div>
+        <RoomBillingTab unit={selectedUnit} booking={booking} guestName={guest?.full_name || null} />
+      </div>
+    );
+  }
   const occupiedUnits = units.filter((u: any) => getUnitStatus(u) === 'occupied' || getUnitGuest(u.name));
   const toCleanUnits = units.filter((u: any) => getUnitStatus(u) === 'to_clean');
   const readyUnits = units.filter((u: any) => getUnitStatus(u) === 'ready' && !getUnitGuest(u.name));
