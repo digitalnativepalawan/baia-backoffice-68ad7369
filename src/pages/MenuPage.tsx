@@ -5,7 +5,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCart } from '@/lib/cart';
 import { useResortProfile } from '@/hooks/useResortProfile';
 import { getMenuItemStockStatus } from '@/lib/stockCheck';
-import { ShoppingBag, Plus, Minus, UtensilsCrossed, ClipboardList, Search, X, Home } from 'lucide-react';
+import { getGuestSession, clearGuestSession } from '@/hooks/useGuestSession';
+import { ShoppingBag, Plus, Minus, UtensilsCrossed, ClipboardList, Search, X, Home, LogOut } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -30,6 +31,15 @@ const MenuPage = () => {
   const orderType = searchParams.get('orderType') || '';
   const location = searchParams.get('location') || '';
   const isStaff = mode === 'staff';
+  const isGuestOrder = mode === 'guest-order';
+  const guestSession = isGuestOrder ? getGuestSession() : null;
+
+  // Redirect if guest session expired
+  useEffect(() => {
+    if (isGuestOrder && !guestSession) {
+      navigate('/');
+    }
+  }, [isGuestOrder, guestSession, navigate]);
 
   const { data: profile } = useResortProfile();
   const brandName = profile?.resort_name || 'Menu';
@@ -132,9 +142,27 @@ const MenuPage = () => {
         <>
           {/* Header */}
           <header className="sticky top-0 z-30 bg-navy-deep/95 backdrop-blur-sm border-b border-border">
+            {/* Guest order banner */}
+            {isGuestOrder && guestSession && (
+              <div className="bg-gold/10 border-b border-gold/20 px-4 py-2 flex items-center justify-between max-w-2xl mx-auto">
+                <p className="font-body text-xs text-gold">
+                  🏠 Room {guestSession.room_name} — {guestSession.guest_name}
+                </p>
+                <button
+                  onClick={() => { clearGuestSession(); navigate('/'); }}
+                  className="flex items-center gap-1 text-cream-dim hover:text-foreground text-xs font-body transition-colors"
+                >
+                  <LogOut className="w-3 h-3" />
+                  Exit
+                </button>
+              </div>
+            )}
             <div className="max-w-2xl mx-auto px-4 pt-4 pb-2 flex items-center justify-between">
               <button
-                onClick={() => navigate('/')}
+                onClick={() => {
+                  if (isGuestOrder) { clearGuestSession(); }
+                  navigate('/');
+                }}
                 className="text-cream-dim hover:text-foreground transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
               >
                 <Home className="w-5 h-5" />
@@ -321,8 +349,8 @@ const MenuPage = () => {
         open={cartOpen}
         onOpenChange={setCartOpen}
         mode={mode}
-        orderType={orderType}
-        locationDetail={location}
+        orderType={isGuestOrder && guestSession ? 'Room' : orderType}
+        locationDetail={isGuestOrder && guestSession ? guestSession.room_name : location}
       />
 
       {/* Bottom nav bar - staff only */}

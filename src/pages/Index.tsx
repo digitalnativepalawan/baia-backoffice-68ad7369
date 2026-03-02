@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useResortProfile } from '@/hooks/useResortProfile';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { setGuestSession } from '@/hooks/useGuestSession';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { LogIn, LogOut } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { LogIn, LogOut, UtensilsCrossed } from 'lucide-react';
 import { toast } from 'sonner';
 
 const STAFF_SESSION_KEY = 'staff_home_session';
@@ -32,6 +35,21 @@ const Index = () => {
   const [loading, setLoading] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
 
+  // Guest ordering state
+  const [showGuestOrder, setShowGuestOrder] = useState(false);
+  const [guestRoom, setGuestRoom] = useState('');
+  const [guestNameInput, setGuestNameInput] = useState('');
+  const [guestLoading, setGuestLoading] = useState(false);
+
+  // Fetch occupied units for guest ordering
+  const { data: occupiedUnits = [] } = useQuery({
+    queryKey: ['occupied-units-landing'],
+    queryFn: async () => {
+      const { data } = await supabase.from('units').select('id, unit_name').eq('status', 'occupied').eq('active', true).order('unit_name');
+      return data || [];
+    },
+  });
+
   const handleLogin = async () => {
     if (!name.trim() || !pin) return;
     setLoading(true);
@@ -52,7 +70,6 @@ const Index = () => {
         expiresAt: Date.now() + 8 * 60 * 60 * 1000,
       };
       sessionStorage.setItem(STAFF_SESSION_KEY, JSON.stringify(s));
-      // Sync to localStorage so Employee Portal & Manager page recognize the session
       localStorage.setItem('emp_id', data.employee.id);
       localStorage.setItem('emp_name', data.employee.name);
       setSession(s);
@@ -72,6 +89,52 @@ const Index = () => {
     setSession(null);
     setName('');
     setPin('');
+  };
+
+  const handleGuestVerify = async () => {
+    if (!guestRoom || !guestNameInput.trim()) return;
+    setGuestLoading(true);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const unit = occupiedUnits.find(u => u.unit_name === guestRoom);
+      if (!unit) {
+        toast.error('Room not found');
+        setGuestLoading(false);
+        return;
+      }
+
+      // Find active booking for this unit with matching guest name
+      const { data: bookings } = await supabase
+        .from('resort_ops_bookings')
+        .select('id, guest_id, check_in, check_out, resort_ops_guests(id, full_name)')
+        .eq('unit_id', unit.id)
+        .lte('check_in', today)
+        .gte('check_out', today);
+
+      const match = (bookings || []).find((b: any) => {
+        const guestName = b.resort_ops_guests?.full_name;
+        return guestName && guestName.toLowerCase().trim() === guestNameInput.toLowerCase().trim();
+      });
+
+      if (!match) {
+        toast.error('Guest name does not match our records for this room');
+        setGuestLoading(false);
+        return;
+      }
+
+      setGuestSession({
+        room_id: unit.id,
+        room_name: unit.unit_name,
+        guest_name: (match as any).resort_ops_guests.full_name,
+        booking_id: match.id,
+      });
+
+      toast.success(`Welcome, ${guestNameInput.trim()}!`);
+      navigate('/menu?mode=guest-order');
+    } catch {
+      toast.error('Verification failed');
+    }
+    setGuestLoading(false);
   };
 
   return (
@@ -160,9 +223,10 @@ const Index = () => {
           </>
         ) : (
           <>
+            {/* Staff Login */}
             {!showLogin ? (
               <button
-                onClick={() => setShowLogin(true)}
+                onClick={() => { setShowLogin(true); setShowGuestOrder(false); }}
                 className="flex items-center justify-center gap-2 font-display text-base tracking-wider py-4 border border-foreground/20 text-cream-dim hover:bg-foreground/5 transition-colors"
               >
                 <LogIn className="w-4 h-4" />
@@ -199,6 +263,55 @@ const Index = () => {
                 </Button>
                 <button
                   onClick={() => { setShowLogin(false); setName(''); setPin(''); }}
+                  className="w-full font-body text-xs text-cream-dim/40 hover:text-cream-dim/60 py-2 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+
+            {/* Guest Ordering */}
+            {!showGuestOrder ? (
+              <button
+                onClick={() => { setShowGuestOrder(true); setShowLogin(false); }}
+                className="flex items-center justify-center gap-2 font-display text-base tracking-wider py-4 border border-foreground/20 text-cream-dim hover:bg-foreground/5 transition-colors"
+              >
+                <UtensilsCrossed className="w-4 h-4" />
+                Guest Ordering
+              </button>
+            ) : (
+              <div className="space-y-3 pt-2 border-t border-foreground/10 mt-1">
+                <p className="font-body text-xs text-cream-dim/70 text-center pt-2">
+                  Place orders directly to our kitchen & bar
+                </p>
+                <Select onValueChange={setGuestRoom} value={guestRoom}>
+                  <SelectTrigger className="bg-secondary border-border text-foreground font-body text-center h-12">
+                    <SelectValue placeholder="Select your room" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border-border">
+                    {occupiedUnits.map(u => (
+                      <SelectItem key={u.id} value={u.unit_name} className="text-foreground font-body">
+                        {u.unit_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  value={guestNameInput}
+                  onChange={e => setGuestNameInput(e.target.value)}
+                  placeholder="Your full name"
+                  className="bg-secondary border-border text-foreground font-body text-center text-lg h-12"
+                  onKeyDown={e => { if (e.key === 'Enter') handleGuestVerify(); }}
+                />
+                <Button
+                  onClick={handleGuestVerify}
+                  disabled={guestLoading || !guestRoom || !guestNameInput.trim()}
+                  className="w-full font-display text-sm tracking-wider h-12"
+                >
+                  {guestLoading ? 'Verifying...' : 'Start Ordering'}
+                </Button>
+                <button
+                  onClick={() => { setShowGuestOrder(false); setGuestRoom(''); setGuestNameInput(''); }}
                   className="w-full font-body text-xs text-cream-dim/40 hover:text-cream-dim/60 py-2 transition-colors"
                 >
                   Cancel

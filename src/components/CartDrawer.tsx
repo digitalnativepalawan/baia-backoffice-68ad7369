@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCart } from '@/lib/cart';
 import { useResortProfile } from '@/hooks/useResortProfile';
 import { formatWhatsAppMessage, buildWhatsAppUrl } from '@/lib/order';
+import { getGuestSession } from '@/hooks/useGuestSession';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -53,6 +54,18 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
   const activePaymentMethods = paymentMethodsList.filter(m => m.is_active);
 
   const isStaff = mode === 'staff';
+  const isGuestOrder = mode === 'guest-order';
+  const guestSession = isGuestOrder ? getGuestSession() : null;
+
+  // Auto-fill for guest ordering
+  useEffect(() => {
+    if (isGuestOrder && guestSession) {
+      setSelectedOrderType('Room');
+      setSelectedLocation(guestSession.room_name);
+      setGuestName(guestSession.guest_name);
+      setPaymentType('Charge to Room');
+    }
+  }, [isGuestOrder]);
   const subtotal = cart.total();
   const scRate = billingConfig?.enable_service_charge ? (billingConfig.service_charge_rate || 0) : 0;
   const serviceCharge = Math.round(subtotal * (scRate / 100));
@@ -119,6 +132,9 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
       toast.error('Please select a payment type');
       return;
     }
+    if (isGuestOrder && !paymentType) {
+      setPaymentType('Charge to Room');
+    }
 
     // Stock check before ordering
     if (!overrideStock) {
@@ -179,7 +195,7 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
       const hasKitchen = orderItems.some(i => i.department === 'kitchen' || i.department === 'both');
       const hasBar = orderItems.some(i => i.department === 'bar' || i.department === 'both');
 
-      const staffName = localStorage.getItem('emp_name') || '';
+      const staffName = isGuestOrder ? 'Guest Self-Service' : (localStorage.getItem('emp_name') || '');
       const roomUnit = selectedOrderType === 'Room' ? units?.find(u => u.unit_name === selectedLocation) : null;
       const taxDetails = {
         tax_name: billingConfig?.tax_name || 'VAT',
@@ -196,7 +212,7 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
         items: orderItems,
         total: subtotal,
         service_charge: serviceCharge,
-        payment_type: isStaff ? paymentType : '',
+        payment_type: (isStaff || isGuestOrder) ? paymentType : '',
         status: 'New',
         tab_id: tabId,
         kitchen_status: hasKitchen ? 'pending' : 'ready',
@@ -211,7 +227,7 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
       const { data: orderRow } = await supabase.from('orders').insert(insertData).select('id').single();
 
       // Auto-create room_transaction when "Charge to Room"
-      if (paymentType === 'Charge to Room' && roomUnit && orderRow) {
+      if ((paymentType === 'Charge to Room' || isGuestOrder) && roomUnit && orderRow) {
         await (supabase.from('room_transactions' as any) as any).insert({
           unit_id: roomUnit.id,
           unit_name: selectedLocation,
@@ -224,7 +240,9 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
           total_amount: grandTotal,
           payment_method: 'Charge to Room',
           staff_name: staffName || 'Staff',
-          notes: `Order: ${orderItems.map(i => `${i.qty}x ${i.name}`).join(', ')}`,
+          notes: isGuestOrder
+            ? `Guest self-service order: ${orderItems.map(i => `${i.qty}x ${i.name}`).join(', ')}`
+            : `Order: ${orderItems.map(i => `${i.qty}x ${i.name}`).join(', ')}`,
         });
       }
 
@@ -284,11 +302,22 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
                 {orderSummary.itemCount} item{orderSummary.itemCount !== 1 ? 's' : ''} · ₱{orderSummary.grandTotal.toLocaleString()}
               </p>
               <p className="font-body text-xs text-cream-dim text-center mt-2">
-                Added to your open tab
+                {isGuestOrder ? 'Charged to your room' : 'Added to your open tab'}
               </p>
             </div>
             <DrawerFooter className="pt-0 gap-2">
-              <Button onClick={() => { setSubmitted(false); setSelectedOrderType(''); setSelectedLocation(''); setPaymentType(''); setGuestName(''); setScheduleMode('asap'); }} className="font-display tracking-wider py-6 w-full">
+              <Button onClick={() => {
+                setSubmitted(false);
+                if (isGuestOrder && guestSession) {
+                  // Keep room context for guest orders
+                  setSelectedOrderType('Room');
+                  setSelectedLocation(guestSession.room_name);
+                  setGuestName(guestSession.guest_name);
+                  setPaymentType('Charge to Room');
+                } else {
+                  setSelectedOrderType(''); setSelectedLocation(''); setPaymentType(''); setGuestName(''); setScheduleMode('asap');
+                }
+              }} className="font-display tracking-wider py-6 w-full">
                 Place Another Order
               </Button>
               <Button variant="outline" onClick={() => handleClose(false)} className="font-display tracking-wider py-6 w-full">
@@ -377,8 +406,18 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
                     </div>
                   </div>
 
+                  {/* Guest-order mode: show room charge info */}
+                  {isGuestOrder && guestSession && (
+                    <div className="mt-4 pt-3 border-t border-border">
+                      <div className="bg-gold/10 border border-gold/20 rounded-lg p-3 text-center">
+                        <p className="font-display text-xs tracking-wider text-gold mb-1">Room {guestSession.room_name}</p>
+                        <p className="font-body text-xs text-cream-dim">All charges will be added to your room bill</p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Order type selection for guests who haven't pre-selected */}
-                  {needsOrderType && orderTypes.length > 0 && (
+                  {!isGuestOrder && needsOrderType && orderTypes.length > 0 && (
                     <div className="mt-4 pt-3 border-t border-border">
                       <p className="font-display text-sm text-foreground tracking-wider mb-3">Where's your order?</p>
                       <div className="grid grid-cols-2 gap-2 mb-3">
@@ -439,8 +478,8 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
                     </div>
                   )}
 
-                  {/* Guest name for Room orders */}
-                  {selectedOrderType === 'Room' && (
+                  {/* Guest name for Room orders (not for guest-order mode - auto-filled) */}
+                  {selectedOrderType === 'Room' && !isGuestOrder && (
                     <div className="mt-3">
                       <label className="font-body text-xs text-cream-dim">Guest Name</label>
                       <Input value={guestName} onChange={e => setGuestName(e.target.value)}
@@ -575,10 +614,10 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
                   className="font-display tracking-wider py-6 w-full gap-2 text-base"
                 >
                   <Send className="w-4 h-4" />
-                  {submitting ? 'Sending...' : 'Send to Kitchen'}
+                  {submitting ? 'Sending...' : isGuestOrder ? 'Send Order' : 'Send to Kitchen'}
                 </Button>
                 <p className="font-body text-[10px] text-cream-dim text-center mt-1">
-                  Order will be added to your open tab
+                  {isGuestOrder ? 'Charges will be added to your room bill' : 'Order will be added to your open tab'}
                 </p>
               </DrawerFooter>
             )}
