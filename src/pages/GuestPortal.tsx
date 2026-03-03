@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { LogOut, UtensilsCrossed, MapPin, Car, Bike, MessageSquare, Star, Receipt, ArrowLeft, ChevronRight, ClipboardList, Calendar, Clock, Users, StickyNote } from 'lucide-react';
+import { LogOut, UtensilsCrossed, MapPin, Car, Bike, MessageSquare, Star, Receipt, ArrowLeft, ChevronRight, ClipboardList, Calendar, Clock, Users, StickyNote, CheckCircle2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { setGuestSession } from '@/hooks/useGuestSession';
 
 const GUEST_PORTAL_KEY = 'guest_portal_session';
@@ -39,7 +40,7 @@ const GuestPortal = () => {
   const { data: profile } = useResortProfile();
   const qc = useQueryClient();
   const [session, setSession] = useState<GuestPortalSession | null>(getPortalSession);
-  const [view, setView] = useState<'dashboard' | 'menu' | 'tours' | 'transport' | 'rentals' | 'request' | 'review' | 'bill' | 'orders'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'menu' | 'tours' | 'transport' | 'rentals' | 'request' | 'review' | 'bill' | 'orders' | 'requests'>('dashboard');
 
   // Login state
   const [roomName, setRoomName] = useState('');
@@ -159,6 +160,7 @@ const GuestPortal = () => {
               <Tile icon={<MessageSquare className="w-5 h-5" />} label="Leave Note" onClick={() => setView('request')} />
               <Tile icon={<Star className="w-5 h-5" />} label="Write Review" onClick={() => setView('review')} />
               <Tile icon={<ClipboardList className="w-5 h-5" />} label="My Orders" onClick={() => setView('orders')} />
+              <Tile icon={<CheckCircle2 className="w-5 h-5" />} label="My Requests" onClick={() => setView('requests')} />
               <Tile icon={<Receipt className="w-5 h-5" />} label="My Bill" onClick={() => setView('bill')} className="col-span-2" />
             </div>
             <button onClick={logout} className="flex items-center justify-center gap-2 w-full font-body text-xs text-muted-foreground hover:text-foreground py-2">
@@ -173,6 +175,7 @@ const GuestPortal = () => {
         {view === 'request' && <RequestView session={session} qc={qc} />}
         {view === 'review' && <ReviewView session={session} qc={qc} onDone={() => setView('dashboard')} />}
         {view === 'orders' && <OrdersView session={session} />}
+        {view === 'requests' && <RequestsTrackerView session={session} />}
         {view === 'bill' && <BillView session={session} />}
       </div>
     </div>
@@ -573,7 +576,14 @@ const ORDER_STATUS_MAP: Record<string, { label: string; color: string }> = {
   'Preparing': { label: 'Preparing', color: 'bg-amber-500/20 text-amber-400' },
   'Served': { label: 'Served', color: 'bg-green-500/20 text-green-400' },
   'Paid': { label: 'Complete', color: 'bg-muted text-muted-foreground' },
+  'Closed': { label: 'Closed', color: 'bg-muted text-muted-foreground' },
   'Cancelled': { label: 'Cancelled', color: 'bg-destructive/20 text-destructive' },
+};
+
+const DEPT_STATUS_LABELS: Record<string, string> = {
+  pending: 'Waiting',
+  preparing: 'Preparing',
+  ready: 'Ready',
 };
 
 const OrdersView = ({ session }: { session: GuestPortalSession }) => {
@@ -619,16 +629,43 @@ const OrdersView = ({ session }: { session: GuestPortalSession }) => {
         orders.map((order: any) => {
           const statusInfo = ORDER_STATUS_MAP[order.status] || { label: order.status, color: 'bg-muted text-muted-foreground' };
           const items = Array.isArray(order.items) ? order.items : [];
+          const hasKitchenItems = items.some((i: any) => (i.department || 'kitchen') === 'kitchen' || (i.department || 'kitchen') === 'both');
+          const hasBarItems = items.some((i: any) => i.department === 'bar' || i.department === 'both');
           return (
             <div key={order.id} className="bg-card border border-border rounded-lg p-4 space-y-2">
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-start">
                 <span className="font-body text-xs text-muted-foreground">
                   {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
-                <span className={`font-body text-xs px-2 py-0.5 rounded-full ${statusInfo.color}`}>
-                  {statusInfo.label}
-                </span>
+                <div className="flex flex-wrap gap-1 justify-end">
+                  <span className={`font-body text-xs px-2 py-0.5 rounded-full ${statusInfo.color}`}>
+                    {statusInfo.label}
+                  </span>
+                </div>
               </div>
+              {/* Department-level status badges */}
+              {(order.status === 'New' || order.status === 'Preparing' || order.status === 'Served') && (
+                <div className="flex flex-wrap gap-1.5">
+                  {hasKitchenItems && (
+                    <span className={`font-body text-[11px] px-2 py-0.5 rounded-full border ${
+                      order.kitchen_status === 'ready' ? 'bg-green-500/15 text-green-400 border-green-500/30' :
+                      order.kitchen_status === 'preparing' ? 'bg-amber-500/15 text-amber-400 border-amber-500/30' :
+                      'bg-blue-500/15 text-blue-400 border-blue-500/30'
+                    }`}>
+                      🍳 {DEPT_STATUS_LABELS[order.kitchen_status] || 'Waiting'}
+                    </span>
+                  )}
+                  {hasBarItems && (
+                    <span className={`font-body text-[11px] px-2 py-0.5 rounded-full border ${
+                      order.bar_status === 'ready' ? 'bg-green-500/15 text-green-400 border-green-500/30' :
+                      order.bar_status === 'preparing' ? 'bg-amber-500/15 text-amber-400 border-amber-500/30' :
+                      'bg-blue-500/15 text-blue-400 border-blue-500/30'
+                    }`}>
+                      🍹 {DEPT_STATUS_LABELS[order.bar_status] || 'Waiting'}
+                    </span>
+                  )}
+                </div>
+              )}
               <div className="space-y-1">
                 {items.map((item: any, idx: number) => (
                   <div key={idx} className="flex justify-between">
@@ -644,6 +681,114 @@ const OrdersView = ({ session }: { session: GuestPortalSession }) => {
             </div>
           );
         })
+      )}
+    </div>
+  );
+};
+
+// --- Requests Tracker (Tours, Transport, Rentals) ---
+const REQUEST_STATUS_MAP: Record<string, { label: string; color: string }> = {
+  'pending': { label: 'Pending', color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
+  'booked': { label: 'Pending', color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
+  'confirmed': { label: 'Confirmed', color: 'bg-green-500/20 text-green-400 border-green-500/30' },
+  'cancelled': { label: 'Cancelled', color: 'bg-destructive/20 text-destructive border-destructive/30' },
+  'completed': { label: 'Completed', color: 'bg-muted text-muted-foreground border-border' },
+};
+
+const RequestsTrackerView = ({ session }: { session: GuestPortalSession }) => {
+  const qc = useQueryClient();
+
+  const { data: tours = [] } = useQuery({
+    queryKey: ['guest-my-tours', session.booking_id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('guest_tours')
+        .select('*')
+        .eq('booking_id', session.booking_id)
+        .order('created_at', { ascending: false });
+      return data || [];
+    },
+  });
+
+  const { data: requests = [] } = useQuery({
+    queryKey: ['guest-my-requests', session.booking_id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('guest_requests')
+        .select('*')
+        .eq('booking_id', session.booking_id)
+        .order('created_at', { ascending: false });
+      return data || [];
+    },
+  });
+
+  // Realtime subscriptions
+  useEffect(() => {
+    const channel = supabase
+      .channel('guest-requests-realtime')
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'guest_tours',
+        filter: `booking_id=eq.${session.booking_id}`,
+      }, () => { qc.invalidateQueries({ queryKey: ['guest-my-tours', session.booking_id] }); })
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'guest_requests',
+        filter: `booking_id=eq.${session.booking_id}`,
+      }, () => { qc.invalidateQueries({ queryKey: ['guest-my-requests', session.booking_id] }); })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [session.booking_id, qc]);
+
+  const hasAny = tours.length > 0 || requests.length > 0;
+
+  return (
+    <div className="space-y-4">
+      <h2 className="font-display text-lg text-foreground">My Requests</h2>
+      {!hasAny ? (
+        <p className="font-body text-sm text-muted-foreground text-center py-8">No requests submitted yet.</p>
+      ) : (
+        <>
+          {tours.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="font-body text-xs text-muted-foreground uppercase tracking-wider">Tours</h3>
+              {tours.map((t: any) => {
+                const st = REQUEST_STATUS_MAP[t.status] || REQUEST_STATUS_MAP['pending'];
+                return (
+                  <div key={t.id} className="bg-card border border-border rounded-lg p-3 space-y-1.5">
+                    <div className="flex justify-between items-start">
+                      <span className="font-body text-sm text-foreground font-medium">🗺️ {t.tour_name}</span>
+                      <span className={`font-body text-xs px-2 py-0.5 rounded-full border ${st.color}`}>{st.label}</span>
+                    </div>
+                    <div className="flex gap-3 font-body text-xs text-muted-foreground">
+                      <span>{t.tour_date}</span>
+                      <span>{t.pax} pax</span>
+                      <span>Pickup: {t.pickup_time}</span>
+                    </div>
+                    {t.price > 0 && <p className="font-body text-xs text-accent">₱{t.price.toLocaleString()}</p>}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {requests.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="font-body text-xs text-muted-foreground uppercase tracking-wider">Transport & Rentals</h3>
+              {requests.map((r: any) => {
+                const st = REQUEST_STATUS_MAP[r.status] || REQUEST_STATUS_MAP['pending'];
+                const icon = r.request_type === 'Transport' ? '🚗' : r.request_type === 'Rental' ? '🛵' : '📋';
+                return (
+                  <div key={r.id} className="bg-card border border-border rounded-lg p-3 space-y-1.5">
+                    <div className="flex justify-between items-start">
+                      <span className="font-body text-sm text-foreground font-medium">{icon} {r.request_type}</span>
+                      <span className={`font-body text-xs px-2 py-0.5 rounded-full border ${st.color}`}>{st.label}</span>
+                    </div>
+                    <p className="font-body text-xs text-muted-foreground">{r.details}</p>
+                    <p className="font-body text-[11px] text-muted-foreground">{new Date(r.created_at).toLocaleString()}</p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
