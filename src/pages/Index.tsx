@@ -160,7 +160,7 @@ const Index = () => {
                 <ConciergeBell className="w-4 h-4" /> Reception
               </button>
             )}
-            {(session.isAdmin || hasAccess(session.permissions || [], 'experiences')) && (
+            {(session.isAdmin || hasAccess(session.permissions || [], 'experiences') || hasAccess(session.permissions || [], 'reception')) && (
               <button
                 onClick={() => navigate('/experiences')}
                 className="flex items-center justify-center gap-2 font-display text-sm tracking-wider py-3 border border-foreground/10 text-cream-dim hover:bg-foreground/5 transition-colors"

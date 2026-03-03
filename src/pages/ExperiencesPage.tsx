@@ -29,7 +29,7 @@ const ExperiencesPage = () => {
   const session = getSession();
   const perms: string[] = session?.permissions || [];
   const isAdmin = perms.includes('admin');
-  const canDoEdit = isAdmin || canEdit(perms, 'experiences');
+  const canDoEdit = isAdmin || canEdit(perms, 'experiences') || canEdit(perms, 'reception');
   const staffName = session?.name || 'Staff';
 
   const today = new Date();

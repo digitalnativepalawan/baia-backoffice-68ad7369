@@ -40,7 +40,7 @@ const App = () => (
           <Route path="/bar" element={<RequireAuth requiredPermission="bar"><BarPage /></RequireAuth>} />
           <Route path="/housekeeper" element={<RequireAuth requiredPermission="housekeeping"><HousekeeperPage /></RequireAuth>} />
           <Route path="/reception" element={<RequireAuth requiredPermission="reception"><ReceptionPage /></RequireAuth>} />
-          <Route path="/experiences" element={<RequireAuth requiredPermission="experiences"><ExperiencesPage /></RequireAuth>} />
+          <Route path="/experiences" element={<RequireAuth requiredPermission={['experiences', 'reception']}><ExperiencesPage /></RequireAuth>} />
           <Route path="/guest-portal" element={<GuestPortalPage />} />
           
           <Route path="*" element={<NotFound />} />

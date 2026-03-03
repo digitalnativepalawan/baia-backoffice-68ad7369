@@ -8,7 +8,8 @@ const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 
 interface RequireAuthProps {
   children: ReactNode;
-  requiredPermission?: string;
+  /** Single permission key or array (any match grants access) */
+  requiredPermission?: string | string[];
   adminOnly?: boolean;
 }
 
@@ -45,9 +46,12 @@ const RequireAuth = ({ children, requiredPermission, adminOnly }: RequireAuthPro
       navigate('/', { replace: true });
       return;
     }
-    if (requiredPermission && !isAdmin && !hasAccess(perms, requiredPermission)) {
-      toast.error('You do not have access to this section');
-      navigate('/', { replace: true });
+    if (requiredPermission && !isAdmin) {
+      const keys = Array.isArray(requiredPermission) ? requiredPermission : [requiredPermission];
+      if (!keys.some(k => hasAccess(perms, k))) {
+        toast.error('You do not have access to this section');
+        navigate('/', { replace: true });
+      }
     }
   }, [session, navigate, requiredPermission, adminOnly]);
 
@@ -80,7 +84,10 @@ const RequireAuth = ({ children, requiredPermission, adminOnly }: RequireAuthPro
   const perms: string[] = session.permissions || [];
   const isAdmin = perms.includes('admin');
   if (adminOnly && !isAdmin) return null;
-  if (requiredPermission && !isAdmin && !hasAccess(perms, requiredPermission)) return null;
+  if (requiredPermission && !isAdmin) {
+    const keys = Array.isArray(requiredPermission) ? requiredPermission : [requiredPermission];
+    if (!keys.some(k => hasAccess(perms, k))) return null;
+  }
 
   return <>{children}</>;
 };
