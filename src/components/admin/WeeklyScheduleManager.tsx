@@ -322,8 +322,8 @@ const WeeklyScheduleManager = () => {
             )}
             <span className={`text-[8px] font-display ${SHIFT_TEXT_COLORS[type]} opacity-80`}>{type}</span>
           </div>
-          {/* Desktop hover actions */}
-          <div className="hidden group-hover/block:flex gap-0.5 shrink-0">
+          {/* Always-visible action icons */}
+          <div className="flex gap-0.5 shrink-0">
             <button onClick={(e) => { e.stopPropagation(); openEdit(s); }} className="p-0.5 rounded hover:bg-background/30 text-foreground/60 hover:text-accent">
               <Pencil className="h-3 w-3" />
             </button>
@@ -754,20 +754,27 @@ const ShiftModal = ({ shiftModal, shiftForm, setShiftForm, employees, saveShift,
           </div>
         </div>
 
-        {/* Shift type presets */}
+        {/* Shift type label (does NOT change times) */}
         <div>
           <Label className="font-body text-xs text-muted-foreground mb-1 block">Shift Type</Label>
           <div className="flex flex-wrap gap-1">
-            {PRESETS.map(p => (
-              <Button key={p.label} size="sm" variant="outline" className="font-display text-[10px] h-8"
-                onClick={() => setShiftForm((f: any) => ({ ...f, time_in: p.time_in, time_out: p.time_out }))}>
-                {p.label}
-              </Button>
-            ))}
+            {PRESETS.map(p => {
+              const currentType = inferShiftType(shiftForm.time_in, shiftForm.time_out);
+              const isActive = currentType === p.label;
+              return (
+                <Button key={p.label} size="sm"
+                  variant={isActive ? 'default' : 'outline'}
+                  className="font-display text-[10px] h-8"
+                  onClick={() => setShiftForm((f: any) => ({ ...f, time_in: p.time_in, time_out: p.time_out }))}>
+                  {p.label}
+                </Button>
+              );
+            })}
             <Button size="sm" variant="outline" className="font-display text-[10px] h-8" onClick={addBrokenShift}>
               Broken Shift
             </Button>
           </div>
+          <p className="font-body text-[10px] text-muted-foreground mt-1">Selecting a type will set preset times. Adjust times manually after if needed.</p>
         </div>
 
         <Button onClick={saveShift} className="w-full font-display tracking-wider">

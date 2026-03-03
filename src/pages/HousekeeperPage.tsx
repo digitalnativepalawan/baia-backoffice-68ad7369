@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -44,6 +44,16 @@ const HousekeeperPage = () => {
     o.status === 'completed' &&
     o.cleaning_completed_at?.startsWith(today)
   );
+
+  // Sync activeOrder with latest query data so props stay current
+  useEffect(() => {
+    if (activeOrder) {
+      const fresh = allOrders.find((o: any) => o.id === activeOrder.id);
+      if (fresh && JSON.stringify(fresh) !== JSON.stringify(activeOrder)) {
+        setActiveOrder(fresh);
+      }
+    }
+  }, [allOrders, activeOrder]);
 
   // My stats this month
   const monthStart = startOfMonth(new Date()).toISOString();
