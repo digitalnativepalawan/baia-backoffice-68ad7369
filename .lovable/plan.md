@@ -1,36 +1,34 @@
 
 
-## Plan: Guest Portal Real-Time Status Tracking
+## Plan: Embed Housekeeping in Reception + Force-Ready Override
 
-### Current State
-- **My Orders**: Already has realtime subscription but only shows overall status. Does not show department-level progress (kitchen preparing, bar ready, etc.).
-- **Tours, Transport, Rentals**: Guest submits requests but has NO way to see their status afterward. No "My Requests" view exists.
+### Problem
+Staff with both reception and housekeeping roles must switch between two separate pages. The room status flow (to_clean → ready) currently only completes via the dedicated Housekeeping page. Reception staff with manage-level access cannot override a stuck room to "Ready" in urgent situations.
 
 ### Changes
 
-**1. Enhance OrdersView with department-level status** (`src/pages/GuestPortal.tsx`)
-- Show `kitchen_status` and `bar_status` as sub-badges when applicable (e.g., "🍳 Preparing", "🍹 Ready")
-- Add "Closed" to the status map
-- Already has realtime -- no changes needed there
+**1. Add Housekeeping Status Section in Reception** (`src/pages/ReceptionPage.tsx`)
 
-**2. Add a "My Requests" section to the dashboard** (`src/pages/GuestPortal.tsx`)
-- New view `'requests'` accessible from dashboard (new Tile)
-- Query `tour_bookings` filtered by `booking_id` -- shows tour name, date, and status (pending/confirmed/cancelled/completed)
-- Query `guest_requests` filtered by `booking_id` -- shows transport and rental requests with their status
-- Add realtime subscriptions on both `tour_bookings` and `guest_requests` tables so status changes appear instantly
-- Color-coded status badges: pending (amber), confirmed (green), cancelled (red), completed (muted)
+Below the "To Clean" rooms section, add a collapsible **Housekeeping Tracker** panel showing:
+- All active housekeeping orders (pending, inspecting, cleaning) with assigned housekeeper name and status badge
+- For staff with `housekeeping` permission: "Accept" and "Continue" buttons that open the `HousekeepingInspection` component inline (same as /housekeeper page)
+- This eliminates the need for multi-role staff to navigate to `/housekeeper`
 
-**3. Wire realtime for tour_bookings and guest_requests**
-- Subscribe to `postgres_changes` on `tour_bookings` filtered by `booking_id`
-- Subscribe to `postgres_changes` on `guest_requests` filtered by `booking_id`
-- Invalidate queries on change
+**2. Add "Force Ready" override for manage-level users** (`src/pages/ReceptionPage.tsx`)
 
-### No database changes needed
-- `tour_bookings` and `guest_requests` already have status columns
-- Realtime is already enabled or will use channel subscriptions
+On each `to_clean` room card in the Quick Room Status grid AND in the "To Clean" section:
+- Show a "Mark Ready" button visible only to users with `canDoManage` permission
+- Clicking it updates `units.status` to `'ready'` and marks the corresponding housekeeping order as `completed` with a note "Force-marked ready by [staff name]"
+- Log this action to audit_log for accountability
+
+**3. Remove Housekeeping tile from Index for multi-role staff** (`src/pages/Index.tsx`)
+
+No change needed here -- the tile already shows independently. Staff can still use it. But with housekeeping embedded in Reception, multi-role staff won't need to navigate away.
 
 ### Technical Details
-- New `RequestsTrackerView` component inside GuestPortal showing all submitted requests grouped by type
-- New dashboard tile with a clipboard/checklist icon labeled "My Requests"
-- Reuse existing query patterns from OrdersView for consistency
+
+- Reuse `HousekeepingInspection` component (already standalone) when a receptionist clicks "Continue" on an order they accepted
+- The `PasswordConfirmModal` already handles PIN-based acceptance
+- Force-ready will require `canManage(perms, 'reception')` check
+- No database changes needed
 
