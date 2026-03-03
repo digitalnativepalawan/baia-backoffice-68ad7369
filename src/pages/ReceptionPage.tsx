@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,14 +9,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, LogIn, LogOut, DollarSign, BedDouble, MapPin, Car, Bike, Palmtree, UtensilsCrossed, ClipboardList, Sparkles, Receipt, ChevronDown, ChevronUp, CheckCircle } from 'lucide-react';
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
+import { ArrowLeft, LogIn, LogOut, DollarSign, BedDouble, MapPin, Car, Bike, Palmtree, UtensilsCrossed, ClipboardList, Sparkles, Receipt, ChevronDown, ChevronUp, CheckCircle, Clock, ShieldCheck } from 'lucide-react';
 import AddPaymentModal from '@/components/rooms/AddPaymentModal';
 import HousekeeperPickerModal from '@/components/rooms/HousekeeperPickerModal';
+import PasswordConfirmModal from '@/components/housekeeping/PasswordConfirmModal';
+import HousekeepingInspection from '@/components/admin/HousekeepingInspection';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { usePaymentMethods } from '@/hooks/usePaymentMethods';
 import { useRoomTransactions } from '@/hooks/useRoomTransactions';
-import { canEdit, canManage } from '@/lib/permissions';
+import { canEdit, canManage, hasAccess } from '@/lib/permissions';
 import { logAudit } from '@/lib/auditLog';
 
 const from = (table: string) => supabase.from(table as any);
@@ -78,7 +81,9 @@ const ReceptionPage = () => {
   const isAdmin = perms.includes('admin');
   const canDoEdit = isAdmin || canEdit(perms, 'reception');
   const canDoManage = isAdmin || canManage(perms, 'reception');
+  const hasHousekeepingAccess = isAdmin || hasAccess(perms, 'housekeeping');
   const staffName = session?.name || localStorage.getItem('emp_name') || 'Staff';
+  const empId = localStorage.getItem('emp_id');
 
   const today = new Date().toISOString().split('T')[0];
 
@@ -118,6 +123,12 @@ const ReceptionPage = () => {
   // Send to clean loading
   const [sendingClean, setSendingClean] = useState<string | null>(null);
 
+  // Housekeeping tracker state
+  const [hkTrackerOpen, setHkTrackerOpen] = useState(true);
+  const [activeHkOrder, setActiveHkOrder] = useState<any>(null);
+  const [acceptingHkOrderId, setAcceptingHkOrderId] = useState<string | null>(null);
+  const [forcingReady, setForcingReady] = useState<string | null>(null);
+
   const { data: paymentMethods = [] } = usePaymentMethods();
   const activePM = paymentMethods.filter(m => m.is_active && m.name !== 'Charge to Room');
 
@@ -151,14 +162,32 @@ const ReceptionPage = () => {
     },
   });
 
-  // Housekeeping orders (active)
-  const { data: housekeepingOrders = [] } = useQuery({
-    queryKey: ['housekeeping-orders'],
+  // All housekeeping orders (for tracker)
+  const { data: allHkOrders = [] } = useQuery({
+    queryKey: ['housekeeping-orders-all'],
     queryFn: async () => {
-      const { data } = await from('housekeeping_orders').select('*').neq('status', 'completed').order('created_at', { ascending: false });
+      const { data } = await from('housekeeping_orders').select('*').order('created_at', { ascending: false });
       return (data || []) as any[];
     },
+    refetchInterval: 15000,
   });
+
+  // Derive latest active order per unit
+  const latestHkByUnit = new Map<string, any>();
+  allHkOrders.filter((o: any) => o.status !== 'completed').forEach((o: any) => {
+    if (!latestHkByUnit.has(o.unit_name)) latestHkByUnit.set(o.unit_name, o);
+  });
+  const activeHkOrders = Array.from(latestHkByUnit.values());
+
+  // Sync activeHkOrder with latest data
+  useEffect(() => {
+    if (activeHkOrder) {
+      const fresh = allHkOrders.find((o: any) => o.id === activeHkOrder.id);
+      if (fresh && JSON.stringify(fresh) !== JSON.stringify(activeHkOrder)) {
+        setActiveHkOrder(fresh);
+      }
+    }
+  }, [allHkOrders, activeHkOrder]);
 
   // Recent orders for all rooms
   const { data: recentOrders = [] } = useQuery({
@@ -299,7 +328,55 @@ const ReceptionPage = () => {
     toast.success(`Request ${status}`);
   };
 
-  // ── CHECK-IN (manage only) ──
+  // ── FORCE READY (manage only) ──
+  const handleForceReady = async (unit: any) => {
+    if (!canDoManage) { toast.error('Manage access required'); return; }
+    setForcingReady(unit.id);
+    try {
+      await supabase.from('units').update({ status: 'ready' } as any).eq('id', unit.id);
+      // Complete any active housekeeping orders for this unit
+      const hkOrder = activeHkOrders.find((o: any) => o.unit_name === unit.name);
+      if (hkOrder) {
+        await from('housekeeping_orders').update({
+          status: 'completed',
+          cleaning_notes: `Force-marked ready by ${staffName}`,
+          completed_by_name: staffName,
+          cleaning_completed_at: new Date().toISOString(),
+        } as any).eq('id', hkOrder.id);
+      }
+      await logAudit('updated', 'units', unit.id, `Force-marked ${unit.name} as Ready by ${staffName}`);
+      qc.invalidateQueries({ queryKey: ['rooms-units'] });
+      qc.invalidateQueries({ queryKey: ['housekeeping-orders'] });
+      qc.invalidateQueries({ queryKey: ['housekeeping-orders-all'] });
+      toast.success(`${unit.name} marked as Ready`);
+    } catch {
+      toast.error('Failed to mark ready');
+    } finally {
+      setForcingReady(null);
+    }
+  };
+
+  // ── HOUSEKEEPING ACCEPT (for multi-role staff) ──
+  const handleHkAccept = async (employee: { id: string; name: string; display_name: string }) => {
+    if (!acceptingHkOrderId) return;
+    try {
+      await from('housekeeping_orders').update({
+        accepted_by: employee.id,
+        accepted_by_name: employee.display_name || employee.name,
+        accepted_at: new Date().toISOString(),
+        status: 'pending_inspection',
+      } as any).eq('id', acceptingHkOrderId);
+      localStorage.setItem('emp_id', employee.id);
+      localStorage.setItem('emp_name', employee.name);
+      qc.invalidateQueries({ queryKey: ['housekeeping-orders-all'] });
+      toast.success(`Accepted — ${employee.display_name || employee.name}`);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to accept');
+    }
+    setAcceptingHkOrderId(null);
+  };
+
+
   const handleReservationCheckIn = async () => {
     if (!checkInBooking) return;
     setCheckingIn(true);
@@ -410,7 +487,7 @@ const ReceptionPage = () => {
     setSendingClean(unit.id);
     try {
       await supabase.from('units').update({ status: 'to_clean' } as any).eq('id', unit.id);
-      const existing = housekeepingOrders.find((o: any) => o.unit_name === unit.name);
+      const existing = activeHkOrders.find((o: any) => o.unit_name === unit.name);
       if (!existing) {
         await from('housekeeping_orders').insert({
           unit_name: unit.name,
@@ -458,7 +535,7 @@ const ReceptionPage = () => {
       await from('resort_ops_bookings').update({ check_out: today }).eq('id', checkOutBooking.id);
       await supabase.from('units').update({ status: 'to_clean' } as any).eq('id', checkOutUnit.id);
 
-      const existing = housekeepingOrders.find((o: any) => o.unit_name === checkOutUnit.name);
+      const existing = activeHkOrders.find((o: any) => o.unit_name === checkOutUnit.name);
       if (!existing) {
         await from('housekeeping_orders').insert({
           unit_name: checkOutUnit.name,
@@ -824,13 +901,97 @@ const ReceptionPage = () => {
                 {guest && (
                   <p className="font-body text-[10px] text-muted-foreground truncate">{guest.full_name}</p>
                 )}
+                {status === 'to_clean' && canDoManage && (
+                  <Button size="sm" variant="outline" onClick={() => handleForceReady(unit)}
+                    disabled={forcingReady === unit.id}
+                    className="font-display text-[9px] tracking-wider min-h-[24px] h-6 px-1.5 mt-1 w-full border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10">
+                    <ShieldCheck className="w-3 h-3 mr-0.5" /> {forcingReady === unit.id ? '...' : 'Force Ready'}
+                  </Button>
+                )}
               </div>
             );
           })}
         </div>
       </div>
 
-      {/* ══════ CHECK-IN MODAL (manage only) ══════ */}
+      {/* ── Housekeeping Tracker (embedded) ── */}
+      {activeHkOrders.length > 0 && (
+        <Collapsible open={hkTrackerOpen} onOpenChange={setHkTrackerOpen} className="mb-6">
+          <CollapsibleTrigger className="flex items-center justify-between w-full py-2">
+            <h2 className="font-display text-xs tracking-wider text-muted-foreground uppercase flex items-center gap-2">
+              🧹 Housekeeping Tracker ({activeHkOrders.length})
+            </h2>
+            {hkTrackerOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-2 pt-2">
+            {activeHkOrder ? (
+              <HousekeepingInspection
+                order={activeHkOrder}
+                onClose={() => {
+                  setActiveHkOrder(null);
+                  qc.invalidateQueries({ queryKey: ['housekeeping-orders-all'] });
+                  qc.invalidateQueries({ queryKey: ['rooms-units'] });
+                }}
+              />
+            ) : (
+              activeHkOrders.map((order: any) => {
+                const hkStatusLabel = order.status === 'pending_inspection' ? 'Pending' : order.status === 'inspecting' ? 'Inspecting' : order.status === 'cleaning' ? 'Cleaning' : order.status;
+                const hkStatusColor = order.status === 'pending_inspection' ? 'bg-amber-500/20 text-amber-400 border-amber-500/40' : order.status === 'cleaning' ? 'bg-blue-500/20 text-blue-400 border-blue-500/40' : 'bg-muted text-muted-foreground';
+                const isMyOrder = order.accepted_by === empId;
+
+                return (
+                  <div key={order.id} className="border border-border rounded-lg p-3 bg-card space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="font-display text-sm tracking-wider text-foreground">{order.unit_name}</span>
+                        {order.accepted_by_name && (
+                          <p className="font-body text-xs text-muted-foreground">Assigned: {order.accepted_by_name}</p>
+                        )}
+                        {order.accepted_at && (
+                          <p className="font-body text-[10px] text-muted-foreground flex items-center gap-1">
+                            <Clock className="w-3 h-3" /> {format(new Date(order.accepted_at), 'h:mm a')}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <Badge className={`font-body text-xs ${hkStatusColor}`}>{hkStatusLabel}</Badge>
+                        {order.priority === 'urgent' && (
+                          <Badge className="bg-destructive text-destructive-foreground font-body text-[10px]">Urgent</Badge>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      {/* Force Ready for managers */}
+                      {canDoManage && (
+                        <Button size="sm" variant="outline" onClick={() => handleForceReady(units.find((u: any) => u.name === order.unit_name) || { id: '', name: order.unit_name })}
+                          disabled={!!forcingReady}
+                          className="font-display text-[10px] tracking-wider min-h-[32px] border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10">
+                          <ShieldCheck className="w-3 h-3 mr-0.5" /> Force Ready
+                        </Button>
+                      )}
+                      {/* Accept / Continue for housekeeping staff */}
+                      {hasHousekeepingAccess && !order.accepted_by && (
+                        <Button size="sm" onClick={() => setAcceptingHkOrderId(order.id)}
+                          className="font-display text-[10px] tracking-wider min-h-[32px]">
+                          Accept with PIN
+                        </Button>
+                      )}
+                      {hasHousekeepingAccess && isMyOrder && (
+                        <Button size="sm" variant="outline" onClick={() => setActiveHkOrder(order)}
+                          className="font-display text-[10px] tracking-wider min-h-[32px]">
+                          Continue →
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+
+
       <Dialog open={checkInModalOpen} onOpenChange={setCheckInModalOpen}>
         <DialogContent className="bg-card border-border max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
@@ -1043,6 +1204,15 @@ const ReceptionPage = () => {
             handleSendToClean(hkTargetUnit, empId, empName);
           }
         }}
+      />
+
+      {/* ══════ HOUSEKEEPING ACCEPT PIN MODAL ══════ */}
+      <PasswordConfirmModal
+        open={!!acceptingHkOrderId}
+        onClose={() => setAcceptingHkOrderId(null)}
+        onConfirm={handleHkAccept}
+        title="Accept Assignment"
+        description="Enter your name and PIN to accept this housekeeping assignment."
       />
     </div>
   );
