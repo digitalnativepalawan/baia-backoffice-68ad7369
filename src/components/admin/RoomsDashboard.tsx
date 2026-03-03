@@ -986,40 +986,11 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true }: { readOnl
             })}
           </div>
         )}
-      </div>
-    );
-  }
 
-  // ── BILLING TAB ──
-  if (selectedUnit && detailTab === 'billing') {
-    const booking = getActiveBooking(selectedUnit);
-    const guest = (booking as any)?.resort_ops_guests;
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center gap-3">
-          <Button size="sm" variant="ghost" onClick={() => { setSelectedUnit(null); }}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <h3 className="font-display text-lg tracking-wider text-foreground">{selectedUnit.name}</h3>
-        </div>
-        <div className="flex gap-1 flex-wrap">
-          {([
-            { key: 'info' as DetailTab, label: 'Guest', icon: Users },
-            { key: 'orders' as DetailTab, label: 'Orders', icon: UtensilsCrossed },
-            ...(canViewDocuments ? [{ key: 'documents' as DetailTab, label: 'Docs', icon: FileText }] : []),
-            { key: 'notes' as DetailTab, label: 'Notes', icon: StickyNote },
-            { key: 'tours' as DetailTab, label: 'Tours', icon: MapPin },
-            { key: 'vibe' as DetailTab, label: 'Vibe', icon: Sparkles },
-            { key: 'billing' as DetailTab, label: 'Billing', icon: DollarSign },
-          ]).map(({ key, label, icon: Icon }) => (
-            <Button key={key} size="sm" variant={detailTab === key ? 'default' : 'outline'}
-              onClick={() => { setDetailTab(key); if (key === 'vibe') setVibeMode('list'); }}
-              className="font-display text-xs tracking-wider gap-1">
-              <Icon className="w-3.5 h-3.5" /> {label}
-            </Button>
-          ))}
-        </div>
-        <RoomBillingTab unit={selectedUnit} booking={booking} guestName={guest?.full_name || null} readOnly={readOnly} />
+        {/* BILLING */}
+        {detailTab === 'billing' && (
+          <RoomBillingTab unit={selectedUnit} booking={booking} guestName={guest?.full_name || null} readOnly={readOnly} />
+        )}
       </div>
     );
   }
