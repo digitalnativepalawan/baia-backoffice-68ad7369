@@ -1,34 +1,37 @@
 
 
-## Plan: Embed Housekeeping in Reception + Force-Ready Override
+## Plan: Fresh Start — Clear All Operational Data
 
-### Problem
-Staff with both reception and housekeeping roles must switch between two separate pages. The room status flow (to_clean → ready) currently only completes via the dedicated Housekeeping page. Reception staff with manage-level access cannot override a stuck room to "Ready" in urgent situations.
+Keep all code, schema, settings, employees, menu items, categories, rooms/units, and configuration intact. Delete **data rows** from operational tables only.
 
-### Changes
+### Tables to Clear (using insert/delete tool)
 
-**1. Add Housekeeping Status Section in Reception** (`src/pages/ReceptionPage.tsx`)
+1. **Orders & related**: `orders` (all rows)
+2. **Inventory logs**: `inventory_logs`
+3. **Housekeeping orders**: `housekeeping_orders`
+4. **Audit log**: `audit_log`
+5. **Guest tours**: `guest_tours`
+6. **Guest requests**: `guest_requests`
+7. **Guest reviews**: `guest_reviews`
+8. **Guest notes**: `guest_notes`
+9. **Guest documents**: `guest_documents`
+10. **Guest vibe records**: `guest_vibe_records` and `interventions`
+11. **Employee shifts**: `employee_shifts`
+12. **Employee tasks**: `employee_tasks`
+13. **Expenses & expense history**: `expenses`, `expense_history`
+14. **Payroll payments**: `payroll_payments`
+15. **Employee bonuses**: `employee_bonuses`
 
-Below the "To Clean" rooms section, add a collapsible **Housekeeping Tracker** panel showing:
-- All active housekeeping orders (pending, inspecting, cleaning) with assigned housekeeper name and status badge
-- For staff with `housekeeping` permission: "Accept" and "Continue" buttons that open the `HousekeepingInspection` component inline (same as /housekeeper page)
-- This eliminates the need for multi-role staff to navigate to `/housekeeper`
+### What stays untouched
+- `menu_items`, `menu_categories`, `recipe_ingredients`, `ingredients` — menu stays
+- `employees`, `employee_permissions` — staff stays
+- `units`, `room_types`, `bookings` — room config stays
+- `resort_profile`, `billing_config`, `invoice_settings`, `payroll_settings` — all settings
+- `order_types`, `payment_methods`, `app_options`, `devices` — config
+- `cleaning_packages`, `cleaning_package_items`, `housekeeping_checklists` — HK config
+- `rental_rates`, `request_categories`, `tour packages` — service config
+- All edge functions, code, and schema unchanged
 
-**2. Add "Force Ready" override for manage-level users** (`src/pages/ReceptionPage.tsx`)
-
-On each `to_clean` room card in the Quick Room Status grid AND in the "To Clean" section:
-- Show a "Mark Ready" button visible only to users with `canDoManage` permission
-- Clicking it updates `units.status` to `'ready'` and marks the corresponding housekeeping order as `completed` with a note "Force-marked ready by [staff name]"
-- Log this action to audit_log for accountability
-
-**3. Remove Housekeeping tile from Index for multi-role staff** (`src/pages/Index.tsx`)
-
-No change needed here -- the tile already shows independently. Staff can still use it. But with housekeeping embedded in Reception, multi-role staff won't need to navigate away.
-
-### Technical Details
-
-- Reuse `HousekeepingInspection` component (already standalone) when a receptionist clicks "Continue" on an order they accepted
-- The `PasswordConfirmModal` already handles PIN-based acceptance
-- Force-ready will require `canManage(perms, 'reception')` check
-- No database changes needed
+### Execution
+Run DELETE statements via the data tool for each table. Order matters for any FK dependencies (e.g., `interventions` before `guest_vibe_records`, `expense_history` before `expenses`).
 
