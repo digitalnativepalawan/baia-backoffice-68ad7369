@@ -20,10 +20,11 @@ interface HousekeepingInspectionProps {
 
 const HousekeepingInspection = ({ order, onClose }: HousekeepingInspectionProps) => {
   const qc = useQueryClient();
-  const step = order.status === 'pending_inspection' || order.status === 'inspecting' ? 'inspection' : 'cleaning';
+  const derivedStep = order.status === 'pending_inspection' || order.status === 'inspecting' ? 'inspection' : 'cleaning';
+  const [currentStep, setCurrentStep] = useState(derivedStep);
 
-  // PIN confirmation state
-  const [pinAction, setPinAction] = useState<'inspection' | 'cleaning' | null>(null);
+  // PIN confirmation state — only used for cleaning completion
+  const [pinAction, setPinAction] = useState<'cleaning' | null>(null);
 
   // ── Checklist items for this room type ──
   const { data: checklistItems = [] } = useQuery({
@@ -115,7 +116,7 @@ const HousekeepingInspection = ({ order, onClose }: HousekeepingInspectionProps)
   const getIngredient = (id: string) => ingredients.find((i: any) => i.id === id);
 
   // ── Complete Inspection (called after PIN confirm) ──
-  const completeInspection = async (confirmedBy: { id: string; name: string; display_name: string }) => {
+  const completeInspection = async () => {
     setInspecting(true);
     try {
       const inspectionData = checklistItems.map((item: any) => ({
@@ -126,18 +127,21 @@ const HousekeepingInspection = ({ order, onClose }: HousekeepingInspectionProps)
         required: item.is_required,
       }));
 
+      const empName = localStorage.getItem('emp_display_name') || localStorage.getItem('emp_name') || '';
+
       await from('housekeeping_orders').update({
         status: 'cleaning',
         inspection_data: inspectionData,
         damage_notes: damageNotes,
         assigned_to: assignedTo || null,
         inspection_completed_at: new Date().toISOString(),
-        inspection_by_name: confirmedBy.display_name || confirmedBy.name,
+        inspection_by_name: empName,
       } as any).eq('id', order.id);
 
       qc.invalidateQueries({ queryKey: ['housekeeping-orders'] });
       qc.invalidateQueries({ queryKey: ['housekeeping-orders-all'] });
       toast.success('Inspection completed — proceed to cleaning');
+      setCurrentStep('cleaning');
     } catch (err: any) {
       toast.error(err.message || 'Failed to complete inspection');
     } finally {
@@ -209,11 +213,7 @@ const HousekeepingInspection = ({ order, onClose }: HousekeepingInspectionProps)
   };
 
   const handlePinConfirm = (employee: { id: string; name: string; display_name: string }) => {
-    if (pinAction === 'inspection') {
-      completeInspection(employee);
-    } else if (pinAction === 'cleaning') {
-      completeCleaning(employee);
-    }
+    completeCleaning(employee);
     setPinAction(null);
   };
 
@@ -225,7 +225,7 @@ const HousekeepingInspection = ({ order, onClose }: HousekeepingInspectionProps)
         </Button>
         <div>
           <h3 className="font-display text-lg tracking-wider text-foreground">
-            {step === 'inspection' ? 'Room Inspection' : 'Cleaning'}
+            {currentStep === 'inspection' ? 'Room Inspection' : 'Cleaning'}
           </h3>
           <p className="font-body text-xs text-muted-foreground">{order.unit_name}</p>
         </div>
@@ -233,11 +233,11 @@ const HousekeepingInspection = ({ order, onClose }: HousekeepingInspectionProps)
 
       {/* Step indicator */}
       <div className="flex gap-2">
-        <div className={`flex-1 h-1.5 rounded-full ${step === 'inspection' ? 'bg-amber-500' : 'bg-emerald-500'}`} />
-        <div className={`flex-1 h-1.5 rounded-full ${step === 'cleaning' ? 'bg-amber-500' : 'bg-muted'}`} />
+        <div className={`flex-1 h-1.5 rounded-full ${currentStep === 'inspection' ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+        <div className={`flex-1 h-1.5 rounded-full ${currentStep === 'cleaning' ? 'bg-amber-500' : 'bg-muted'}`} />
       </div>
 
-      {step === 'inspection' ? (
+      {currentStep === 'inspection' ? (
         <div className="space-y-4">
           {/* Assign housekeeper */}
           <div>
@@ -303,7 +303,7 @@ const HousekeepingInspection = ({ order, onClose }: HousekeepingInspectionProps)
           </div>
 
           <Button
-            onClick={() => setPinAction('inspection')}
+            onClick={completeInspection}
             disabled={inspecting}
             className="w-full font-display tracking-wider min-h-[44px]"
           >
@@ -392,11 +392,8 @@ const HousekeepingInspection = ({ order, onClose }: HousekeepingInspectionProps)
         open={!!pinAction}
         onClose={() => setPinAction(null)}
         onConfirm={handlePinConfirm}
-        title={pinAction === 'inspection' ? 'Confirm Inspection' : 'Confirm Cleaning Complete'}
-        description={pinAction === 'inspection'
-          ? 'Enter your PIN to confirm the inspection is complete.'
-          : 'Enter your PIN to confirm cleaning is done and mark the room as ready.'
-        }
+        title="Confirm Cleaning Complete"
+        description="Enter your PIN to confirm cleaning is done and mark the room as ready."
       />
     </div>
   );
