@@ -22,6 +22,8 @@ const HousekeepingInspection = ({ order, onClose }: HousekeepingInspectionProps)
   const qc = useQueryClient();
   const derivedStep = order.status === 'pending_inspection' || order.status === 'inspecting' ? 'inspection' : 'cleaning';
   const [currentStep, setCurrentStep] = useState(derivedStep);
+  // Guard: once we move to 'cleaning', never go back even if order re-renders with old status
+  const [lockedStep, setLockedStep] = useState(false);
 
   // PIN confirmation state — only used for cleaning completion
   const [pinAction, setPinAction] = useState<'cleaning' | null>(null);
@@ -138,10 +140,14 @@ const HousekeepingInspection = ({ order, onClose }: HousekeepingInspectionProps)
         inspection_by_name: empName,
       } as any).eq('id', order.id);
 
-      qc.invalidateQueries({ queryKey: ['housekeeping-orders'] });
-      qc.invalidateQueries({ queryKey: ['housekeeping-orders-all'] });
-      toast.success('Inspection completed — proceed to cleaning');
+      // Set step BEFORE invalidating queries to prevent re-mount resetting state
       setCurrentStep('cleaning');
+      toast.success('Inspection completed — proceed to cleaning');
+      // Delay query invalidation so React processes the state update first
+      setTimeout(() => {
+        qc.invalidateQueries({ queryKey: ['housekeeping-orders'] });
+        qc.invalidateQueries({ queryKey: ['housekeeping-orders-all'] });
+      }, 300);
     } catch (err: any) {
       toast.error(err.message || 'Failed to complete inspection');
     } finally {
