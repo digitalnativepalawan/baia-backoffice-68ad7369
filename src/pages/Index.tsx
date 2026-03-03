@@ -77,12 +77,13 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-navy-texture flex flex-col items-center justify-center px-6">
       {profile?.logo_url && (
-        <img
-          src={profile.logo_url}
-          alt={profile.resort_name || 'Resort logo'}
-          style={{ width: logoSize, height: logoSize }}
-          className="object-contain mb-6"
-        />
+        <div className="mb-6 rounded-lg overflow-hidden" style={{ width: logoSize, height: logoSize, backgroundColor: 'hsl(220, 35%, 8%)' }}>
+          <img
+            src={profile.logo_url}
+            alt={profile.resort_name || 'Resort logo'}
+            className="w-full h-full object-contain"
+          />
+        </div>
       )}
 
       {profile?.resort_name && (
