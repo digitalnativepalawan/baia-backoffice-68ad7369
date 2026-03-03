@@ -125,6 +125,11 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true }: { readOnl
     },
   });
 
+  // Get unit status — must be declared before getActiveBooking which depends on it
+  const getUnitStatus = (unit: any): 'occupied' | 'to_clean' | 'ready' => {
+    return (unit as any).status || 'ready';
+  };
+
   // Resolve resort_ops_unit for a room name
   const resolveResortUnit = (roomName: string) => {
     return resortUnits.find((ru: any) => ru.name.toLowerCase().trim() === roomName.toLowerCase().trim());
@@ -301,11 +306,6 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true }: { readOnl
   const getUnitVibeRisk = (unitName: string) => {
     const records = vibeRecords.filter((v: any) => v.unit_name === unitName && !v.checked_out);
     return records.some((v: any) => (v.review_risk_level || []).includes('High'));
-  };
-
-  // Get unit status
-  const getUnitStatus = (unit: any): 'occupied' | 'to_clean' | 'ready' => {
-    return (unit as any).status || 'ready';
   };
 
   // Get latest housekeeping order for unit (only latest per unit)
