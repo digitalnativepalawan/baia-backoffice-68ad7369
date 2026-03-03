@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { hasAccess } from '@/lib/permissions';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { LogIn, LogOut, DoorOpen } from 'lucide-react';
+import { LogIn, LogOut, DoorOpen, ConciergeBell, Palmtree } from 'lucide-react';
 import { toast } from 'sonner';
 
 const STAFF_SESSION_KEY = 'staff_home_session';
@@ -150,6 +150,22 @@ const Index = () => {
                 className="font-display text-sm tracking-wider py-3 border border-foreground/10 text-cream-dim hover:bg-foreground/5 transition-colors"
               >
                 🧹 Housekeeping
+              </button>
+            )}
+            {(session.isAdmin || hasAccess(session.permissions || [], 'reception')) && (
+              <button
+                onClick={() => navigate('/reception')}
+                className="flex items-center justify-center gap-2 font-display text-sm tracking-wider py-3 border border-foreground/10 text-cream-dim hover:bg-foreground/5 transition-colors"
+              >
+                <ConciergeBell className="w-4 h-4" /> Reception
+              </button>
+            )}
+            {(session.isAdmin || hasAccess(session.permissions || [], 'experiences')) && (
+              <button
+                onClick={() => navigate('/experiences')}
+                className="flex items-center justify-center gap-2 font-display text-sm tracking-wider py-3 border border-foreground/10 text-cream-dim hover:bg-foreground/5 transition-colors"
+              >
+                <Palmtree className="w-4 h-4" /> Experiences
               </button>
             )}
             {session.isAdmin && (

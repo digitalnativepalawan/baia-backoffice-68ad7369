@@ -10,6 +10,8 @@ const GRANULAR_PERMISSIONS = [
   { key: 'kitchen', label: 'Kitchen Display' },
   { key: 'bar', label: 'Bar Display' },
   { key: 'housekeeping', label: 'Housekeeping' },
+  { key: 'reception', label: 'Reception' },
+  { key: 'experiences', label: 'Experiences' },
   { key: 'reports', label: 'Reports' },
   { key: 'inventory', label: 'Inventory' },
   { key: 'payroll', label: 'Payroll' },
@@ -21,16 +23,21 @@ const GRANULAR_PERMISSIONS = [
   { key: 'timesheet', label: 'Timesheet' },
 ] as const;
 
+/** Sections that support 3-level (view/edit/manage) permissions */
+const THREE_LEVEL_SECTIONS = new Set(['reception', 'experiences']);
+
 const LEVEL_LABELS: Record<PermissionLevel, string> = {
   off: 'Off',
   view: 'View',
   edit: 'Edit',
+  manage: 'Manage',
 };
 
 const LEVEL_COLORS: Record<PermissionLevel, string> = {
   off: 'bg-muted text-muted-foreground',
   view: 'bg-blue-600/20 text-blue-400 border-blue-500/40',
   edit: 'bg-emerald-600/20 text-emerald-400 border-emerald-500/40',
+  manage: 'bg-purple-600/20 text-purple-400 border-purple-500/40',
 };
 
 const StaffAccessManager = () => {
@@ -69,21 +76,27 @@ const StaffAccessManager = () => {
     toast.success('Permission updated');
   };
 
-  /** Cycle a section permission: off → view → edit → off */
+  /** Cycle a section permission: off → view → edit → (manage →) off */
   const cyclePermission = async (empId: string, section: string) => {
     const empPerms = getEmpPermissions(empId);
     const current = getPermissionLevel(empPerms, section);
+    const isThreeLevel = THREE_LEVEL_SECTIONS.has(section);
 
     // Remove existing permissions for this section
     const toRemove = permissions.filter(
-      p => p.employee_id === empId && (p.permission === section || p.permission === `${section}:view` || p.permission === `${section}:edit`)
+      p => p.employee_id === empId && (p.permission === section || p.permission === `${section}:view` || p.permission === `${section}:edit` || p.permission === `${section}:manage`)
     );
     for (const p of toRemove) {
       await (supabase.from('employee_permissions' as any) as any).delete().eq('id', p.id);
     }
 
     // Insert next level
-    const nextLevel: PermissionLevel = current === 'off' ? 'view' : current === 'view' ? 'edit' : 'off';
+    let nextLevel: PermissionLevel;
+    if (isThreeLevel) {
+      nextLevel = current === 'off' ? 'view' : current === 'view' ? 'edit' : current === 'edit' ? 'manage' : 'off';
+    } else {
+      nextLevel = current === 'off' ? 'view' : current === 'view' ? 'edit' : 'off';
+    }
     if (nextLevel !== 'off') {
       await (supabase.from('employee_permissions' as any) as any).insert({
         employee_id: empId,
@@ -113,7 +126,7 @@ const StaffAccessManager = () => {
     <section>
       <h3 className="font-display text-sm tracking-wider text-foreground mb-2">Staff Access</h3>
       <p className="font-body text-xs text-muted-foreground mb-4">
-        Tap each section badge to cycle: <span className="text-muted-foreground">Off</span> → <span className="text-blue-400">View</span> → <span className="text-emerald-400">Edit</span> → Off
+        Tap each section badge to cycle: <span className="text-muted-foreground">Off</span> → <span className="text-blue-400">View</span> → <span className="text-emerald-400">Edit</span> → <span className="text-purple-400">Manage</span> (Reception/Experiences) → Off
       </p>
       <div className="space-y-4">
         {employees.map((emp: any) => {
