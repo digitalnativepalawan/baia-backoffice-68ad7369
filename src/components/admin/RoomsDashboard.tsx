@@ -645,7 +645,13 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
                     ) : !readOnly ? (
                       <>
                         <p className="font-body text-xs text-muted-foreground">Check in a guest to enable full room management.</p>
-                        <Button size="sm" onClick={() => setShowCheckInForm(true)}
+                        <Button size="sm" onClick={() => {
+                          const rt = roomTypes.find((r: any) => r.id === selectedUnit?.room_type_id);
+                          if (rt?.base_rate) {
+                            setCheckInForm(prev => ({ ...prev, roomRate: String(rt.base_rate) }));
+                          }
+                          setShowCheckInForm(true);
+                        }}
                           className="font-display text-xs tracking-wider min-h-[44px]">
                           <LogIn className="w-4 h-4 mr-2" /> Check In Guest
                         </Button>
