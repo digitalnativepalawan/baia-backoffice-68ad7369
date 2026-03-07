@@ -209,7 +209,7 @@ const HousekeepingInspection = ({ order, onClose }: HousekeepingInspectionProps)
       qc.invalidateQueries({ queryKey: ['housekeeping-orders-all'] });
       qc.invalidateQueries({ queryKey: ['rooms-units'] });
       qc.invalidateQueries({ queryKey: ['ingredients'] });
-      toast.success(`${order.unit_name} is now ready!`);
+      toast.success(`✅ ${order.unit_name} is now READY — Reception updated automatically`, { duration: 5000 });
       onClose();
     } catch (err: any) {
       toast.error(err.message || 'Failed to complete cleaning');

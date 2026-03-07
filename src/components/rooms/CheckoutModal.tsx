@@ -7,8 +7,9 @@ import { Separator } from '@/components/ui/separator';
 import { usePaymentMethods } from '@/hooks/usePaymentMethods';
 import { supabase } from '@/integrations/supabase/client';
 import { logAudit } from '@/lib/auditLog';
+import { openWhatsApp } from '@/lib/messenger';
 import { toast } from 'sonner';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { RoomTransaction } from '@/hooks/useRoomTransactions';
 
 interface CheckoutModalProps {
@@ -30,6 +31,25 @@ const CheckoutModal = ({ open, onOpenChange, unitId, unitName, guestName, bookin
   const [paymentMethod, setPaymentMethod] = useState('');
   const [paymentAmount, setPaymentAmount] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [selectedHousekeeper, setSelectedHousekeeper] = useState('');
+
+  // Fetch housekeeping employees
+  const { data: hkEmployees = [] } = useQuery({
+    queryKey: ['housekeeping-employees'],
+    queryFn: async () => {
+      const { data: perms } = await supabase.from('employee_permissions')
+        .select('employee_id')
+        .like('permission', 'housekeeping%');
+      const hkIds = new Set((perms || []).map((p: any) => p.employee_id));
+      const { data: emps } = await supabase.from('employees')
+        .select('id, name, display_name, whatsapp_number, preferred_contact_method')
+        .eq('active', true)
+        .order('name');
+      const all = (emps || []) as any[];
+      const filtered = all.filter(e => hkIds.has(e.id));
+      return filtered.length > 0 ? filtered : all;
+    },
+  });
 
   const charges = transactions.filter(t => t.total_amount > 0);
   const payments = transactions.filter(t => t.total_amount < 0);
@@ -37,7 +57,6 @@ const CheckoutModal = ({ open, onOpenChange, unitId, unitName, guestName, bookin
   const totalPayments = Math.abs(payments.reduce((s, t) => s + t.total_amount, 0));
   const balance = totalCharges - totalPayments;
 
-  // Room charge from booking
   const nights = booking ? Math.max(1, Math.ceil((new Date(booking.check_out).getTime() - new Date(booking.check_in).getTime()) / 86400000)) : 0;
   const roomRate = booking ? Number(booking.room_rate) : 0;
 
@@ -45,7 +64,6 @@ const CheckoutModal = ({ open, onOpenChange, unitId, unitName, guestName, bookin
     setSubmitting(true);
     try {
       const finalAmount = parseFloat(paymentAmount) || 0;
-      // Record final payment if any
       if (finalAmount > 0 && paymentMethod) {
         await (supabase.from('room_transactions' as any) as any).insert({
           unit_id: unitId,
@@ -63,36 +81,55 @@ const CheckoutModal = ({ open, onOpenChange, unitId, unitName, guestName, bookin
         });
       }
 
-      // Update booking checkout date
       if (bookingId) {
         const today = new Date().toISOString().split('T')[0];
         await supabase.from('resort_ops_bookings').update({ check_out: today } as any).eq('id', bookingId);
       }
 
-      // Set unit status to to_clean
       await supabase.from('units').update({ status: 'to_clean' } as any).eq('id', unitId);
 
-      // Idempotent: check for existing open housekeeping order before creating
+      // Create housekeeping order with assignment
       const { data: existingOrders } = await (supabase.from('housekeeping_orders' as any) as any)
         .select('id')
         .eq('unit_name', unitName)
         .neq('status', 'completed');
-      
+
+      const hkEmployee = hkEmployees.find((e: any) => e.id === selectedHousekeeper);
+
       if (!existingOrders || existingOrders.length === 0) {
         await (supabase.from('housekeeping_orders' as any) as any).insert({
           unit_name: unitName,
           room_type_id: roomTypeId || null,
           status: 'pending_inspection',
+          assigned_to: selectedHousekeeper || null,
+          accepted_by: selectedHousekeeper || null,
+          accepted_by_name: hkEmployee ? (hkEmployee.display_name || hkEmployee.name) : '',
+          accepted_at: selectedHousekeeper ? new Date().toISOString() : null,
         });
+      } else if (selectedHousekeeper) {
+        await (supabase.from('housekeeping_orders' as any) as any).update({
+          assigned_to: selectedHousekeeper,
+          accepted_by: selectedHousekeeper,
+          accepted_by_name: hkEmployee ? (hkEmployee.display_name || hkEmployee.name) : '',
+          accepted_at: new Date().toISOString(),
+        }).eq('id', existingOrders[0].id);
       }
 
-      await logAudit('updated', 'units', unitId, `Checkout completed for ${guestName || 'Guest'} in ${unitName}`);
+      // Send WhatsApp notification to assigned housekeeper
+      if (hkEmployee && hkEmployee.whatsapp_number) {
+        const staffName = localStorage.getItem('emp_name') || 'Reception';
+        const msg = `🧹 *Room ${unitName} needs cleaning*\n\nGuest "${guestName || 'Guest'}" has checked out.\nAssigned to you by ${staffName}.\n\nPlease start when ready.`;
+        openWhatsApp(hkEmployee.whatsapp_number, msg);
+      }
+
+      await logAudit('updated', 'units', unitId, `Checkout completed for ${guestName || 'Guest'} in ${unitName}${hkEmployee ? ` — assigned to ${hkEmployee.display_name || hkEmployee.name}` : ''}`);
 
       qc.invalidateQueries({ queryKey: ['room-transactions', unitId] });
       qc.invalidateQueries({ queryKey: ['rooms-bookings'] });
       qc.invalidateQueries({ queryKey: ['rooms-units'] });
       qc.invalidateQueries({ queryKey: ['housekeeping-orders'] });
-      toast.success('Checkout complete — housekeeping order created');
+      qc.invalidateQueries({ queryKey: ['housekeeping-orders-all'] });
+      toast.success(`Checkout complete${hkEmployee ? ` — ${hkEmployee.display_name || hkEmployee.name} notified` : ''}`);
       onOpenChange(false);
     } catch {
       toast.error('Checkout failed');
@@ -177,6 +214,32 @@ const CheckoutModal = ({ open, onOpenChange, unitId, unitName, guestName, bookin
                 className="bg-secondary border-border text-foreground font-body" />
             </div>
           )}
+
+          {/* Assign Housekeeper */}
+          <div className="border border-amber-500/30 bg-amber-500/5 rounded-lg p-3 space-y-2">
+            <p className="font-display text-xs tracking-wider text-amber-400 uppercase">🧹 Assign Housekeeper</p>
+            <Select onValueChange={setSelectedHousekeeper} value={selectedHousekeeper}>
+              <SelectTrigger className="bg-secondary border-border text-foreground font-body">
+                <SelectValue placeholder="Select housekeeper (optional)" />
+              </SelectTrigger>
+              <SelectContent className="bg-card border-border">
+                {hkEmployees.map((e: any) => (
+                  <SelectItem key={e.id} value={e.id} className="text-foreground font-body">
+                    {e.display_name || e.name}
+                    {e.whatsapp_number ? ' 📱' : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedHousekeeper && (() => {
+              const emp = hkEmployees.find((e: any) => e.id === selectedHousekeeper);
+              return emp?.whatsapp_number ? (
+                <p className="font-body text-xs text-emerald-400">✓ Will notify via WhatsApp on checkout</p>
+              ) : (
+                <p className="font-body text-xs text-muted-foreground">No WhatsApp number — assignment only</p>
+              );
+            })()}
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} className="font-display text-xs tracking-wider">Cancel</Button>

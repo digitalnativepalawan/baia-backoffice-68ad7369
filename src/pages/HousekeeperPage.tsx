@@ -3,10 +3,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, CheckCircle, Clock, ClipboardCheck, BarChart3 } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Clock, ClipboardCheck, BarChart3, UserCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { format, startOfMonth, differenceInMinutes } from 'date-fns';
+import { format, startOfMonth } from 'date-fns';
 import PasswordConfirmModal from '@/components/housekeeping/PasswordConfirmModal';
 import HousekeepingInspection from '@/components/admin/HousekeepingInspection';
 
@@ -21,37 +21,42 @@ const HousekeeperPage = () => {
   const empId = localStorage.getItem('emp_id');
   const empName = localStorage.getItem('emp_name') || 'Housekeeper';
 
-  // All housekeeping orders
   const { data: allOrders = [] } = useQuery({
     queryKey: ['housekeeping-orders-all'],
     queryFn: async () => {
       const { data } = await from('housekeeping_orders').select('*').order('created_at', { ascending: false });
       return (data || []) as any[];
     },
-    refetchInterval: 15000,
+    refetchInterval: 5000,
   });
 
-  // Derive latest order per unit (ignore stale duplicates)
+  // Derive latest order per unit
   const latestByUnit = new Map<string, any>();
   allOrders.filter((o: any) => o.status !== 'completed').forEach((o: any) => {
     if (!latestByUnit.has(o.unit_name)) latestByUnit.set(o.unit_name, o);
   });
 
-  // Pending (unassigned) — only latest per unit
-  const pendingOrders = Array.from(latestByUnit.values()).filter((o: any) => !o.accepted_by);
+  // Separate: assigned to me vs unassigned pending
+  const allActive = Array.from(latestByUnit.values());
+  const myAssigned = allActive.filter((o: any) => (o.assigned_to === empId || o.accepted_by === empId) && !o.accepted_by);
+  const pendingOrders = allActive.filter((o: any) => !o.accepted_by);
+  const myInProgress = allActive.filter((o: any) => o.accepted_by === empId);
 
-  // My in-progress — only latest per unit
-  const myInProgress = Array.from(latestByUnit.values()).filter((o: any) => o.accepted_by === empId);
+  // Sort: urgent first, then assigned-to-me first
+  const sortOrders = (orders: any[]) => orders.sort((a, b) => {
+    const aPri = a.priority === 'urgent' ? 0 : a.priority === 'high' ? 1 : 2;
+    const bPri = b.priority === 'urgent' ? 0 : b.priority === 'high' ? 1 : 2;
+    if (aPri !== bPri) return aPri - bPri;
+    const aAssigned = a.assigned_to === empId ? 0 : 1;
+    const bAssigned = b.assigned_to === empId ? 0 : 1;
+    return aAssigned - bAssigned;
+  });
 
-  // My completed today
   const today = new Date().toISOString().split('T')[0];
   const myCompletedToday = allOrders.filter((o: any) =>
-    o.accepted_by === empId &&
-    o.status === 'completed' &&
-    o.cleaning_completed_at?.startsWith(today)
+    o.accepted_by === empId && o.status === 'completed' && o.cleaning_completed_at?.startsWith(today)
   );
 
-  // Sync activeOrder with latest query data so props stay current
   useEffect(() => {
     if (activeOrder) {
       const fresh = allOrders.find((o: any) => o.id === activeOrder.id);
@@ -61,12 +66,9 @@ const HousekeeperPage = () => {
     }
   }, [allOrders, activeOrder]);
 
-  // My stats this month
   const monthStart = startOfMonth(new Date()).toISOString();
   const myCompletedMonth = allOrders.filter((o: any) =>
-    o.accepted_by === empId &&
-    o.status === 'completed' &&
-    o.cleaning_completed_at >= monthStart
+    o.accepted_by === empId && o.status === 'completed' && o.cleaning_completed_at >= monthStart
   );
   const avgTime = myCompletedMonth.length > 0
     ? Math.round(myCompletedMonth.reduce((sum: number, o: any) => sum + (o.time_to_complete_minutes || 0), 0) / myCompletedMonth.length)
@@ -81,11 +83,8 @@ const HousekeeperPage = () => {
         accepted_at: new Date().toISOString(),
         status: 'pending_inspection',
       } as any).eq('id', acceptingOrderId);
-
-      // Update emp_id/emp_name in localStorage for this session
       localStorage.setItem('emp_id', employee.id);
       localStorage.setItem('emp_name', employee.name);
-
       qc.invalidateQueries({ queryKey: ['housekeeping-orders-all'] });
       toast.success(`Accepted — ${employee.display_name || employee.name}`);
     } catch (err: any) {
@@ -134,25 +133,41 @@ const HousekeeperPage = () => {
           <p className="font-body text-xs text-muted-foreground">No pending assignments</p>
         ) : (
           <div className="space-y-2">
-            {pendingOrders.map((order: any) => (
-              <div key={order.id} className="border border-border rounded-lg p-4 bg-card">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-display text-base tracking-wider text-foreground">{order.unit_name}</span>
-                  <Badge className={priorityColor(order.priority || 'normal')} variant="secondary">
-                    {order.priority || 'normal'}
-                  </Badge>
+            {sortOrders(pendingOrders).map((order: any) => {
+              const isAssignedToMe = order.assigned_to === empId;
+              return (
+                <div key={order.id} className={`border rounded-lg p-4 bg-card ${
+                  order.priority === 'urgent' ? 'border-destructive/60 bg-destructive/5' :
+                  isAssignedToMe ? 'border-primary/50 bg-primary/5' : 'border-border'
+                }`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-display text-base tracking-wider text-foreground">{order.unit_name}</span>
+                      {isAssignedToMe && (
+                        <Badge className="bg-primary/20 text-primary border-primary/40 font-body text-[10px]">
+                          <UserCheck className="w-3 h-3 mr-0.5" /> Assigned to you
+                        </Badge>
+                      )}
+                    </div>
+                    <Badge className={priorityColor(order.priority || 'normal')} variant="secondary">
+                      {order.priority || 'normal'}
+                    </Badge>
+                  </div>
+                  <p className="font-body text-xs text-muted-foreground mb-3">
+                    Created: {format(new Date(order.created_at), 'h:mm a')}
+                  </p>
+                  <Button
+                    onClick={() => setAcceptingOrderId(order.id)}
+                    className={`w-full font-display tracking-wider text-sm min-h-[52px] ${
+                      isAssignedToMe ? 'bg-primary hover:bg-primary/90 animate-pulse' : ''
+                    }`}
+                    size="lg"
+                  >
+                    ✋ Accept with PIN
+                  </Button>
                 </div>
-                <p className="font-body text-xs text-muted-foreground mb-3">
-                  Created: {format(new Date(order.created_at), 'h:mm a')}
-                </p>
-                <Button
-                  onClick={() => setAcceptingOrderId(order.id)}
-                  className="w-full font-display tracking-wider min-h-[44px]"
-                >
-                  Accept with PIN
-                </Button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
@@ -167,11 +182,11 @@ const HousekeeperPage = () => {
         ) : (
           <div className="space-y-2">
             {myInProgress.map((order: any) => (
-              <div key={order.id} className="border border-border rounded-lg p-4 bg-card">
+              <div key={order.id} className="border border-primary/40 rounded-lg p-4 bg-card">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-display text-base tracking-wider text-foreground">{order.unit_name}</span>
                   <Badge variant="outline" className="font-body text-xs">
-                    {order.status === 'cleaning' ? 'Cleaning' : 'Inspection'}
+                    {order.status === 'cleaning' ? '🧹 Cleaning' : '🔍 Inspection'}
                   </Badge>
                 </div>
                 {order.accepted_at && (
@@ -181,8 +196,8 @@ const HousekeeperPage = () => {
                 )}
                 <Button
                   onClick={() => setActiveOrder(order)}
-                  variant="outline"
-                  className="w-full font-display tracking-wider min-h-[44px]"
+                  className="w-full font-display tracking-wider text-sm min-h-[52px]"
+                  size="lg"
                 >
                   Continue →
                 </Button>
