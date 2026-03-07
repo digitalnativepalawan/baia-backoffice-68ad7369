@@ -14,6 +14,7 @@ import RoomsDashboard from '@/components/admin/RoomsDashboard';
 import WeeklyScheduleManager from '@/components/admin/WeeklyScheduleManager';
 import TimesheetDashboard from '@/components/admin/TimesheetDashboard';
 import HousekeepingConfig from '@/components/admin/HousekeepingConfig';
+import RoomSetup from '@/components/admin/RoomSetup';
 import DepartmentOrdersView from '@/components/DepartmentOrdersView';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -300,6 +301,7 @@ const ManagerPage = () => {
           {hasAccess(permissions, 'setup') && (
             <TabsContent value="setup">
               <div className={readOnly('setup') ? 'pointer-events-none opacity-70' : ''}>
+                <RoomSetup />
                 <HousekeepingConfig />
               </div>
             </TabsContent>

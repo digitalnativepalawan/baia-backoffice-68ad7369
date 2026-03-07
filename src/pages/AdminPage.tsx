@@ -29,6 +29,7 @@ import AdminLoginGate from '@/components/admin/AdminLoginGate';
 import TimesheetDashboard from '@/components/admin/TimesheetDashboard';
 import WeeklyScheduleManager from '@/components/admin/WeeklyScheduleManager';
 import HousekeepingConfig from '@/components/admin/HousekeepingConfig';
+import RoomSetup from '@/components/admin/RoomSetup';
 import DeviceManager from '@/components/admin/DeviceManager';
 import BillingConfigForm from '@/components/admin/BillingConfigForm';
 import AuditLogView from '@/components/admin/AuditLogView';
@@ -557,6 +558,7 @@ const AdminPage = () => {
               </div>
             </section>
             <DeviceManager />
+            <RoomSetup />
             <HousekeepingConfig />
             <StaffAccessManager />
             <EmployeeContactConfig />
