@@ -119,6 +119,12 @@ const WeeklyScheduleManager = ({ readOnly = false }: { readOnly?: boolean }) => 
   // Keep deleteIdRef in sync
   useEffect(() => { deleteIdRef.current = deleteId; }, [deleteId]);
 
+  // Expose setDeleteId so ShiftModal can trigger delete
+  useEffect(() => {
+    (window as any).__scheduleDeleteId = setDeleteId;
+    return () => { delete (window as any).__scheduleDeleteId; };
+  }, []);
+
   const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ['employees-schedule'],
     queryFn: async () => {
@@ -1067,6 +1073,12 @@ const ShiftModal = ({ shiftModal, shiftForm, setShiftForm, employees, saveShift,
           </div>
         </div>
       </div>
+      {shiftModal?.mode === 'edit' && (
+        <Button variant="destructive" className="w-full font-display text-xs min-h-[44px]"
+          onClick={() => { if (shiftModal.schedule) { onClose(); setTimeout(() => (window as any).__scheduleDeleteId?.(shiftModal.schedule.id), 50); } }}>
+          <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete This Shift
+        </Button>
+      )}
       <div className="flex gap-2 pt-2">
         <Button variant="outline" className="flex-1 font-display text-xs" onClick={onClose}>Cancel</Button>
         <Button variant="outline" className="font-display text-xs" onClick={addBrokenShift}>

@@ -35,6 +35,8 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
   const [stockWarning, setStockWarning] = useState<Shortage[]>([]);
   const [overrideStock, setOverrideStock] = useState(false);
   const [scheduleMode, setScheduleMode] = useState<'asap' | 'scheduled'>('asap');
+  const [tabMode, setTabMode] = useState<'new' | 'existing'>('new');
+  const [selectedTabId, setSelectedTabId] = useState('');
   const [scheduledDay, setScheduledDay] = useState<'today' | 'tomorrow'>('today');
   const [scheduledHour, setScheduledHour] = useState('7');
   const [scheduledMinute, setScheduledMinute] = useState('00');
@@ -466,7 +468,7 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
                   {isStaff && selectedOrderType !== 'WalkIn' && selectedOrderType !== 'DineIn' && (
                     <div className="mt-4 pt-3 border-t border-border">
                       <p className="font-display text-sm text-foreground tracking-wider mb-2">Payment Type</p>
-                      <Select onValueChange={setPaymentType} value={paymentType}>
+                      <Select onValueChange={(v) => { setPaymentType(v); if (v !== 'Tab') { setTabMode('new'); setSelectedTabId(''); } }} value={paymentType}>
                         <SelectTrigger className="bg-secondary border-border text-foreground font-body">
                           <SelectValue placeholder="Select payment type" />
                         </SelectTrigger>
@@ -474,8 +476,14 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
                           {activePaymentMethods.map(m => (
                             <SelectItem key={m.id} value={m.name} className="text-foreground font-body">{m.name}</SelectItem>
                           ))}
+                          <SelectItem value="Tab" className="text-foreground font-body">📋 Open Tab</SelectItem>
                         </SelectContent>
                       </Select>
+
+                      {/* Tab picker when "Tab" is selected */}
+                      {paymentType === 'Tab' && (
+                        <TabPicker tabMode={tabMode} setTabMode={setTabMode} selectedTabId={selectedTabId} setSelectedTabId={setSelectedTabId} />
+                      )}
                     </div>
                   )}
 
