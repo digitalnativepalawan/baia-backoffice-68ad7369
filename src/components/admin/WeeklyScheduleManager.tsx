@@ -306,11 +306,20 @@ const WeeklyScheduleManager = ({ readOnly = false }: { readOnly?: boolean }) => 
     qc.invalidateQueries({ queryKey: ['weekly-schedules'] });
   };
 
-  const confirmDelete = async () => {
-    const idToDelete = deleteIdRef.current;
-    if (!idToDelete) return;
+  const confirmDelete = async (scheduleId?: string) => {
+    const idToDelete = scheduleId || deleteId;
+    if (!idToDelete) {
+      toast.error('No shift selected for deletion');
+      return;
+    }
+
     setDeleteId(null);
-    await supabase.from('weekly_schedules').delete().eq('id', idToDelete);
+    const { error } = await supabase.from('weekly_schedules').delete().eq('id', idToDelete);
+    if (error) {
+      toast.error(`Failed to delete shift: ${error.message}`);
+      return;
+    }
+
     qc.invalidateQueries({ queryKey: ['weekly-schedules'] });
     toast.success('Shift deleted');
   };
