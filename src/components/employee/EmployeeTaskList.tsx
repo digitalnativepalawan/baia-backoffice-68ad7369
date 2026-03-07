@@ -4,14 +4,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
-import { Plus, Check, Pencil, Trash2, X, MessageCircle, Phone } from 'lucide-react';
+import { Plus, Check, Pencil, Trash2, X, MessageCircle, Phone, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import { sendMessengerMessage, openWhatsApp } from '@/lib/messenger';
 import { useResortProfile } from '@/hooks/useResortProfile';
 
 interface Props {
-  employeeId?: string; // filter to one employee (portal) or all (admin)
+  employeeId?: string;
   createdBy?: 'admin' | 'employee';
   readOnly?: boolean;
   employees?: { id: string; name: string; messenger_link?: string; whatsapp_number?: string; active?: boolean; display_name?: string; preferred_contact_method?: string }[];
@@ -23,7 +24,8 @@ const EmployeeTaskList = ({ employeeId, createdBy = 'admin', readOnly = false, e
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState('');
-  const [assignee, setAssignee] = useState(employeeId || '');
+  const [assignees, setAssignees] = useState<string[]>(employeeId ? [employeeId] : []);
+  const [selectAll, setSelectAll] = useState(false);
   const [sendVia, setSendVia] = useState<'whatsapp' | 'messenger' | 'none'>('whatsapp');
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -31,6 +33,8 @@ const EmployeeTaskList = ({ employeeId, createdBy = 'admin', readOnly = false, e
   const [editDesc, setEditDesc] = useState('');
   const [editDue, setEditDue] = useState('');
   const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('all');
+
+  const activeEmployees = employees.filter(e => e.active !== false);
 
   const { data: tasks = [] } = useQuery({
     queryKey: ['employee-tasks', employeeId],
@@ -48,43 +52,74 @@ const EmployeeTaskList = ({ employeeId, createdBy = 'admin', readOnly = false, e
     return true;
   });
 
-  const autoSendTask = (targetId: string, taskTitle: string, taskDesc: string, taskDue: string, method: 'whatsapp' | 'messenger' | 'none') => {
+  const toggleAssignee = (id: string) => {
+    setAssignees(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    setSelectAll(false);
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    setSelectAll(checked);
+    setAssignees(checked ? activeEmployees.map(e => e.id) : []);
+  };
+
+  const bulkSendMessages = (targetIds: string[], taskTitle: string, taskDesc: string, taskDue: string, method: 'whatsapp' | 'messenger' | 'none') => {
     if (method === 'none') return;
-    const emp = employees.find(e => e.id === targetId);
-    if (!emp || emp.active === false) return;
+    let sent = 0;
+    let skipped = 0;
 
-    const displayName = emp.display_name || emp.name;
-    const due = taskDue ? `\nDue: ${format(new Date(taskDue), 'MMM d, h:mm a')}` : '';
-    const msg = `Hi ${displayName},\n\nTask: ${taskTitle}${taskDesc ? '\n' + taskDesc : ''}${due}\n\n— ${resortProfile?.resort_name || 'Resort'} Admin`;
+    targetIds.forEach((empId, idx) => {
+      const emp = employees.find(e => e.id === empId);
+      if (!emp || emp.active === false) { skipped++; return; }
 
-    if (method === 'whatsapp' && emp.whatsapp_number) {
-      openWhatsApp(emp.whatsapp_number, msg);
-    } else if (method === 'messenger' && emp.messenger_link) {
-      sendMessengerMessage(
-        { name: emp.name, display_name: emp.display_name, messenger_link: emp.messenger_link, active: true },
-        `Task: ${taskTitle}${taskDesc ? '\n' + taskDesc : ''}${due}`,
-        resortProfile?.resort_name || 'Resort'
-      );
-    }
+      const displayName = emp.display_name || emp.name;
+      const due = taskDue ? `\nDue: ${format(new Date(taskDue), 'MMM d, h:mm a')}` : '';
+      const msg = `Hi ${displayName},\n\nTask: ${taskTitle}${taskDesc ? '\n' + taskDesc : ''}${due}\n\n— ${resortProfile?.resort_name || 'Resort'} Admin`;
+
+      if (method === 'whatsapp' && emp.whatsapp_number) {
+        // Stagger opens to avoid popup blocking
+        setTimeout(() => openWhatsApp(emp.whatsapp_number!, msg), idx * 800);
+        sent++;
+      } else if (method === 'messenger' && emp.messenger_link) {
+        setTimeout(() => sendMessengerMessage(
+          { name: emp.name, display_name: emp.display_name, messenger_link: emp.messenger_link!, active: true },
+          `Task: ${taskTitle}${taskDesc ? '\n' + taskDesc : ''}${due}`,
+          resortProfile?.resort_name || 'Resort'
+        ), idx * 800);
+        sent++;
+      } else {
+        skipped++;
+      }
+    });
+
+    if (sent > 0) toast.success(`${method === 'whatsapp' ? '📱' : '💬'} Sending to ${sent} staff member${sent > 1 ? 's' : ''}`);
+    if (skipped > 0) toast.info(`${skipped} skipped (no ${method} configured)`);
   };
 
   const addTask = async () => {
-    const targetId = employeeId || assignee;
-    if (!title.trim() || !targetId) return;
-    await (supabase.from('employee_tasks' as any) as any).insert({
-      employee_id: targetId,
+    const targetIds = employeeId ? [employeeId] : (selectAll ? activeEmployees.map(e => e.id) : assignees);
+    if (!title.trim() || targetIds.length === 0) return;
+
+    const rows = targetIds.map(empId => ({
+      employee_id: empId,
       title: title.trim(),
       description: description.trim(),
       due_date: dueDate ? new Date(dueDate).toISOString() : null,
       created_by: createdBy,
-    });
+    }));
+
+    await (supabase.from('employee_tasks' as any) as any).insert(rows);
+
     const savedTitle = title.trim();
     const savedDesc = description.trim();
     const savedDue = dueDate;
+    const count = targetIds.length;
+
     setTitle(''); setDescription(''); setDueDate(''); setShowForm(false);
+    if (!employeeId) { setAssignees([]); setSelectAll(false); }
     qc.invalidateQueries({ queryKey: ['employee-tasks'] });
-    toast.success('Task added');
-    autoSendTask(targetId, savedTitle, savedDesc, savedDue, sendVia);
+    toast.success(`Task added to ${count} staff member${count > 1 ? 's' : ''}`);
+
+    bulkSendMessages(targetIds, savedTitle, savedDesc, savedDue, sendVia);
   };
 
   const toggleComplete = async (task: any) => {
@@ -134,13 +169,49 @@ const EmployeeTaskList = ({ employeeId, createdBy = 'admin', readOnly = false, e
 
       {showForm && (
         <div className="border border-primary/30 rounded-lg p-3 space-y-2">
-          {!employeeId && employees.length > 0 && (
-            <select value={assignee} onChange={e => setAssignee(e.target.value)}
-              className="w-full bg-secondary border border-border text-foreground font-body text-sm rounded-md px-3 py-2">
-              <option value="">Assign to...</option>
-              {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-            </select>
+          {/* Multi-select assignees */}
+          {!employeeId && activeEmployees.length > 0 && (
+            <div className="space-y-1.5">
+              <label className="font-body text-xs text-muted-foreground flex items-center gap-1">
+                <Users className="w-3 h-3" /> Assign to
+              </label>
+              {/* Selected badges */}
+              {assignees.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {selectAll ? (
+                    <Badge variant="default" className="font-body text-xs">All Staff ({activeEmployees.length})</Badge>
+                  ) : (
+                    assignees.map(id => (
+                      <Badge key={id} variant="secondary" className="font-body text-xs gap-1">
+                        {getEmployeeName(id)}
+                        <X className="w-3 h-3 cursor-pointer" onClick={() => toggleAssignee(id)} />
+                      </Badge>
+                    ))
+                  )}
+                </div>
+              )}
+              {/* Checkbox list */}
+              <div className="border border-border rounded-md p-2 max-h-36 overflow-y-auto space-y-1.5 bg-secondary">
+                <label className="flex items-center gap-2 cursor-pointer font-body text-sm font-semibold text-foreground">
+                  <Checkbox checked={selectAll} onCheckedChange={(c) => handleSelectAll(!!c)} />
+                  All Staff
+                </label>
+                <div className="border-t border-border my-1" />
+                {activeEmployees.map(emp => (
+                  <label key={emp.id} className="flex items-center gap-2 cursor-pointer font-body text-sm text-foreground">
+                    <Checkbox
+                      checked={assignees.includes(emp.id)}
+                      onCheckedChange={() => toggleAssignee(emp.id)}
+                    />
+                    {emp.display_name || emp.name}
+                    {emp.whatsapp_number && <span className="text-green-500 text-xs">📱</span>}
+                    {emp.messenger_link && <span className="text-blue-500 text-xs">💬</span>}
+                  </label>
+                ))}
+              </div>
+            </div>
           )}
+
           <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Task title"
             className="bg-secondary border-border text-foreground font-body text-sm" />
           <Input value={description} onChange={e => setDescription(e.target.value)} placeholder="Description (optional)"
@@ -165,7 +236,9 @@ const EmployeeTaskList = ({ employeeId, createdBy = 'admin', readOnly = false, e
           </div>
           <div className="flex gap-2">
             <Button size="sm" onClick={addTask} className="font-display text-xs tracking-wider flex-1"
-              disabled={!title.trim() || (!employeeId && !assignee)}>Save</Button>
+              disabled={!title.trim() || (!employeeId && assignees.length === 0)}>
+              {assignees.length > 1 || selectAll ? `Send to ${selectAll ? activeEmployees.length : assignees.length} staff` : 'Save'}
+            </Button>
             <Button size="sm" variant="outline" onClick={() => setShowForm(false)} className="font-display text-xs tracking-wider flex-1">Cancel</Button>
           </div>
         </div>
