@@ -603,25 +603,6 @@ const ReceptionPage = () => {
   };
 
   // ── CHECK-OUT ──
-  const [checkOutHousekeeper, setCheckOutHousekeeper] = useState('');
-
-  // Fetch housekeeping employees for checkout picker
-  const { data: hkEmployeesForCheckout = [] } = useQuery({
-    queryKey: ['housekeeping-employees'],
-    queryFn: async () => {
-      const { data: perms } = await supabase.from('employee_permissions')
-        .select('employee_id')
-        .like('permission', 'housekeeping%');
-      const hkIds = new Set((perms || []).map((p: any) => p.employee_id));
-      const { data: emps } = await supabase.from('employees')
-        .select('id, name, display_name, whatsapp_number')
-        .eq('active', true)
-        .order('name');
-      const all = (emps || []) as any[];
-      const filtered = all.filter(e => hkIds.has(e.id));
-      return filtered.length > 0 ? filtered : all;
-    },
-  });
 
   const handleCheckOut = async () => {
     if (!checkOutBooking || !checkOutUnit) return;
