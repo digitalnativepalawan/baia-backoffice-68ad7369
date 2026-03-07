@@ -816,15 +816,19 @@ const ReceptionPage = () => {
                     className="font-display text-[10px] tracking-wider min-h-[32px]">
                     <Receipt className="w-3 h-3 mr-0.5" /> Bill {billUnitId === unit.id ? <ChevronUp className="w-3 h-3 ml-0.5" /> : <ChevronDown className="w-3 h-3 ml-0.5" />}
                   </Button>
-                  {canDoEdit && (
-                    <Button size="sm" variant="outline" onClick={() => handleSendToCleanWithPicker(unit)}
-                      disabled={sendingClean === unit.id}
-                      className="font-display text-[10px] tracking-wider min-h-[32px]">
-                      <Sparkles className="w-3 h-3 mr-0.5" /> {sendingClean === unit.id ? '...' : 'Clean'}
-                    </Button>
-                  )}
-                </div>
-                {billUnitId === unit.id && <InlineBill unitId={unit.id} />}
+                   {canDoEdit && (
+                     <Button size="sm" variant="outline" onClick={() => handleSendToCleanWithPicker(unit)}
+                       disabled={sendingClean === unit.id}
+                       className="font-display text-[10px] tracking-wider min-h-[32px]">
+                       <Sparkles className="w-3 h-3 mr-0.5" /> {sendingClean === unit.id ? '...' : 'Clean'}
+                     </Button>
+                   )}
+                   <Button size="sm" variant="outline" onClick={() => { setDetailUnit(unit); setDetailSheetOpen(true); }}
+                     className="font-display text-[10px] tracking-wider min-h-[32px]">
+                     <Eye className="w-3 h-3 mr-0.5" /> Details
+                   </Button>
+                 </div>
+                 {billUnitId === unit.id && <InlineBill unitId={unit.id} />}
               </div>
             );
           })}
