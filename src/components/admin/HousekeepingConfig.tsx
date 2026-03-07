@@ -63,40 +63,8 @@ const HousekeepingConfig = () => {
     },
   });
 
-  // ── Room Types State ──
-  const [newRoomType, setNewRoomType] = useState('');
+  // ── Room Types State (preview only — CRUD moved to RoomSetup) ──
   const [previewRoomTypeId, setPreviewRoomTypeId] = useState<string | null>(null);
-  const [editingRoomTypeId, setEditingRoomTypeId] = useState<string | null>(null);
-  const [editingRoomTypeName, setEditingRoomTypeName] = useState('');
-
-  const addRoomType = async () => {
-    if (!newRoomType.trim()) return;
-    await supabase.from('room_types').insert({ name: newRoomType.trim() });
-    setNewRoomType('');
-    qc.invalidateQueries({ queryKey: ['room-types'] });
-    toast.success('Room type added');
-  };
-
-  const deleteRoomType = async (id: string) => {
-    await supabase.from('room_types').delete().eq('id', id);
-    qc.invalidateQueries({ queryKey: ['room-types'] });
-    toast.success('Room type deleted');
-  };
-
-  const saveRoomTypeName = async () => {
-    if (!editingRoomTypeId || !editingRoomTypeName.trim()) return;
-    await supabase.from('room_types').update({ name: editingRoomTypeName.trim() }).eq('id', editingRoomTypeId);
-    setEditingRoomTypeId(null);
-    setEditingRoomTypeName('');
-    qc.invalidateQueries({ queryKey: ['room-types'] });
-    toast.success('Room type updated');
-  };
-
-  const assignRoomType = async (unitId: string, roomTypeId: string | null) => {
-    await supabase.from('units').update({ room_type_id: roomTypeId } as any).eq('id', unitId);
-    qc.invalidateQueries({ queryKey: ['units-admin'] });
-    toast.success('Room type assigned');
-  };
 
   // ── Checklists State ──
   const [selectedChecklistType, setSelectedChecklistType] = useState<string>('');
