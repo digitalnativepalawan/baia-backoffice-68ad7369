@@ -1,37 +1,28 @@
 
 
-## Plan: Fix Schedule Delete & Enhance Task/Assignment Scheduling
+## Plan: Fix Lingering Orders + Seamless Checkout Cleanup
 
-### Issues Found
-
-1. **Delete button bug**: The trash icon on shift blocks triggers `setDeleteId(s.id)`, but the parent div's `onClick={() => openEdit(s)}` fires simultaneously despite `stopPropagation`. On mobile, the tiny button (3x3 icon) is nearly impossible to tap. The AlertDialog `onOpenChange={() => setDeleteId(null)}` also races with the confirm action.
-
-2. **Missing scheduling features**: The schedule only manages time shifts. There's no way to assign tasks like housecleaning, reception duty, or track completion from within the schedule view.
+### Root Problem
+The Experiences page shows **all** completed/confirmed guest requests and tour bookings indefinitely — there's no filter by active booking or checkout status. When a guest checks out, their completed requests (Rental, Transport, etc.) keep showing because the queries only exclude `cancelled`, not `completed`. The checkout flow also doesn't clean up related guest_requests/tour_bookings.
 
 ### Changes
 
-**1. Fix Delete Button** (`WeeklyScheduleManager.tsx`)
-- Make `confirmDelete` capture `deleteId` before the dialog closes by saving it in a ref or local variable
-- Increase touch target size for edit/delete buttons on shift blocks
-- Prevent edit modal from opening when clicking edit/delete icons (the `stopPropagation` exists but the parent click handler on the entire timeline area also fires)
+**1. Checkout cleanup — auto-close related requests** (`src/components/rooms/CheckoutModal.tsx`)
+- After checkout, update all `guest_requests` and `tour_bookings` linked to the same `booking_id` that are still `pending` → set them to `cancelled` (guest left, no longer actionable)
+- This prevents orphaned pending requests from lingering after checkout
 
-**2. Add Task/Assignment Creation from Schedule** (`WeeklyScheduleManager.tsx`)
-- Add an "Assign Task" button alongside "Add Shift" 
-- New modal to create a task assignment: select employee, pick type (Housecleaning, Reception, Custom), set date/time, add notes
-- For housecleaning: select a room/unit to clean, auto-creates a `housekeeping_orders` entry assigned to the selected employee
-- For other tasks: creates an `employee_tasks` entry with due date and description
-- Tasks appear as colored pills on the timeline (already partially implemented)
+**2. Experiences page — only show actionable items** (`src/pages/ExperiencesPage.tsx`)
+- **Guest Requests query**: Filter out `completed` status (only show `pending` and `confirmed`) — completed requests are historical and belong in archive, not the active dashboard
+- **Tour Bookings query**: Same — exclude `completed` status from the active view
+- Add a "Recent History" collapsible section at the bottom for completed items from the last 24 hours only, so staff can reference recent activity without clutter
+- Add date filtering: only show requests from the last 7 days max to prevent old data accumulating
 
-**3. Show Completion Info on Task Detail** (`WeeklyScheduleManager.tsx`)
-- In the task detail dialog, show who completed the task and when (`completed_at`)
-- For housekeeping pills, show completion status (`cleaning_completed_at`, `completed_by_name`)
-- Make housekeeping pills clickable to show full details (room, status, who inspected/cleaned)
-
-**4. Enhance Task Detail Dialog** (`WeeklyScheduleManager.tsx`)
-- Add edit capability: change title, description, due date, reassign to different employee
-- Add delete capability for tasks
-- Show completion audit trail
+**3. Reception page — cross-reference active bookings** (`src/pages/ReceptionPage.tsx`)
+- In any section showing guest requests or tours, cross-check against active bookings (where the unit is currently occupied) so checked-out guest data doesn't appear in active views
+- Ensure checkout invalidates experience-related query keys so the Experiences page refreshes immediately
 
 ### Files to Edit
-- `src/components/admin/WeeklyScheduleManager.tsx` — all changes in this single file
+1. `src/components/rooms/CheckoutModal.tsx` — cancel pending requests/bookings on checkout
+2. `src/pages/ExperiencesPage.tsx` — filter out completed items from active view, add recent history section
+3. `src/pages/ReceptionPage.tsx` — invalidate experience queries on checkout
 
