@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Home, Clock, LogOut, ListTodo, Banknote, Settings, Star, LayoutDashboard, CalendarDays } from 'lucide-react';
+import { Home, Clock, LogOut, ListTodo, Banknote, Settings, Star, LayoutDashboard, CalendarDays, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import EmployeeTaskList from '@/components/employee/EmployeeTaskList';
@@ -123,35 +123,27 @@ const EmployeePortal = () => {
     if (!loginName || !loginPin) return;
     setLoginLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('employee-auth', {
+      const res = await supabase.functions.invoke('employee-auth', {
         body: { action: 'verify', name: loginName, pin: loginPin },
       });
-      if (error) {
-        // Extract message from FunctionsHttpError context
-        let msg = 'Login failed';
-        try {
-          const ctx = await (error as any).context?.json?.();
-          if (ctx?.error) msg = ctx.error;
-        } catch {
-          if (typeof data === 'object' && data?.error) msg = data.error;
-        }
-        toast.error(msg);
+      const data = res.data;
+      // Success path first — if we got an employee back, login worked
+      if (data?.employee) {
+        const employee = data.employee;
+        localStorage.setItem('emp_id', employee.id);
+        localStorage.setItem('emp_name', employee.name);
+        setEmpId(employee.id);
+        setEmpName(employee.name);
+        setDisplayName(employee.display_name || '');
+        toast.success(`Welcome, ${employee.display_name || employee.name}!`);
         setLoginLoading(false);
         return;
       }
-      if (data?.error) {
-        toast.error(data.error);
-        setLoginLoading(false);
-        return;
-      }
-      const employee = data.employee;
-      localStorage.setItem('emp_id', employee.id);
-      localStorage.setItem('emp_name', employee.name);
-      setEmpId(employee.id);
-      setEmpName(employee.name);
-      setDisplayName(employee.display_name || '');
-      toast.success(`Welcome, ${employee.display_name || employee.name}!`);
+      // Error path
+      const msg = data?.error || 'Login failed';
+      toast.error(msg);
     } catch (e: any) {
+      console.error('Login error:', e);
       toast.error(e.message || 'Login failed');
     }
     setLoginLoading(false);
@@ -414,24 +406,86 @@ const EmployeePortal = () => {
 
         {/* SETTINGS TAB */}
         {tab === 'settings' && (
-          <div className="space-y-4">
-            <div className="border border-border rounded-lg p-4 space-y-3">
-              <p className="font-display text-xs tracking-wider text-foreground">Display Name</p>
-              <p className="font-body text-xs text-muted-foreground">This changes how your name appears. Login still uses your original name.</p>
-              <Input value={displayName} onChange={e => setDisplayName(e.target.value)}
-                placeholder={empName} className="bg-secondary border-border text-foreground font-body" />
-              <Button size="sm" onClick={saveDisplayName} className="font-display text-xs tracking-wider w-full">Save</Button>
-            </div>
-            <div className="border border-border rounded-lg p-4 space-y-2">
-              <p className="font-display text-xs tracking-wider text-foreground">Account Info</p>
-              <p className="font-body text-xs text-muted-foreground">Login name: <span className="text-foreground">{empName}</span></p>
-              {emp?.phone && <p className="font-body text-xs text-muted-foreground">Phone: <span className="text-foreground">{emp.phone}</span></p>}
-            </div>
-          </div>
+          <SettingsTab empId={empId} empName={empName} emp={emp} displayName={displayName} setDisplayName={setDisplayName} saveDisplayName={saveDisplayName} />
         )}
       </div>
     </div>
   );
 };
+
+/* ---------- Settings Tab with Change PIN ---------- */
+function SettingsTab({ empId, empName, emp, displayName, setDisplayName, saveDisplayName }: {
+  empId: string; empName: string; emp: any; displayName: string; setDisplayName: (v: string) => void; saveDisplayName: () => void;
+}) {
+  const [currentPin, setCurrentPin] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [pinLoading, setPinLoading] = useState(false);
+
+  const changePin = async () => {
+    if (!currentPin || !newPin || !confirmPin) return;
+    if (newPin !== confirmPin) { toast.error('New PINs do not match'); return; }
+    if (newPin.length < 4) { toast.error('PIN must be at least 4 digits'); return; }
+    setPinLoading(true);
+    try {
+      // Verify current PIN first
+      const verifyRes = await supabase.functions.invoke('employee-auth', {
+        body: { action: 'change-pin', employee_id: empId, name: empName, old_pin: currentPin, new_pin: newPin },
+      });
+      if (verifyRes.data?.error) {
+        toast.error(verifyRes.data.error);
+        setPinLoading(false);
+        return;
+      }
+      if (verifyRes.data?.success) {
+        toast.success('PIN updated successfully');
+        setCurrentPin(''); setNewPin(''); setConfirmPin('');
+      }
+    } catch {
+      toast.error('Failed to change PIN');
+    }
+    setPinLoading(false);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="border border-border rounded-lg p-4 space-y-3">
+        <p className="font-display text-xs tracking-wider text-foreground">Display Name</p>
+        <p className="font-body text-xs text-muted-foreground">This changes how your name appears. Login still uses your original name.</p>
+        <Input value={displayName} onChange={e => setDisplayName(e.target.value)}
+          placeholder={empName} className="bg-secondary border-border text-foreground font-body" />
+        <Button size="sm" onClick={saveDisplayName} className="font-display text-xs tracking-wider w-full">Save</Button>
+      </div>
+
+      {/* Change PIN */}
+      <div className="border border-border rounded-lg p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <KeyRound className="w-4 h-4 text-primary" />
+          <p className="font-display text-xs tracking-wider text-foreground">Change PIN</p>
+        </div>
+        <Input type="tel" inputMode="numeric" pattern="[0-9]*" maxLength={6}
+          value={currentPin} onChange={e => setCurrentPin(e.target.value.replace(/\D/g, ''))}
+          placeholder="Current PIN" className="bg-secondary border-border text-foreground font-body text-center text-xl tracking-[0.5em]" />
+        <Input type="tel" inputMode="numeric" pattern="[0-9]*" maxLength={6}
+          value={newPin} onChange={e => setNewPin(e.target.value.replace(/\D/g, ''))}
+          placeholder="New PIN" className="bg-secondary border-border text-foreground font-body text-center text-xl tracking-[0.5em]" />
+        <Input type="tel" inputMode="numeric" pattern="[0-9]*" maxLength={6}
+          value={confirmPin} onChange={e => setConfirmPin(e.target.value.replace(/\D/g, ''))}
+          placeholder="Confirm New PIN" className="bg-secondary border-border text-foreground font-body text-center text-xl tracking-[0.5em]"
+          onKeyDown={e => { if (e.key === 'Enter') changePin(); }} />
+        <Button size="sm" onClick={changePin} disabled={pinLoading || !currentPin || !newPin || !confirmPin}
+          className="font-display text-xs tracking-wider w-full">
+          {pinLoading ? 'Updating…' : 'Update PIN'}
+        </Button>
+      </div>
+
+      <div className="border border-border rounded-lg p-4 space-y-2">
+        <p className="font-display text-xs tracking-wider text-foreground">Account Info</p>
+        <p className="font-body text-xs text-muted-foreground">Login name: <span className="text-foreground">{empName}</span></p>
+        {emp?.phone && <p className="font-body text-xs text-muted-foreground">Phone: <span className="text-foreground">{emp.phone}</span></p>}
+      </div>
+    </div>
+  );
+}
 
 export default EmployeePortal;

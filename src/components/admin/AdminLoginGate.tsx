@@ -65,30 +65,13 @@ const AdminLoginGate = ({ children }: AdminLoginGateProps) => {
     if (!loginName.trim() || !loginPin) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('employee-auth', {
+      const res = await supabase.functions.invoke('employee-auth', {
         body: { action: 'admin-verify', name: loginName.trim(), pin: loginPin },
       });
+      const data = res.data;
 
-      if (error) {
-        let msg = 'Login failed';
-        try {
-          const ctx = await (error as any).context?.json?.();
-          if (ctx?.error) msg = ctx.error;
-        } catch {
-          if (typeof data === 'object' && data?.error) msg = data.error;
-        }
-        toast.error(msg);
-        setLoading(false);
-        return;
-      }
-
-      if (data?.error) {
-        toast.error(data.error);
-        setLoading(false);
-        return;
-      }
-
-      if (data?.isAdmin) {
+      // Success path first
+      if (data?.isAdmin && data?.employee) {
         const session = {
           name: data.employee.name,
           employeeId: data.employee.id,
@@ -99,7 +82,12 @@ const AdminLoginGate = ({ children }: AdminLoginGateProps) => {
         setAdminName(data.employee.name);
         setLoginPin('');
         toast.success(`Welcome, ${data.employee.name}`);
+        setLoading(false);
+        return;
       }
+
+      // Error path
+      toast.error(data?.error || 'Login failed');
     } catch {
       toast.error('Login failed');
     }
