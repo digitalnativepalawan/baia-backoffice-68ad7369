@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { LogOut, UtensilsCrossed, MapPin, Car, Bike, MessageSquare, Star, Receipt, ArrowLeft, ChevronRight, ClipboardList, Calendar, Clock, Users, StickyNote, CheckCircle2, Utensils, Palmtree, Truck, CreditCard, FileText, Loader2 } from 'lucide-react';
+import { LogOut, UtensilsCrossed, MapPin, Car, Bike, MessageSquare, Star, Receipt, ArrowLeft, ChevronRight, ClipboardList, Calendar, Clock, Users, StickyNote, CheckCircle2, Utensils, Palmtree, Truck, CreditCard, FileText, Loader2, ConciergeBell } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { setGuestSession } from '@/hooks/useGuestSession';
 
@@ -40,7 +40,7 @@ const GuestPortal = () => {
   const { data: profile } = useResortProfile();
   const qc = useQueryClient();
   const [session, setSession] = useState<GuestPortalSession | null>(getPortalSession);
-  const [view, setView] = useState<'dashboard' | 'menu' | 'tours' | 'transport' | 'rentals' | 'request' | 'review' | 'bill' | 'orders' | 'requests'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'menu-food' | 'menu-drinks' | 'experiences' | 'request' | 'message' | 'tours' | 'transport' | 'rentals' | 'review' | 'bill' | 'orders' | 'requests'>('dashboard');
 
   // Login state
   const [roomName, setRoomName] = useState('');
@@ -145,29 +145,91 @@ const GuestPortal = () => {
           </button>
         ) : (
           <>
-            <div className="bg-card border border-border rounded-lg p-4 mb-6">
-              <p className="font-display text-lg text-foreground">Welcome, {session.guest_name.split(' ')[0]}!</p>
-              <p className="font-body text-sm text-muted-foreground">{session.room_name} · Check-out: {new Date(session.check_out).toLocaleDateString()}</p>
+            {/* Welcome header */}
+            <div className="bg-card border border-border rounded-lg p-5 mb-6">
+              <p className="font-display text-xl text-foreground">Welcome, {session.guest_name.split(' ')[0]}!</p>
+              <p className="font-body text-sm text-muted-foreground mt-1">{session.room_name} · Check-out: {new Date(session.check_out).toLocaleDateString()}</p>
             </div>
-            <div className="grid grid-cols-2 gap-3 mb-6">
-              <Tile icon={<UtensilsCrossed className="w-5 h-5" />} label="Order Food" onClick={() => {
-                setGuestSession({ room_id: session.room_id, room_name: session.room_name, guest_name: session.guest_name, booking_id: session.booking_id });
-                navigate('/menu?mode=guest-order');
-              }} />
-              <Tile icon={<MapPin className="w-5 h-5" />} label="Book Tour" onClick={() => setView('tours')} />
-              <Tile icon={<Car className="w-5 h-5" />} label="Transport" onClick={() => setView('transport')} />
-              <Tile icon={<Bike className="w-5 h-5" />} label="Rent Scooter" onClick={() => setView('rentals')} />
-              <Tile icon={<MessageSquare className="w-5 h-5" />} label="Leave Note" onClick={() => setView('request')} />
-              <Tile icon={<Star className="w-5 h-5" />} label="Write Review" onClick={() => setView('review')} />
-              <Tile icon={<ClipboardList className="w-5 h-5" />} label="My Orders" onClick={() => setView('orders')} />
-              <Tile icon={<CheckCircle2 className="w-5 h-5" />} label="My Requests" onClick={() => setView('requests')} />
-              <Tile icon={<Receipt className="w-5 h-5" />} label="My Bill" onClick={() => setView('bill')} className="col-span-2" />
+
+            <p className="font-display text-sm tracking-wider text-muted-foreground mb-4">What can we help with?</p>
+
+            {/* 5 large concierge tiles — stacked on mobile */}
+            <div className="flex flex-col gap-3 mb-6">
+              <GuestTile
+                icon={<UtensilsCrossed className="w-6 h-6" />}
+                label="Order Food"
+                subtitle="Browse our menu and order to your room"
+                onClick={() => {
+                  setGuestSession({ room_id: session.room_id, room_name: session.room_name, guest_name: session.guest_name, booking_id: session.booking_id });
+                  navigate('/menu?mode=guest-order&dept=kitchen');
+                }}
+              />
+              <GuestTile
+                icon={<span className="text-2xl">🍹</span>}
+                label="Order Drinks"
+                subtitle="Cocktails, coffee, fresh juices & more"
+                onClick={() => {
+                  setGuestSession({ room_id: session.room_id, room_name: session.room_name, guest_name: session.guest_name, booking_id: session.booking_id });
+                  navigate('/menu?mode=guest-order&dept=bar');
+                }}
+              />
+              <GuestTile
+                icon={<Palmtree className="w-6 h-6" />}
+                label="Book Experiences"
+                subtitle="Tours, transport & equipment rental"
+                onClick={() => setView('experiences')}
+              />
+              <GuestTile
+                icon={<MessageSquare className="w-6 h-6" />}
+                label="Request Service"
+                subtitle="Housekeeping, towels, or anything you need"
+                onClick={() => setView('request')}
+              />
+              <GuestTile
+                icon={<ConciergeBell className="w-6 h-6" />}
+                label="Message Reception"
+                subtitle="Send a note directly to our front desk"
+                onClick={() => setView('message')}
+              />
             </div>
+
+            {/* Activity links — smaller, below main tiles */}
+            <div className="flex gap-3 mb-6">
+              <button onClick={() => setView('orders')} className="flex-1 bg-secondary/50 border border-border rounded-lg py-3 px-3 text-center hover:bg-secondary transition-colors">
+                <ClipboardList className="w-4 h-4 mx-auto text-muted-foreground mb-1" />
+                <span className="font-body text-xs text-muted-foreground">My Orders</span>
+              </button>
+              <button onClick={() => setView('requests')} className="flex-1 bg-secondary/50 border border-border rounded-lg py-3 px-3 text-center hover:bg-secondary transition-colors">
+                <CheckCircle2 className="w-4 h-4 mx-auto text-muted-foreground mb-1" />
+                <span className="font-body text-xs text-muted-foreground">My Requests</span>
+              </button>
+              <button onClick={() => setView('bill')} className="flex-1 bg-secondary/50 border border-border rounded-lg py-3 px-3 text-center hover:bg-secondary transition-colors">
+                <Receipt className="w-4 h-4 mx-auto text-muted-foreground mb-1" />
+                <span className="font-body text-xs text-muted-foreground">My Bill</span>
+              </button>
+            </div>
+
             <button onClick={logout} className="flex items-center justify-center gap-2 w-full font-body text-xs text-muted-foreground hover:text-foreground py-2">
               <LogOut className="w-3.5 h-3.5" /> Sign out
             </button>
           </>
         )}
+
+        {/* Experiences hub — combines tours, transport, rentals */}
+        {view === 'experiences' && (
+          <div className="space-y-4">
+            <h2 className="font-display text-lg text-foreground">Book an Experience</h2>
+            <p className="font-body text-xs text-muted-foreground">Choose from tours, transport, or equipment rental below.</p>
+            <div className="flex flex-col gap-3">
+              <GuestTile icon={<MapPin className="w-5 h-5" />} label="Island Tours" subtitle="Explore the best of Palawan" onClick={() => setView('tours')} />
+              <GuestTile icon={<Car className="w-5 h-5" />} label="Transport" subtitle="Airport transfers & van hire" onClick={() => setView('transport')} />
+              <GuestTile icon={<Bike className="w-5 h-5" />} label="Rent Equipment" subtitle="Scooters, bikes, kayaks & more" onClick={() => setView('rentals')} />
+            </div>
+          </div>
+        )}
+
+        {/* Message reception — simple text-to-reception */}
+        {view === 'message' && <MessageReceptionView session={session} qc={qc} onDone={() => setView('dashboard')} />}
 
         {view === 'tours' && <ToursView session={session} qc={qc} />}
         {view === 'transport' && <TransportView session={session} qc={qc} />}
@@ -182,12 +244,70 @@ const GuestPortal = () => {
   );
 };
 
-const Tile = ({ icon, label, onClick, className = '' }: { icon: React.ReactNode; label: string; onClick: () => void; className?: string }) => (
-  <button onClick={onClick} className={`bg-card border border-border rounded-lg p-4 flex flex-col items-center gap-2 hover:bg-secondary transition-colors ${className}`}>
-    <span className="text-accent">{icon}</span>
-    <span className="font-body text-sm text-foreground">{label}</span>
+/** Large full-width tile for guest concierge */
+const GuestTile = ({ icon, label, subtitle, onClick }: { icon: React.ReactNode; label: string; subtitle: string; onClick: () => void }) => (
+  <button onClick={onClick} className="w-full bg-card border border-border rounded-lg p-5 flex items-center gap-4 hover:bg-secondary transition-colors text-left">
+    <div className="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center flex-shrink-0">
+      <span className="text-accent">{icon}</span>
+    </div>
+    <div>
+      <p className="font-display text-base text-foreground">{label}</p>
+      <p className="font-body text-xs text-muted-foreground">{subtitle}</p>
+    </div>
   </button>
 );
+
+/** Simple message-to-reception flow */
+const MessageReceptionView = ({ session, qc, onDone }: { session: GuestPortalSession; qc: any; onDone: () => void }) => {
+  const [message, setMessage] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  const send = async () => {
+    if (!message.trim()) return;
+    setSubmitting(true);
+    await supabase.from('guest_requests').insert({
+      booking_id: session.booking_id,
+      room_id: session.room_id,
+      guest_name: session.guest_name,
+      request_type: 'Message',
+      details: message.trim(),
+      status: 'pending',
+    });
+    qc.invalidateQueries({ queryKey: ['guest-requests-admin'] });
+    setSubmitting(false);
+    setSent(true);
+  };
+
+  if (sent) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 space-y-4">
+        <div className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center">
+          <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+        </div>
+        <p className="font-display text-lg text-foreground">Message Sent!</p>
+        <p className="font-body text-sm text-muted-foreground text-center">Our team will get back to you shortly.</p>
+        <Button onClick={onDone} variant="outline" className="font-display tracking-wider mt-4">Done</Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <h2 className="font-display text-lg text-foreground">Message Reception</h2>
+      <p className="font-body text-sm text-muted-foreground">Send a message directly to our front desk team.</p>
+      <Textarea
+        value={message}
+        onChange={e => setMessage(e.target.value)}
+        placeholder="How can we help you today?"
+        className="bg-secondary border-border text-foreground min-h-[150px] text-base"
+      />
+      <Button onClick={send} disabled={submitting || !message.trim()} className="w-full font-display tracking-wider h-12">
+        {submitting ? 'Sending...' : 'Send Message'}
+      </Button>
+    </div>
+  );
+};
 
 // --- Tours (Enhanced: pickup time, notes, pending status) ---
 const ToursView = ({ session, qc }: { session: GuestPortalSession; qc: any }) => {

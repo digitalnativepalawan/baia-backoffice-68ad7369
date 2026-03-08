@@ -13,6 +13,7 @@ import { canEdit } from '@/lib/permissions';
 
 interface DepartmentOrdersViewProps {
   department: 'kitchen' | 'bar';
+  embedded?: boolean;
 }
 
 type DeptStatus = 'pending' | 'preparing' | 'ready';
@@ -31,7 +32,7 @@ const DEPT_STATUS_COLORS: Record<DeptStatus, string> = {
 
 const DEPT_TABS: DeptStatus[] = ['pending', 'preparing', 'ready'];
 
-const DepartmentOrdersView = ({ department }: DepartmentOrdersViewProps) => {
+const DepartmentOrdersView = ({ department, embedded = false }: DepartmentOrdersViewProps) => {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -208,19 +209,20 @@ const DepartmentOrdersView = ({ department }: DepartmentOrdersViewProps) => {
   const deptLabel = department === 'kitchen' ? '🍳 Kitchen' : '🍹 Bar';
 
   return (
-    <div className="min-h-screen bg-navy-texture flex flex-col">
-      {/* Header */}
-      <header className="sticky top-0 z-30 bg-navy-deep/95 backdrop-blur-sm border-b border-border">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-          <button onClick={() => navigate('/')} className="text-cream-dim hover:text-foreground min-w-[44px] min-h-[44px] flex items-center justify-center">
-            <Home className="w-5 h-5" />
-          </button>
-          <h1 className="font-display text-lg tracking-[0.15em] text-foreground">{deptLabel}</h1>
-          <button onClick={handleLogout} className="text-cream-dim hover:text-foreground min-w-[44px] min-h-[44px] flex items-center justify-center">
-            <LogOut className="w-5 h-5" />
-          </button>
-        </div>
-      </header>
+    <div className={embedded ? 'flex flex-col' : 'min-h-screen bg-navy-texture flex flex-col'}>
+      {!embedded && (
+        <header className="sticky top-0 z-30 bg-navy-deep/95 backdrop-blur-sm border-b border-border">
+          <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+            <button onClick={() => navigate('/')} className="text-cream-dim hover:text-foreground min-w-[44px] min-h-[44px] flex items-center justify-center">
+              <Home className="w-5 h-5" />
+            </button>
+            <h1 className="font-display text-lg tracking-[0.15em] text-foreground">{deptLabel}</h1>
+            <button onClick={handleLogout} className="text-cream-dim hover:text-foreground min-w-[44px] min-h-[44px] flex items-center justify-center">
+              <LogOut className="w-5 h-5" />
+            </button>
+          </div>
+        </header>
+      )}
 
       {/* Status tabs — department-specific */}
       <div className="flex flex-wrap gap-1 px-4 py-3">

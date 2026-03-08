@@ -16,8 +16,8 @@ import HousekeeperPage from "./pages/HousekeeperPage";
 import GuestPortalPage from "./pages/GuestPortal";
 import ReceptionPage from "./pages/ReceptionPage";
 import ExperiencesPage from "./pages/ExperiencesPage";
+import StaffShell from "./pages/StaffShell";
 import RequireAuth from "./components/RequireAuth";
-
 
 const queryClient = new QueryClient();
 
@@ -30,17 +30,26 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/menu" element={<MenuPage />} />
-          <Route path="/order-type" element={<RequireAuth requiredPermission="orders"><OrderType /></RequireAuth>} />
+          <Route path="/guest-portal" element={<GuestPortalPage />} />
+
+          {/* Staff Shell — role-aware action console */}
+          <Route path="/staff" element={<RequireAuth><StaffShell /></RequireAuth>} />
+
+          {/* Admin Shell — control tower */}
           <Route path="/admin" element={<RequireAuth><AdminPage /></RequireAuth>} />
+
+          {/* Shared operational routes (still accessible directly) */}
+          <Route path="/order-type" element={<RequireAuth requiredPermission="orders"><OrderType /></RequireAuth>} />
           <Route path="/employee" element={<RequireAuth><EmployeePage /></RequireAuth>} />
           <Route path="/employee-portal" element={<RequireAuth><EmployeePortal /></RequireAuth>} />
+
+          {/* Legacy direct routes — kept for bookmarks / deep links */}
           <Route path="/kitchen" element={<RequireAuth requiredPermission="kitchen"><KitchenPage /></RequireAuth>} />
           <Route path="/bar" element={<RequireAuth requiredPermission="bar"><BarPage /></RequireAuth>} />
           <Route path="/housekeeper" element={<RequireAuth requiredPermission="housekeeping"><HousekeeperPage /></RequireAuth>} />
           <Route path="/reception" element={<RequireAuth requiredPermission="reception"><ReceptionPage /></RequireAuth>} />
           <Route path="/experiences" element={<RequireAuth requiredPermission={['experiences', 'reception']}><ExperiencesPage /></RequireAuth>} />
-          <Route path="/guest-portal" element={<GuestPortalPage />} />
-          
+
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

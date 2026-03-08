@@ -12,7 +12,7 @@ import HousekeepingInspection from '@/components/admin/HousekeepingInspection';
 
 const from = (table: string) => supabase.from(table as any);
 
-const HousekeeperPage = () => {
+const HousekeeperPage = ({ embedded = false }: { embedded?: boolean }) => {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [acceptingOrderId, setAcceptingOrderId] = useState<string | null>(null);
@@ -112,17 +112,18 @@ const HousekeeperPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 max-w-lg mx-auto">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <Button size="sm" variant="ghost" onClick={() => navigate('/')}>
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
-        <div>
-          <h1 className="font-display text-xl tracking-wider text-foreground">🏨 Housekeeping</h1>
-          <p className="font-body text-xs text-muted-foreground">Welcome, {empName}</p>
+    <div className={embedded ? 'space-y-4' : 'min-h-screen bg-background p-4 max-w-lg mx-auto'}>
+      {!embedded && (
+        <div className="flex items-center gap-3 mb-6">
+          <Button size="sm" variant="ghost" onClick={() => navigate('/')}>
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <div>
+            <h1 className="font-display text-xl tracking-wider text-foreground">🏨 Housekeeping</h1>
+            <p className="font-body text-xs text-muted-foreground">Welcome, {empName}</p>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* New Assignments */}
       <section className="mb-6">

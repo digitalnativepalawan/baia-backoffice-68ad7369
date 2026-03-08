@@ -1,153 +1,37 @@
 
 
-## Plan: Three UI Shells — Guest, Staff, Admin
+## Plan: Fix Schedule Delete & Enhance Task/Assignment Scheduling
 
-### Architecture Overview
+### Issues Found
 
-Restructure the app into 3 distinct interface shells that share the same backend. Each shell has its own layout, home screen, and visual language. No database changes. No functionality removed.
+1. **Delete button bug**: The trash icon on shift blocks triggers `setDeleteId(s.id)`, but the parent div's `onClick={() => openEdit(s)}` fires simultaneously despite `stopPropagation`. On mobile, the tiny button (3x3 icon) is nearly impossible to tap. The AlertDialog `onOpenChange={() => setDeleteId(null)}` also races with the confirm action.
 
-```text
-/guest-portal     → Guest Shell (concierge)
-/                 → Landing (logo + 3 entry points)
-/staff            → Staff Shell (action console) ← NEW
-/admin            → Admin Shell (control tower) — existing, restructured
-```
+2. **Missing scheduling features**: The schedule only manages time shifts. There's no way to assign tasks like housecleaning, reception duty, or track completion from within the schedule view.
 
-### Landing Page (`/` — Index.tsx)
+### Changes
 
-Simplify to 3 large tiles only:
-- **I'm a Guest** → `/guest-portal`
-- **Staff Login** → PIN login → redirect to `/staff`
-- **Admin** → PIN login → redirect to `/admin`
+**1. Fix Delete Button** (`WeeklyScheduleManager.tsx`)
+- Make `confirmDelete` capture `deleteId` before the dialog closes by saving it in a ref or local variable
+- Increase touch target size for edit/delete buttons on shift blocks
+- Prevent edit modal from opening when clicking edit/delete icons (the `stopPropagation` exists but the parent click handler on the entire timeline area also fires)
 
-Remove all the current permission-gated navigation buttons. After login, staff and admin go directly to their shell.
+**2. Add Task/Assignment Creation from Schedule** (`WeeklyScheduleManager.tsx`)
+- Add an "Assign Task" button alongside "Add Shift" 
+- New modal to create a task assignment: select employee, pick type (Housecleaning, Reception, Custom), set date/time, add notes
+- For housecleaning: select a room/unit to clean, auto-creates a `housekeeping_orders` entry assigned to the selected employee
+- For other tasks: creates an `employee_tasks` entry with due date and description
+- Tasks appear as colored pills on the timeline (already partially implemented)
 
----
+**3. Show Completion Info on Task Detail** (`WeeklyScheduleManager.tsx`)
+- In the task detail dialog, show who completed the task and when (`completed_at`)
+- For housekeeping pills, show completion status (`cleaning_completed_at`, `completed_by_name`)
+- Make housekeeping pills clickable to show full details (room, status, who inspected/cleaned)
 
-### Shell 1: Guest Shell (`/guest-portal` — GuestPortal.tsx)
+**4. Enhance Task Detail Dialog** (`WeeklyScheduleManager.tsx`)
+- Add edit capability: change title, description, due date, reassign to different employee
+- Add delete capability for tasks
+- Show completion audit trail
 
-**Refactor the existing page.** Keep all current functionality but:
-
-- Reduce dashboard tiles from 9 to 5 as specified:
-  - Order Food, Order Drinks (split current "Order Food" by department), Book Experiences (merge Tour + Transport + Rental into one tile), Request Service (merge Leave Note + general requests), Message Reception (new simple text-to-reception flow)
-- Remove "My Orders", "My Requests", "My Bill" from main grid — move to a small "My Activity" link below tiles
-- Make tiles much larger (full-width stacked on mobile)
-- Add clear success confirmation screens after every action (toast → full-screen green checkmark with "Done" button)
-- Use warm hospitality language: "What can we help with?" not "Dashboard"
-
-**Files**: `src/pages/GuestPortal.tsx`
-
----
-
-### Shell 2: Staff Shell — NEW (`/staff` — StaffShell.tsx)
-
-**New page** that acts as a role-aware action console. After PIN login, detect primary role from permissions and show the appropriate home screen.
-
-**Role detection logic**:
-```text
-permissions include 'reception'    → Reception Home
-permissions include 'housekeeping' → Housekeeping Home
-permissions include 'kitchen'      → Kitchen Home
-permissions include 'bar'          → Bar Home
-permissions include 'experiences'  → Experiences Home
-fallback                           → generic staff home with permitted tiles
-```
-
-**Reception Home** — card-based layout:
-- Today Timeline (arrivals + departures chronologically)
-- Arrivals section (units with check-in today)
-- Checkouts section (units with checkout today)
-- Current Guests (occupied rooms)
-- Open Tabs
-- Guest Requests / Tours
-
-Each card: room name + status + **one primary action button** (Check In, Check Out, View, etc.)
-
-Reuses existing `ReceptionPage.tsx` logic but restructured into a cleaner card layout.
-
-**Housekeeping Home** — reuses existing `HousekeeperPage.tsx` logic, already well-structured with:
-- Needs Cleaning (pending assignments)
-- Cleaning In Progress
-- Ready Rooms (completed today)
-
-**Kitchen Home** — reuses `DepartmentOrdersView` with `department="kitchen"`:
-- New Food Orders (pending tab)
-- Preparing Food Orders (preparing tab)
-
-**Bar Home** — reuses `DepartmentOrdersView` with `department="bar"`:
-- New Drink Orders
-- Preparing Drink Orders
-
-**Staff card rule**: Every operational card shows item name, current state badge, and one primary action button only.
-
-**Role switcher**: If a staff member has multiple roles, show a small tab bar at top to switch between their permitted home screens.
-
-**Files**:
-- `src/pages/StaffShell.tsx` (new — layout shell with role detection)
-- `src/components/staff/ReceptionHome.tsx` (new — extracts from ReceptionPage)
-- `src/components/staff/HousekeepingHome.tsx` (new — wraps HousekeeperPage logic)
-- `src/components/staff/KitchenHome.tsx` (new — wraps DepartmentOrdersView)
-- `src/components/staff/BarHome.tsx` (new — wraps DepartmentOrdersView)
-- `src/components/staff/ExperiencesHome.tsx` (new — wraps ExperiencesPage logic)
-
----
-
-### Shell 3: Admin Shell (`/admin` — AdminPage.tsx)
-
-**Restructure existing AdminPage** into a control tower layout:
-
-- **Attention Strip** at top: count badges for pending orders, rooms needing cleaning, unconfirmed requests, low stock items
-- **Daily Summary** card: occupancy %, revenue today, arrivals/departures count
-- **Resort Control Board**: the existing tab system (Operations, People, Config) but renamed:
-  - Setup, Reports, Logs, Resort Ops remain
-  - Orders/Kitchen/Bar/Rooms/Housekeeping move out of admin (they live in Staff Shell now) — admin keeps read-only overview versions
-- Admin-only features: Audit Log, Archive, Staff Access, Devices, Billing Config, Guest Portal Config
-
-**Files**: `src/pages/AdminPage.tsx` (restructure existing)
-
----
-
-### Routing Changes (`App.tsx`)
-
-```text
-/                    → Landing (3 tiles)
-/guest-portal        → Guest Shell
-/staff               → Staff Shell (NEW, RequireAuth)
-/admin               → Admin Shell (RequireAuth, admin-only)
-/menu                → Menu (shared, accessed from guest or staff)
-/order-type          → Order flow (accessed from staff shell)
-/employee            → Employee Portal (clock in/out, pay, schedule)
-```
-
-Remove standalone routes: `/kitchen`, `/bar`, `/housekeeper`, `/reception`, `/experiences` — these are now sub-views inside `/staff`.
-
----
-
-### UX Rules Enforcement
-
-1. **Guest never sees** staff/admin navigation, operational terminology, or status codes
-2. **Staff never sees** guest marketing tiles or admin config options
-3. **Every card answers**: "What do I do next?" with one clear action button
-4. **Irrelevant modules hidden** — permission system already supports this, just needs cleaner gating at shell level
-5. **Success confirmations** — guest actions get full-screen confirmations; staff actions get toast + auto-advance
-
----
-
-### Summary of File Changes
-
-| Action | File |
-|--------|------|
-| Rewrite | `src/pages/Index.tsx` — 3-tile landing |
-| Refactor | `src/pages/GuestPortal.tsx` — 5 tiles, warm language, success screens |
-| Create | `src/pages/StaffShell.tsx` — role-aware staff console |
-| Create | `src/components/staff/ReceptionHome.tsx` |
-| Create | `src/components/staff/HousekeepingHome.tsx` |
-| Create | `src/components/staff/KitchenHome.tsx` |
-| Create | `src/components/staff/BarHome.tsx` |
-| Create | `src/components/staff/ExperiencesHome.tsx` |
-| Restructure | `src/pages/AdminPage.tsx` — attention strip + daily summary + control board |
-| Update | `src/App.tsx` — new `/staff` route, remove standalone department routes |
-| Keep | All existing components, hooks, libs — reused inside new shells |
-
-No database changes. No functionality removed. Existing pages become composable pieces inside the new shells.
+### Files to Edit
+- `src/components/admin/WeeklyScheduleManager.tsx` — all changes in this single file
 
