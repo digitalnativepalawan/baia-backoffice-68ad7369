@@ -39,6 +39,55 @@ const TYPE_LABELS: Record<string, string> = {
   WalkIn: 'Walk-In Guest',
 };
 
+const EditableOrderItems = ({ items, onSave }: { items: OrderItem[]; onSave: (items: OrderItem[]) => void }) => {
+  const [editItems, setEditItems] = useState<OrderItem[]>(() => items.map(i => ({ ...i })));
+
+  const updateQty = (idx: number, delta: number) => {
+    setEditItems(prev => {
+      const next = [...prev];
+      const newQty = next[idx].qty + delta;
+      if (newQty <= 0) return prev.filter((_, i) => i !== idx);
+      next[idx] = { ...next[idx], qty: newQty };
+      return next;
+    });
+  };
+
+  const removeItem = (idx: number) => {
+    setEditItems(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  return (
+    <div className="space-y-1">
+      {editItems.map((item, i) => (
+        <div key={i} className="flex items-center justify-between py-0.5">
+          <span className="font-body text-sm text-foreground flex-1">{item.name}</span>
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => updateQty(i, -1)} className="w-7 h-7 flex items-center justify-center rounded bg-secondary text-foreground hover:bg-destructive/20">
+              <Minus className="w-3 h-3" />
+            </button>
+            <span className="font-display text-sm text-foreground w-5 text-center">{item.qty}</span>
+            <button onClick={() => updateQty(i, 1)} className="w-7 h-7 flex items-center justify-center rounded bg-secondary text-foreground hover:bg-primary/20">
+              <Plus className="w-3 h-3" />
+            </button>
+            <span className="font-body text-xs text-muted-foreground w-14 text-right">₱{(item.price * item.qty).toLocaleString()}</span>
+            <button onClick={() => removeItem(i)} className="w-7 h-7 flex items-center justify-center rounded text-destructive hover:bg-destructive/10">
+              <Trash2 className="w-3 h-3" />
+            </button>
+          </div>
+        </div>
+      ))}
+      {editItems.length > 0 && (
+        <Button size="sm" onClick={() => onSave(editItems)} className="w-full mt-2 font-display text-xs tracking-wider min-h-[36px]">
+          Save Changes
+        </Button>
+      )}
+      {editItems.length === 0 && (
+        <p className="font-body text-xs text-destructive text-center py-2">All items removed — delete this order instead</p>
+      )}
+    </div>
+  );
+};
+
 const TabInvoice = ({ tabId, onClose, isAdmin }: TabInvoiceProps) => {
   const qc = useQueryClient();
   const { data: profile } = useResortProfile();
