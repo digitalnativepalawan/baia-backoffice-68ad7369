@@ -397,8 +397,13 @@ const EmployeeTaskList = ({ employeeId, createdBy = 'admin', readOnly = false, e
                           setEditId(task.id); setEditTitle(task.title); setEditDesc(task.description || '');
                           setEditDue(task.due_date ? format(new Date(task.due_date), "yyyy-MM-dd'T'HH:mm") : '');
                         }}><Pencil className="w-5 h-5" /></Button>
-                        <Button size="icon" variant="ghost" className="h-10 w-10 text-muted-foreground hover:text-destructive"
-                          onClick={() => deleteTask(task.id)}><Trash2 className="w-5 h-5" /></Button>
+                        {filter === 'archived' ? (
+                          <Button size="icon" variant="ghost" className="h-10 w-10 text-primary"
+                            onClick={() => restoreTask(task.id)} title="Restore task"><Upload className="w-5 h-5" /></Button>
+                        ) : (
+                          <Button size="icon" variant="ghost" className="h-10 w-10 text-muted-foreground hover:text-destructive"
+                            onClick={() => archiveTask(task.id)} title="Archive task"><Trash2 className="w-5 h-5" /></Button>
+                        )}
                         <Button size="icon" variant="ghost" className="h-10 w-10 text-muted-foreground"
                           title="Send via Messenger"
                           disabled={(() => { const emp = employees.find(e => e.id === task.employee_id); return !emp?.messenger_link || emp?.active === false; })()}
