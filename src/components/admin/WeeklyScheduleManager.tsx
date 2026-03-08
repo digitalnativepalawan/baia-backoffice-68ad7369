@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -100,8 +101,10 @@ const WeeklyScheduleManager = ({ readOnly = false }: { readOnly?: boolean }) => 
   const [selectedDayIdx, setSelectedDayIdx] = useState(() => new Date().getDay());
 
   const [shiftModal, setShiftModal] = useState<{ mode: 'add' | 'edit'; schedule?: Schedule; date?: string; empId?: string } | null>(null);
-  const [shiftForm, setShiftForm] = useState({ employee_id: '', schedule_date: '', time_in: '07:00', time_out: '16:00' });
+  const [shiftForm, setShiftForm] = useState({ employee_id: '', schedule_date: '', time_in: '07:00', time_out: '16:00', selected_days: [] as string[] });
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const deleteIdRef = useRef<string | null>(null);
+  useEffect(() => { deleteIdRef.current = deleteId; }, [deleteId]);
   const [contextSheet, setContextSheet] = useState<Schedule | null>(null);
 
   // Task assignment modal
@@ -240,12 +243,13 @@ const WeeklyScheduleManager = ({ readOnly = false }: { readOnly?: boolean }) => 
   }, [employees]);
 
   const openAdd = (date?: string, empId?: string) => {
-    setShiftForm({ employee_id: empId || employees[0]?.id || '', schedule_date: date || format(weekDates[selectedDayIdx], 'yyyy-MM-dd'), time_in: '07:00', time_out: '16:00' });
+    const d = date || format(weekDates[selectedDayIdx], 'yyyy-MM-dd');
+    setShiftForm({ employee_id: empId || employees[0]?.id || '', schedule_date: d, time_in: '07:00', time_out: '16:00', selected_days: [d] });
     setShiftModal({ mode: 'add', date, empId });
   };
 
   const openEdit = (s: Schedule) => {
-    setShiftForm({ employee_id: s.employee_id, schedule_date: s.schedule_date, time_in: s.time_in.slice(0, 5), time_out: s.time_out.slice(0, 5) });
+    setShiftForm({ employee_id: s.employee_id, schedule_date: s.schedule_date, time_in: s.time_in.slice(0, 5), time_out: s.time_out.slice(0, 5), selected_days: [s.schedule_date] });
     setShiftModal({ mode: 'edit', schedule: s });
   };
 
@@ -273,23 +277,32 @@ const WeeklyScheduleManager = ({ readOnly = false }: { readOnly?: boolean }) => 
   }, [schedules]);
 
   const saveShift = async () => {
-    if (!shiftForm.employee_id || !shiftForm.schedule_date) return;
-    const excludeId = shiftModal?.mode === 'edit' ? shiftModal.schedule?.id : undefined;
-    if (checkOverlap(shiftForm.employee_id, shiftForm.schedule_date, shiftForm.time_in, shiftForm.time_out, excludeId)) {
-      toast.warning('This shift overlaps with an existing shift for this employee');
-    }
+    if (!shiftForm.employee_id) return;
     if (shiftModal?.mode === 'edit' && shiftModal.schedule) {
+      // Single edit
+      if (checkOverlap(shiftForm.employee_id, shiftForm.schedule_date, shiftForm.time_in, shiftForm.time_out, shiftModal.schedule.id)) {
+        toast.warning('This shift overlaps with an existing shift for this employee');
+      }
       await supabase.from('weekly_schedules').update({
         employee_id: shiftForm.employee_id, schedule_date: shiftForm.schedule_date,
         time_in: shiftForm.time_in, time_out: shiftForm.time_out,
       }).eq('id', shiftModal.schedule.id);
       toast.success('Shift updated');
     } else {
-      await supabase.from('weekly_schedules').insert({
-        employee_id: shiftForm.employee_id, schedule_date: shiftForm.schedule_date,
-        time_in: shiftForm.time_in, time_out: shiftForm.time_out,
+      // Multi-day insert
+      const days = shiftForm.selected_days.length > 0 ? shiftForm.selected_days : [shiftForm.schedule_date];
+      if (days.length === 0) { toast.error('Select at least one day'); return; }
+      let overlapCount = 0;
+      days.forEach(d => {
+        if (checkOverlap(shiftForm.employee_id, d, shiftForm.time_in, shiftForm.time_out)) overlapCount++;
       });
-      toast.success('Shift added');
+      if (overlapCount > 0) toast.warning(`${overlapCount} shift(s) overlap with existing shifts`);
+      const rows = days.map(d => ({
+        employee_id: shiftForm.employee_id, schedule_date: d,
+        time_in: shiftForm.time_in, time_out: shiftForm.time_out,
+      }));
+      await supabase.from('weekly_schedules').insert(rows);
+      toast.success(`${rows.length} shift(s) added`);
     }
     setShiftModal(null);
     qc.invalidateQueries({ queryKey: ['weekly-schedules'] });
@@ -307,7 +320,7 @@ const WeeklyScheduleManager = ({ readOnly = false }: { readOnly?: boolean }) => 
   };
 
   const confirmDelete = async (scheduleId?: string) => {
-    const idToDelete = scheduleId || deleteId;
+    const idToDelete = scheduleId || deleteIdRef.current;
     if (!idToDelete) {
       toast.error('No shift selected for deletion');
       return;
@@ -847,7 +860,7 @@ const WeeklyScheduleManager = ({ readOnly = false }: { readOnly?: boolean }) => 
         </Sheet>
 
         <ShiftModal shiftModal={shiftModal} shiftForm={shiftForm} setShiftForm={setShiftForm}
-          employees={employees} saveShift={saveShift} addBrokenShift={addBrokenShift}
+          employees={employees} weekDates={weekDates} saveShift={saveShift} addBrokenShift={addBrokenShift}
           onClose={() => setShiftModal(null)}
           onDelete={shiftModal?.mode === 'edit' && shiftModal.schedule ? () => { setShiftModal(null); setDeleteId(shiftModal.schedule!.id); } : undefined}
           onDuplicate={shiftModal?.mode === 'edit' && shiftModal.schedule ? () => { duplicateShift(shiftModal.schedule!); setShiftModal(null); } : undefined} />
@@ -978,7 +991,7 @@ const WeeklyScheduleManager = ({ readOnly = false }: { readOnly?: boolean }) => 
       </Card>
 
       <ShiftModal shiftModal={shiftModal} shiftForm={shiftForm} setShiftForm={setShiftForm}
-        employees={employees} saveShift={saveShift} addBrokenShift={addBrokenShift}
+        employees={employees} weekDates={weekDates} saveShift={saveShift} addBrokenShift={addBrokenShift}
         onClose={() => setShiftModal(null)}
         onDelete={shiftModal?.mode === 'edit' && shiftModal.schedule ? () => { setShiftModal(null); setDeleteId(shiftModal.schedule!.id); } : undefined}
         onDuplicate={shiftModal?.mode === 'edit' && shiftModal.schedule ? () => { duplicateShift(shiftModal.schedule!); setShiftModal(null); } : undefined} />
@@ -1028,94 +1041,149 @@ const WeeklyScheduleManager = ({ readOnly = false }: { readOnly?: boolean }) => 
 };
 
 // Shift Add/Edit Modal
-const ShiftModal = ({ shiftModal, shiftForm, setShiftForm, employees, saveShift, addBrokenShift, onClose, onDelete, onDuplicate }: {
-  shiftModal: any; shiftForm: any; setShiftForm: any; employees: Employee[];
+const ShiftModal = ({ shiftModal, shiftForm, setShiftForm, employees, weekDates, saveShift, addBrokenShift, onClose, onDelete, onDuplicate }: {
+  shiftModal: any; shiftForm: any; setShiftForm: any; employees: Employee[]; weekDates: Date[];
   saveShift: () => void; addBrokenShift: () => void; onClose: () => void; onDelete?: () => void; onDuplicate?: () => void;
-}) => (
-  <Dialog open={!!shiftModal} onOpenChange={() => onClose()}>
-    <DialogContent className="bg-card border-border max-w-sm">
-      <DialogHeader>
-        <DialogTitle className="font-display text-foreground">{shiftModal?.mode === 'edit' ? 'Edit Shift' : 'Add Shift'}</DialogTitle>
-      </DialogHeader>
-      <div className="space-y-3">
-        <div>
-          <Label className="font-body text-xs text-muted-foreground">Employee</Label>
-          <Select value={shiftForm.employee_id} onValueChange={v => setShiftForm((p: any) => ({ ...p, employee_id: v }))}>
-            <SelectTrigger className="bg-secondary border-border text-foreground font-body"><SelectValue /></SelectTrigger>
-            <SelectContent className="bg-card border-border">
-              {employees.map(e => <SelectItem key={e.id} value={e.id} className="font-body text-foreground">{e.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label className="font-body text-xs text-muted-foreground">Date</Label>
-          <Input type="date" value={shiftForm.schedule_date}
-            onChange={e => setShiftForm((p: any) => ({ ...p, schedule_date: e.target.value }))}
-            className="bg-secondary border-border text-foreground font-body" />
-        </div>
-        <div className="flex gap-2">
-          {PRESETS.map(p => (
-            <Button key={p.label} size="sm" variant="outline" className="flex-1 font-body text-xs"
-              onClick={() => setShiftForm((prev: any) => ({ ...prev, time_in: p.time_in, time_out: p.time_out }))}>
-              {p.label}
-            </Button>
-          ))}
-        </div>
-        <div className="grid grid-cols-2 gap-2">
+}) => {
+  const isAdd = shiftModal?.mode === 'add';
+  const allDays = weekDates.map(d => format(d, 'yyyy-MM-dd'));
+  const selectedDays: string[] = shiftForm.selected_days || [];
+  const allChecked = allDays.every(d => selectedDays.includes(d));
+
+  const toggleDay = (dateStr: string) => {
+    setShiftForm((p: any) => {
+      const days = p.selected_days || [];
+      return { ...p, selected_days: days.includes(dateStr) ? days.filter((d: string) => d !== dateStr) : [...days, dateStr] };
+    });
+  };
+
+  const toggleAll = () => {
+    setShiftForm((p: any) => ({ ...p, selected_days: allChecked ? [] : [...allDays] }));
+  };
+
+  return (
+    <Dialog open={!!shiftModal} onOpenChange={() => onClose()}>
+      <DialogContent className="bg-card border-border max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="font-display text-foreground">{isAdd ? 'Add Shift' : 'Edit Shift'}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
           <div>
-            <Label className="font-body text-xs text-muted-foreground">Time In</Label>
-            <Input type="time" value={shiftForm.time_in}
-              onChange={e => setShiftForm((p: any) => ({ ...p, time_in: e.target.value }))}
-              className="bg-secondary border-border text-foreground font-body" />
+            <Label className="font-body text-xs text-muted-foreground">Employee</Label>
+            <Select value={shiftForm.employee_id} onValueChange={v => setShiftForm((p: any) => ({ ...p, employee_id: v }))}>
+              <SelectTrigger className="bg-secondary border-border text-foreground font-body"><SelectValue /></SelectTrigger>
+              <SelectContent className="bg-card border-border">
+                {employees.map(e => <SelectItem key={e.id} value={e.id} className="font-body text-foreground">{e.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
-          <div>
-            <Label className="font-body text-xs text-muted-foreground">Time Out</Label>
-            <Input type="time" value={shiftForm.time_out}
-              onChange={e => setShiftForm((p: any) => ({ ...p, time_out: e.target.value }))}
-              className="bg-secondary border-border text-foreground font-body" />
+          {isAdd ? (
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <Label className="font-body text-xs text-muted-foreground">Days</Label>
+                <button onClick={toggleAll} className="font-body text-[10px] text-accent hover:underline">
+                  {allChecked ? 'Clear All' : 'All Week'}
+                </button>
+              </div>
+              <div className="grid grid-cols-7 gap-1">
+                {weekDates.map((d, i) => {
+                  const dateStr = format(d, 'yyyy-MM-dd');
+                  const checked = selectedDays.includes(dateStr);
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => toggleDay(dateStr)}
+                      className={`flex flex-col items-center py-1.5 px-1 rounded text-xs font-body transition-colors border
+                        ${checked
+                          ? 'bg-accent/20 border-accent/50 text-accent'
+                          : 'bg-secondary border-border text-muted-foreground hover:bg-secondary/80'
+                        }`}
+                    >
+                      <span className="text-[10px]">{format(d, 'EEE')}</span>
+                      <span className="font-semibold">{format(d, 'd')}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div>
+              <Label className="font-body text-xs text-muted-foreground">Date</Label>
+              <Input type="date" value={shiftForm.schedule_date}
+                onChange={e => setShiftForm((p: any) => ({ ...p, schedule_date: e.target.value }))}
+                className="bg-secondary border-border text-foreground font-body" />
+            </div>
+          )}
+          <div className="flex gap-2">
+            {PRESETS.map(p => (
+              <Button key={p.label} size="sm" variant="outline" className="flex-1 font-body text-xs"
+                onClick={() => setShiftForm((prev: any) => ({ ...prev, time_in: p.time_in, time_out: p.time_out }))}>
+                {p.label}
+              </Button>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label className="font-body text-xs text-muted-foreground">Time In</Label>
+              <Input type="time" value={shiftForm.time_in}
+                onChange={e => setShiftForm((p: any) => ({ ...p, time_in: e.target.value }))}
+                className="bg-secondary border-border text-foreground font-body" />
+            </div>
+            <div>
+              <Label className="font-body text-xs text-muted-foreground">Time Out</Label>
+              <Input type="time" value={shiftForm.time_out}
+                onChange={e => setShiftForm((p: any) => ({ ...p, time_out: e.target.value }))}
+                className="bg-secondary border-border text-foreground font-body" />
+            </div>
           </div>
         </div>
-      </div>
-      {shiftModal?.mode === 'edit' && onDelete && (
-        <Button variant="destructive" className="w-full font-display text-xs min-h-[44px]" onClick={onDelete}>
-          <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete This Shift
-        </Button>
-      )}
-      <div className="flex gap-2 pt-2">
-        <Button variant="outline" className="flex-1 font-display text-xs" onClick={onClose}>Cancel</Button>
-        <Button variant="outline" className="font-display text-xs" onClick={addBrokenShift}>
-          <Clock className="h-3.5 w-3.5 mr-1" /> Broken
-        </Button>
-        {onDuplicate && (
-          <Button variant="outline" className="font-display text-xs" onClick={onDuplicate}>
-            <Copy className="h-3.5 w-3.5 mr-1" /> Dup
+        {shiftModal?.mode === 'edit' && onDelete && (
+          <Button variant="destructive" className="w-full font-display text-xs min-h-[44px]" onClick={onDelete}>
+            <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete This Shift
           </Button>
         )}
-        <Button className="flex-1 font-display text-xs" onClick={saveShift}>Save</Button>
-      </div>
-    </DialogContent>
-  </Dialog>
-);
+        <div className="flex gap-2 pt-2">
+          <Button variant="outline" className="flex-1 font-display text-xs" onClick={onClose}>Cancel</Button>
+          <Button variant="outline" className="font-display text-xs" onClick={addBrokenShift}>
+            <Clock className="h-3.5 w-3.5 mr-1" /> Broken
+          </Button>
+          {onDuplicate && (
+            <Button variant="outline" className="font-display text-xs" onClick={onDuplicate}>
+              <Copy className="h-3.5 w-3.5 mr-1" /> Dup
+            </Button>
+          )}
+          <Button className="flex-1 font-display text-xs" onClick={saveShift}>
+            {isAdd && selectedDays.length > 1 ? `Save (${selectedDays.length})` : 'Save'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
 
 // Delete Confirmation
-const DeleteConfirm = ({ deleteId, setDeleteId, onConfirm }: { deleteId: string | null; setDeleteId: (v: string | null) => void; onConfirm: (id: string) => void }) => (
-  <AlertDialog open={!!deleteId} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>
-    <AlertDialogContent className="bg-card border-border">
-      <AlertDialogHeader>
-        <AlertDialogTitle className="font-display text-foreground">Delete Shift?</AlertDialogTitle>
-        <AlertDialogDescription className="font-body text-muted-foreground">
-          This action cannot be undone.
-        </AlertDialogDescription>
-      </AlertDialogHeader>
-      <AlertDialogFooter>
-        <AlertDialogCancel className="font-display text-xs">Cancel</AlertDialogCancel>
-        <AlertDialogAction onClick={() => { if (deleteId) onConfirm(deleteId); }} className="font-display text-xs bg-destructive text-destructive-foreground">
-          Delete
-        </AlertDialogAction>
-      </AlertDialogFooter>
-    </AlertDialogContent>
-  </AlertDialog>
-);
+const DeleteConfirm = ({ deleteId, setDeleteId, onConfirm }: { deleteId: string | null; setDeleteId: (v: string | null) => void; onConfirm: (id: string) => void }) => {
+  const idRef = useRef<string | null>(null);
+  useEffect(() => { if (deleteId) idRef.current = deleteId; }, [deleteId]);
+  return (
+    <AlertDialog open={!!deleteId} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>
+      <AlertDialogContent className="bg-card border-border">
+        <AlertDialogHeader>
+          <AlertDialogTitle className="font-display text-foreground">Delete Shift?</AlertDialogTitle>
+          <AlertDialogDescription className="font-body text-muted-foreground">
+            This action cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel className="font-display text-xs">Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={() => { if (idRef.current) onConfirm(idRef.current); }} className="font-display text-xs bg-destructive text-destructive-foreground">
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+};
 
 // Task Assignment Modal
 const TaskAssignModal = ({ open, onClose, form, setForm, employees, units, onSave }: {

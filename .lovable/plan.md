@@ -1,25 +1,37 @@
 
 
-## Plan: Fix Schedule Delete & Add Multi-Day Shift Creation
+## Plan: Fix Schedule Delete & Enhance Task/Assignment Scheduling
 
-### Problems Identified
+### Issues Found
 
-1. **Delete race condition**: In `DeleteConfirm`, `AlertDialogAction`'s `onClick` fires after `onOpenChange` already sets `deleteId` to `null`. So `onConfirm(deleteId)` passes `null`. The shift never gets deleted.
+1. **Delete button bug**: The trash icon on shift blocks triggers `setDeleteId(s.id)`, but the parent div's `onClick={() => openEdit(s)}` fires simultaneously despite `stopPropagation`. On mobile, the tiny button (3x3 icon) is nearly impossible to tap. The AlertDialog `onOpenChange={() => setDeleteId(null)}` also races with the confirm action.
 
-2. **Tedious schedule entry**: To give one employee the same shift Mon–Sun, admin must create 7 individual shifts. There's no way to select multiple days at once.
+2. **Missing scheduling features**: The schedule only manages time shifts. There's no way to assign tasks like housecleaning, reception duty, or track completion from within the schedule view.
 
-### Changes (single file: `WeeklyScheduleManager.tsx`)
+### Changes
 
-**Fix 1: Delete reliability**
-- In `DeleteConfirm`, capture `deleteId` in a ref so the confirm handler always has the correct value, even if React state clears first. Same pattern already used for `deleteTaskId` (line 542-543).
+**1. Fix Delete Button** (`WeeklyScheduleManager.tsx`)
+- Make `confirmDelete` capture `deleteId` before the dialog closes by saving it in a ref or local variable
+- Increase touch target size for edit/delete buttons on shift blocks
+- Prevent edit modal from opening when clicking edit/delete icons (the `stopPropagation` exists but the parent click handler on the entire timeline area also fires)
 
-**Fix 2: Multi-day shift creation with checkboxes**
-- In the `ShiftModal` (Add mode only), replace the single date picker with a row of 7 day-of-week checkboxes (Mon, Tue, Wed...) pre-checked for the selected day.
-- Add an "All Week" toggle button to quickly check all 7 days.
-- On save, insert one shift per checked day (batch insert).
-- Edit mode keeps the single date picker (editing one shift at a time).
-- The `shiftForm` state gets a new `selected_days: string[]` array holding `yyyy-MM-dd` strings of checked days.
+**2. Add Task/Assignment Creation from Schedule** (`WeeklyScheduleManager.tsx`)
+- Add an "Assign Task" button alongside "Add Shift" 
+- New modal to create a task assignment: select employee, pick type (Housecleaning, Reception, Custom), set date/time, add notes
+- For housecleaning: select a room/unit to clean, auto-creates a `housekeeping_orders` entry assigned to the selected employee
+- For other tasks: creates an `employee_tasks` entry with due date and description
+- Tasks appear as colored pills on the timeline (already partially implemented)
+
+**3. Show Completion Info on Task Detail** (`WeeklyScheduleManager.tsx`)
+- In the task detail dialog, show who completed the task and when (`completed_at`)
+- For housekeeping pills, show completion status (`cleaning_completed_at`, `completed_by_name`)
+- Make housekeeping pills clickable to show full details (room, status, who inspected/cleaned)
+
+**4. Enhance Task Detail Dialog** (`WeeklyScheduleManager.tsx`)
+- Add edit capability: change title, description, due date, reassign to different employee
+- Add delete capability for tasks
+- Show completion audit trail
 
 ### Files to Edit
-- `src/components/admin/WeeklyScheduleManager.tsx`
+- `src/components/admin/WeeklyScheduleManager.tsx` — all changes in this single file
 
