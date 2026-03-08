@@ -75,7 +75,7 @@ const getSession = () => {
   return null;
 };
 
-const ReceptionPage = () => {
+const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const session = getSession();
