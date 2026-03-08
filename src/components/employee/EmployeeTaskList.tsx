@@ -211,7 +211,7 @@ const EmployeeTaskList = ({ employeeId, createdBy = 'admin', readOnly = false, e
     <div className="space-y-3">
       {/* Filter + Add */}
       <div className="flex gap-1 flex-wrap">
-        {(['all', 'pending', 'completed'] as const).map(f => (
+        {(['all', 'pending', 'completed', 'archived'] as const).map(f => (
           <Button key={f} size="sm" variant={filter === f ? 'default' : 'outline'}
             onClick={() => setFilter(f)} className="font-body text-xs flex-1 capitalize">{f}</Button>
         ))}
