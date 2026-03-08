@@ -24,7 +24,7 @@ const getSession = () => {
   return null;
 };
 
-const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }{ embedded = false }: { embedded?: boolean }) => {
+const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const session = getSession();
