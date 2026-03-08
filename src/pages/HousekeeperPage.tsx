@@ -12,7 +12,7 @@ import HousekeepingInspection from '@/components/admin/HousekeepingInspection';
 
 const from = (table: string) => supabase.from(table as any);
 
-const HousekeeperPage = () => {
+const HousekeeperPage = ({ embedded = false }: { embedded?: boolean }) => {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [acceptingOrderId, setAcceptingOrderId] = useState<string | null>(null);
