@@ -483,16 +483,31 @@ const WeeklyScheduleManager = ({ readOnly = false }: { readOnly?: boolean }) => 
       openEdit(s);
     };
 
+    const handleEditClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      actionClickedRef.current = true;
+      openEdit(s);
+    };
+
+    const handleDeleteClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      actionClickedRef.current = true;
+      setDeleteId(s.id);
+    };
+
     const block = (
       <div
-        className={`absolute top-0.5 bottom-0.5 rounded border ${SHIFT_COLORS[type]} cursor-pointer
-          transition-all hover:shadow-lg hover:shadow-background/20 hover:scale-[1.02] hover:z-10
+        className={`absolute z-10 top-0.5 bottom-0.5 rounded border ${SHIFT_COLORS[type]} cursor-pointer
+          transition-all hover:shadow-lg hover:shadow-background/20 hover:scale-[1.02] hover:z-20
           flex items-center overflow-hidden group/block`}
         style={{ left: `${left}%`, width: `${width}%`, minWidth: compact ? '30px' : '40px' }}
         onClick={handleBlockClick}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}
+        data-shift-block="true"
       >
         <div className={`px-1 flex items-center gap-0.5 w-full min-h-[40px] ${compact ? 'min-h-[36px]' : 'min-h-[44px]'}`}>
           <div className="flex-1 min-w-0">
@@ -509,13 +524,17 @@ const WeeklyScheduleManager = ({ readOnly = false }: { readOnly?: boolean }) => 
           {!readOnly && (
             <div className="flex gap-0.5 shrink-0">
               <button
-                onClick={(e) => { e.stopPropagation(); actionClickedRef.current = true; openEdit(s); }}
+                type="button"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={handleEditClick}
                 className="p-1.5 rounded hover:bg-background/30 text-foreground/60 hover:text-accent min-w-[28px] min-h-[28px] flex items-center justify-center"
               >
                 <Pencil className="h-3.5 w-3.5" />
               </button>
               <button
-                onClick={(e) => { e.stopPropagation(); actionClickedRef.current = true; setDeleteId(s.id); }}
+                type="button"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={handleDeleteClick}
                 className="p-1.5 rounded hover:bg-background/30 text-foreground/60 hover:text-destructive min-w-[28px] min-h-[28px] flex items-center justify-center"
               >
                 <Trash2 className="h-3.5 w-3.5" />
