@@ -40,7 +40,7 @@ const GuestPortal = () => {
   const { data: profile } = useResortProfile();
   const qc = useQueryClient();
   const [session, setSession] = useState<GuestPortalSession | null>(getPortalSession);
-  const [view, setView] = useState<'dashboard' | 'menu' | 'tours' | 'transport' | 'rentals' | 'request' | 'review' | 'bill' | 'orders' | 'requests'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'menu-food' | 'menu-drinks' | 'experiences' | 'request' | 'message' | 'tours' | 'transport' | 'rentals' | 'review' | 'bill' | 'orders' | 'requests'>('dashboard');
 
   // Login state
   const [roomName, setRoomName] = useState('');
