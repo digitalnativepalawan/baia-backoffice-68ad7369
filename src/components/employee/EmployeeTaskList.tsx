@@ -34,7 +34,7 @@ const EmployeeTaskList = ({ employeeId, createdBy = 'admin', readOnly = false, e
   const [editTitle, setEditTitle] = useState('');
   const [editDesc, setEditDesc] = useState('');
   const [editDue, setEditDue] = useState('');
-  const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('all');
+  const [filter, setFilter] = useState<'all' | 'pending' | 'completed' | 'archived'>('all');
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
   const [detailTask, setDetailTask] = useState<any>(null);
 
