@@ -16,6 +16,7 @@ import { usePaymentMethods } from '@/hooks/usePaymentMethods';
 interface TabInvoiceProps {
   tabId: string;
   onClose: () => void;
+  isAdmin?: boolean;
 }
 
 interface OrderItem {
