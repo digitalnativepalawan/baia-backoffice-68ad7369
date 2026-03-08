@@ -11,10 +11,10 @@ import JSZip from 'jszip';
 
 type DateRange = 'week' | 'month' | 'custom';
 
-const toCsvRow = (vals: (string | number | null | undefined)[]) =>
+const toCsvRow = (vals: (string | number | boolean | null | undefined)[]) =>
   vals.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',');
 
-const arrayToCsv = (headers: string[], rows: (string | number | null | undefined)[][]) =>
+const arrayToCsv = (headers: string[], rows: (string | number | boolean | null | undefined)[][]) =>
   [headers.join(','), ...rows.map(toCsvRow)].join('\n');
 
 const AccountingExport = () => {
@@ -135,10 +135,25 @@ const AccountingExport = () => {
         bookings.map(b => [b.id, b.created_at, b.check_in, b.check_out, b.platform, b.room_rate, b.paid_amount, b.adults, b.children, b.special_requests, b.notes])
       ));
 
-      // Revenue summary
+      // Resort Ops Expenses
+      const { data: expenses = [] } = await supabase
+        .from('resort_ops_expenses')
+        .select('*')
+        .gte('expense_date', format(dateFrom, 'yyyy-MM-dd'))
+        .lte('expense_date', format(dateTo, 'yyyy-MM-dd'))
+        .order('expense_date', { ascending: false });
+
+      zip.file('expenses.csv', arrayToCsv(
+        ['id', 'expense_date', 'category', 'name', 'description', 'amount', 'vat_status', 'vatable_sale', 'vat_amount', 'vat_exempt_amount', 'zero_rated_amount', 'withholding_tax', 'payment_method', 'invoice_number', 'official_receipt_number', 'supplier_tin', 'is_paid', 'project_unit', 'notes'],
+        expenses.map(e => [e.id, e.expense_date, e.category, e.name, e.description, e.amount, e.vat_status, e.vatable_sale, e.vat_amount, e.vat_exempt_amount, e.zero_rated_amount, e.withholding_tax, e.payment_method, e.invoice_number, e.official_receipt_number, e.supplier_tin, e.is_paid, e.project_unit, e.notes])
+      ));
+
+      // Revenue & Expense summary
       const totalRevenue = orders.filter(o => ['Paid', 'Closed'].includes(o.status)).reduce((s, o) => s + (o.total || 0), 0);
       const totalSC = orders.reduce((s, o) => s + (o.service_charge || 0), 0);
       const toursRevenue = tours.reduce((s, t) => s + (t.price || 0), 0);
+      const totalExpenses = expenses.reduce((s, e) => s + (e.amount || 0), 0);
+      const totalInputVAT = expenses.reduce((s, e) => s + (e.vat_amount || 0), 0);
       zip.file('summary.csv', arrayToCsv(
         ['metric', 'value'],
         [
@@ -149,6 +164,9 @@ const AccountingExport = () => {
           ['Service Charges', totalSC],
           ['Tours Revenue', toursRevenue],
           ['Total Bookings', bookings.length],
+          ['Total Expenses', totalExpenses],
+          ['Total Input VAT', totalInputVAT],
+          ['Net Income (Revenue - Expenses)', totalRevenue + toursRevenue - totalExpenses],
           ['Total Tasks', tasks.length],
           ['Housekeeping Jobs', hk.length],
         ]
@@ -269,7 +287,7 @@ const AccountingExport = () => {
       </div>
 
       <p className="font-body text-[11px] text-muted-foreground">
-        Exports a ZIP file with: bookings, orders, tabs, experiences, guest requests, housekeeping, tasks, and a revenue summary.
+        Exports a ZIP file with: bookings, orders, tabs, experiences, guest requests, housekeeping, tasks, expenses, and a revenue/expense summary.
       </p>
     </section>
   );

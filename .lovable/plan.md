@@ -1,28 +1,37 @@
 
 
-## Add Resort Ops Expenses to Accounting Export
+## Plan: Fix Schedule Delete & Enhance Task/Assignment Scheduling
 
-You're right — the current Accounting Export only covers revenue-side data (orders, bookings, tours, etc.) but completely misses the **expenses** from Resort Ops. That's a big gap for accounting.
+### Issues Found
 
-### What's missing
+1. **Delete button bug**: The trash icon on shift blocks triggers `setDeleteId(s.id)`, but the parent div's `onClick={() => openEdit(s)}` fires simultaneously despite `stopPropagation`. On mobile, the tiny button (3x3 icon) is nearly impossible to tap. The AlertDialog `onOpenChange={() => setDeleteId(null)}` also races with the confirm action.
 
-The `expenses` table contains all Resort Ops expense records (vendor payments, utilities, supplies, labor syncs, etc.) with VAT details, categories, payment methods, and receipt images. None of this is included in the ZIP export.
+2. **Missing scheduling features**: The schedule only manages time shifts. There's no way to assign tasks like housecleaning, reception duty, or track completion from within the schedule view.
 
-### Plan
+### Changes
 
-**Edit `src/components/admin/AccountingExport.tsx`** — add one more query + CSV file:
+**1. Fix Delete Button** (`WeeklyScheduleManager.tsx`)
+- Make `confirmDelete` capture `deleteId` before the dialog closes by saving it in a ref or local variable
+- Increase touch target size for edit/delete buttons on shift blocks
+- Prevent edit modal from opening when clicking edit/delete icons (the `stopPropagation` exists but the parent click handler on the entire timeline area also fires)
 
-1. Query the `expenses` table for the selected date range (using `expense_date` or `created_at`)
-2. Generate `expenses.csv` with columns: `id`, `expense_date`, `category`, `vendor`, `description`, `amount`, `vat_status`, `vatable_sale`, `vat_amount`, `vat_exempt_amount`, `zero_rated_amount`, `payment_method`, `invoice_number`, `official_receipt_number`, `tin`, `status`, `notes`
-3. Add expense totals to `summary.csv`: Total Expenses, Total Input VAT, Net (Revenue minus Expenses)
-4. Update the description text to mention expenses
+**2. Add Task/Assignment Creation from Schedule** (`WeeklyScheduleManager.tsx`)
+- Add an "Assign Task" button alongside "Add Shift" 
+- New modal to create a task assignment: select employee, pick type (Housecleaning, Reception, Custom), set date/time, add notes
+- For housecleaning: select a room/unit to clean, auto-creates a `housekeeping_orders` entry assigned to the selected employee
+- For other tasks: creates an `employee_tasks` entry with due date and description
+- Tasks appear as colored pills on the timeline (already partially implemented)
 
-**No database changes needed.** No other files touched. The `expenses` table already exists with all necessary fields and public RLS.
+**3. Show Completion Info on Task Detail** (`WeeklyScheduleManager.tsx`)
+- In the task detail dialog, show who completed the task and when (`completed_at`)
+- For housekeeping pills, show completion status (`cleaning_completed_at`, `completed_by_name`)
+- Make housekeeping pills clickable to show full details (room, status, who inspected/cleaned)
 
-### Summary CSV additions
-```
-Total Expenses, <sum>
-Total Input VAT, <sum of vat_amount>
-Net Income (Revenue - Expenses), <calculated>
-```
+**4. Enhance Task Detail Dialog** (`WeeklyScheduleManager.tsx`)
+- Add edit capability: change title, description, due date, reassign to different employee
+- Add delete capability for tasks
+- Show completion audit trail
+
+### Files to Edit
+- `src/components/admin/WeeklyScheduleManager.tsx` — all changes in this single file
 
