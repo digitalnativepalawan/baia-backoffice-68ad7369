@@ -569,7 +569,7 @@ const AdminPage = () => {
                   </div>
                 </>
               ) : selectedTabId ? (
-                <TabInvoice tabId={selectedTabId} onClose={() => setSelectedTabId(null)} />
+                <TabInvoice tabId={selectedTabId} onClose={() => setSelectedTabId(null)} isAdmin={isAdmin} />
               ) : (
                 <div className="space-y-3">
                   {(() => {
@@ -1138,7 +1138,7 @@ const AdminPage = () => {
       <Dialog open={!!viewingTabId} onOpenChange={() => setViewingTabId(null)}>
         <DialogContent className="bg-card border-border max-w-md max-h-[90vh] overflow-y-auto">
           {viewingTabId && (
-            <TabInvoice tabId={viewingTabId} onClose={() => setViewingTabId(null)} />
+            <TabInvoice tabId={viewingTabId} onClose={() => setViewingTabId(null)} isAdmin={isAdmin} />
           )}
         </DialogContent>
       </Dialog>

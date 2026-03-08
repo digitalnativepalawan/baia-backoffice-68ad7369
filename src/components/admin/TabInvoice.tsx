@@ -5,7 +5,7 @@ import { useInvoiceSettings } from '@/hooks/useInvoiceSettings';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, X, Plus, Minus, ShoppingCart, Download, MessageCircle } from 'lucide-react';
+import { ArrowLeft, X, Plus, Minus, ShoppingCart, Download, MessageCircle, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
@@ -16,6 +16,7 @@ import { usePaymentMethods } from '@/hooks/usePaymentMethods';
 interface TabInvoiceProps {
   tabId: string;
   onClose: () => void;
+  isAdmin?: boolean;
 }
 
 interface OrderItem {
@@ -38,7 +39,56 @@ const TYPE_LABELS: Record<string, string> = {
   WalkIn: 'Walk-In Guest',
 };
 
-const TabInvoice = ({ tabId, onClose }: TabInvoiceProps) => {
+const EditableOrderItems = ({ items, onSave }: { items: OrderItem[]; onSave: (items: OrderItem[]) => void }) => {
+  const [editItems, setEditItems] = useState<OrderItem[]>(() => items.map(i => ({ ...i })));
+
+  const updateQty = (idx: number, delta: number) => {
+    setEditItems(prev => {
+      const next = [...prev];
+      const newQty = next[idx].qty + delta;
+      if (newQty <= 0) return prev.filter((_, i) => i !== idx);
+      next[idx] = { ...next[idx], qty: newQty };
+      return next;
+    });
+  };
+
+  const removeItem = (idx: number) => {
+    setEditItems(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  return (
+    <div className="space-y-1">
+      {editItems.map((item, i) => (
+        <div key={i} className="flex items-center justify-between py-0.5">
+          <span className="font-body text-sm text-foreground flex-1">{item.name}</span>
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => updateQty(i, -1)} className="w-7 h-7 flex items-center justify-center rounded bg-secondary text-foreground hover:bg-destructive/20">
+              <Minus className="w-3 h-3" />
+            </button>
+            <span className="font-display text-sm text-foreground w-5 text-center">{item.qty}</span>
+            <button onClick={() => updateQty(i, 1)} className="w-7 h-7 flex items-center justify-center rounded bg-secondary text-foreground hover:bg-primary/20">
+              <Plus className="w-3 h-3" />
+            </button>
+            <span className="font-body text-xs text-muted-foreground w-14 text-right">₱{(item.price * item.qty).toLocaleString()}</span>
+            <button onClick={() => removeItem(i)} className="w-7 h-7 flex items-center justify-center rounded text-destructive hover:bg-destructive/10">
+              <Trash2 className="w-3 h-3" />
+            </button>
+          </div>
+        </div>
+      ))}
+      {editItems.length > 0 && (
+        <Button size="sm" onClick={() => onSave(editItems)} className="w-full mt-2 font-display text-xs tracking-wider min-h-[36px]">
+          Save Changes
+        </Button>
+      )}
+      {editItems.length === 0 && (
+        <p className="font-body text-xs text-destructive text-center py-2">All items removed — delete this order instead</p>
+      )}
+    </div>
+  );
+};
+
+const TabInvoice = ({ tabId, onClose, isAdmin }: TabInvoiceProps) => {
   const qc = useQueryClient();
   const { data: profile } = useResortProfile();
   const { data: invoiceSettings } = useInvoiceSettings();
@@ -51,6 +101,9 @@ const TabInvoice = ({ tabId, onClose }: TabInvoiceProps) => {
   const [addingItems, setAddingItems] = useState(false);
   const [cart, setCart] = useState<CartEntry[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [confirmDeleteOrder, setConfirmDeleteOrder] = useState<string | null>(null);
+  const [confirmDeleteTab, setConfirmDeleteTab] = useState(false);
+  const [editingOrder, setEditingOrder] = useState<string | null>(null);
 
   const { data: tab } = useQuery({
     queryKey: ['tab', tabId],
@@ -202,7 +255,49 @@ const TabInvoice = ({ tabId, onClose }: TabInvoiceProps) => {
     }
   };
 
-  // Build a combined order for PDF/WhatsApp (all items across all orders)
+  const deleteOrderFromTab = async (orderId: string) => {
+    try {
+      await supabase.from('orders').delete().eq('id', orderId);
+      qc.invalidateQueries({ queryKey: ['tab-orders', tabId] });
+      qc.invalidateQueries({ queryKey: ['orders-admin'] });
+      setConfirmDeleteOrder(null);
+      toast.success('Order removed from tab');
+    } catch {
+      toast.error('Failed to delete order');
+    }
+  };
+
+  const deleteEntireTab = async () => {
+    try {
+      // Delete all orders in the tab first
+      const orderIds = orders.map(o => o.id);
+      if (orderIds.length > 0) {
+        await supabase.from('orders').delete().in('id', orderIds);
+      }
+      await supabase.from('tabs').delete().eq('id', tabId);
+      qc.invalidateQueries({ queryKey: ['tabs-admin'] });
+      qc.invalidateQueries({ queryKey: ['orders-admin'] });
+      toast.success('Tab deleted');
+      onClose();
+    } catch {
+      toast.error('Failed to delete tab');
+    }
+  };
+
+  const updateOrderItems = async (orderId: string, updatedItems: OrderItem[]) => {
+    const newTotal = updatedItems.reduce((s, i) => s + i.price * i.qty, 0);
+    const newSc = Math.round(newTotal * (scPct / 100));
+    await supabase.from('orders').update({
+      items: updatedItems as any,
+      total: newTotal,
+      service_charge: newSc,
+    }).eq('id', orderId);
+    qc.invalidateQueries({ queryKey: ['tab-orders', tabId] });
+    qc.invalidateQueries({ queryKey: ['orders-admin'] });
+    setEditingOrder(null);
+    toast.success('Order updated');
+  };
+
   const combinedOrder = {
     id: tabId,
     order_type: tab.location_type,
@@ -338,22 +433,56 @@ const TabInvoice = ({ tabId, onClose }: TabInvoiceProps) => {
       {/* Orders grouped */}
       {orders.map((order, idx) => {
         const items = (Array.isArray(order.items) ? order.items : []) as unknown as OrderItem[];
+        const isEditing = editingOrder === order.id;
         return (
           <div key={order.id} className="border border-border rounded-lg p-3">
             <div className="flex justify-between items-center mb-2">
               <span className="font-display text-xs text-cream-dim tracking-wider">
                 Order #{idx + 1}
               </span>
-              <span className="font-body text-[10px] text-cream-dim">
-                {format(new Date(order.created_at), 'MMM d, h:mm a')}
-              </span>
-            </div>
-            {items.map((item, i) => (
-              <div key={i} className="flex justify-between font-body text-sm py-0.5">
-                <span className="text-foreground">{item.qty}x {item.name}</span>
-                <span className="text-foreground">₱{(item.price * item.qty).toLocaleString()}</span>
+              <div className="flex items-center gap-2">
+                <span className="font-body text-[10px] text-cream-dim">
+                  {format(new Date(order.created_at), 'MMM d, h:mm a')}
+                </span>
+                {isAdmin && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setEditingOrder(isEditing ? null : order.id)}
+                      className="font-body text-[10px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded border border-border hover:border-foreground/30 transition-colors"
+                    >
+                      {isEditing ? 'Cancel' : 'Adjust'}
+                    </button>
+                    {confirmDeleteOrder === order.id ? (
+                      <button
+                        onClick={() => deleteOrderFromTab(order.id)}
+                        className="font-body text-[10px] text-destructive hover:text-destructive px-1.5 py-0.5 rounded border border-destructive/40 bg-destructive/10 animate-pulse"
+                      >
+                        Confirm?
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => { setConfirmDeleteOrder(order.id); setTimeout(() => setConfirmDeleteOrder(null), 3000); }}
+                        className="font-body text-[10px] text-muted-foreground hover:text-destructive px-1.5 py-0.5 rounded border border-border hover:border-destructive/40 transition-colors"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
-            ))}
+            </div>
+            {isEditing ? (
+              <EditableOrderItems items={items} onSave={(updated) => updateOrderItems(order.id, updated)} />
+            ) : (
+              <>
+                {items.map((item, i) => (
+                  <div key={i} className="flex justify-between font-body text-sm py-0.5">
+                    <span className="text-foreground">{item.qty}x {item.name}</span>
+                    <span className="text-foreground">₱{(item.price * item.qty).toLocaleString()}</span>
+                  </div>
+                ))}
+              </>
+            )}
             <div className="flex justify-between font-body text-xs text-cream-dim mt-1 pt-1 border-t border-border/50">
               <span>Subtotal: ₱{Number(order.total).toLocaleString()}</span>
               <span>SC: ₱{Number(order.service_charge || 0).toLocaleString()}</span>
@@ -446,6 +575,26 @@ const TabInvoice = ({ tabId, onClose }: TabInvoiceProps) => {
             <p className="font-body text-[10px] text-cream-dim">
               {format(new Date(tab.closed_at), 'MMM d, yyyy h:mm a')}
             </p>
+          )}
+        </div>
+      )}
+
+      {/* Admin: Delete entire tab */}
+      {isAdmin && (
+        <div className="pt-2">
+          {confirmDeleteTab ? (
+            <div className="flex gap-2">
+              <Button variant="destructive" className="flex-1 font-display text-xs tracking-wider min-h-[44px] animate-pulse" onClick={deleteEntireTab}>
+                <Trash2 className="w-4 h-4 mr-1" /> Confirm Delete Tab
+              </Button>
+              <Button variant="outline" className="font-body text-xs min-h-[44px]" onClick={() => setConfirmDeleteTab(false)}>
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            <Button variant="outline" className="w-full font-body text-xs gap-1.5 min-h-[44px] border-destructive/30 text-destructive hover:bg-destructive/10" onClick={() => setConfirmDeleteTab(true)}>
+              <Trash2 className="w-4 h-4" /> Delete Entire Tab
+            </Button>
           )}
         </div>
       )}
