@@ -384,22 +384,56 @@ const TabInvoice = ({ tabId, onClose, isAdmin }: TabInvoiceProps) => {
       {/* Orders grouped */}
       {orders.map((order, idx) => {
         const items = (Array.isArray(order.items) ? order.items : []) as unknown as OrderItem[];
+        const isEditing = editingOrder === order.id;
         return (
           <div key={order.id} className="border border-border rounded-lg p-3">
             <div className="flex justify-between items-center mb-2">
               <span className="font-display text-xs text-cream-dim tracking-wider">
                 Order #{idx + 1}
               </span>
-              <span className="font-body text-[10px] text-cream-dim">
-                {format(new Date(order.created_at), 'MMM d, h:mm a')}
-              </span>
-            </div>
-            {items.map((item, i) => (
-              <div key={i} className="flex justify-between font-body text-sm py-0.5">
-                <span className="text-foreground">{item.qty}x {item.name}</span>
-                <span className="text-foreground">₱{(item.price * item.qty).toLocaleString()}</span>
+              <div className="flex items-center gap-2">
+                <span className="font-body text-[10px] text-cream-dim">
+                  {format(new Date(order.created_at), 'MMM d, h:mm a')}
+                </span>
+                {isAdmin && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setEditingOrder(isEditing ? null : order.id)}
+                      className="font-body text-[10px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded border border-border hover:border-foreground/30 transition-colors"
+                    >
+                      {isEditing ? 'Cancel' : 'Adjust'}
+                    </button>
+                    {confirmDeleteOrder === order.id ? (
+                      <button
+                        onClick={() => deleteOrderFromTab(order.id)}
+                        className="font-body text-[10px] text-destructive hover:text-destructive px-1.5 py-0.5 rounded border border-destructive/40 bg-destructive/10 animate-pulse"
+                      >
+                        Confirm?
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => { setConfirmDeleteOrder(order.id); setTimeout(() => setConfirmDeleteOrder(null), 3000); }}
+                        className="font-body text-[10px] text-muted-foreground hover:text-destructive px-1.5 py-0.5 rounded border border-border hover:border-destructive/40 transition-colors"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
-            ))}
+            </div>
+            {isEditing ? (
+              <EditableOrderItems items={items} onSave={(updated) => updateOrderItems(order.id, updated)} />
+            ) : (
+              <>
+                {items.map((item, i) => (
+                  <div key={i} className="flex justify-between font-body text-sm py-0.5">
+                    <span className="text-foreground">{item.qty}x {item.name}</span>
+                    <span className="text-foreground">₱{(item.price * item.qty).toLocaleString()}</span>
+                  </div>
+                ))}
+              </>
+            )}
             <div className="flex justify-between font-body text-xs text-cream-dim mt-1 pt-1 border-t border-border/50">
               <span>Subtotal: ₱{Number(order.total).toLocaleString()}</span>
               <span>SC: ₱{Number(order.service_charge || 0).toLocaleString()}</span>
