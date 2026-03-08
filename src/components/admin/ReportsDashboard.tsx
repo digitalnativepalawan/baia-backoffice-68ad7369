@@ -501,6 +501,9 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
         )}
       </section>
 
+      {/* Accounting Export */}
+      <AccountingExport />
+
       {/* Coming Soon - Tours */}
       <section className="p-4 border border-dashed border-border rounded-lg opacity-60">
         <div className="flex items-center gap-2 mb-2">
