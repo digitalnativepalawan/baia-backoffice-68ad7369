@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
-import { Plus, Check, CheckCircle2, Pencil, Trash2, X, MessageCircle, Phone, Users, Eye } from 'lucide-react';
+import { Plus, Check, CheckCircle2, Pencil, Trash2, X, MessageCircle, Phone, Users, Eye, Upload } from 'lucide-react';
 import { format } from 'date-fns';
 import { sendMessengerMessage, openWhatsApp } from '@/lib/messenger';
 import { useResortProfile } from '@/hooks/useResortProfile';
@@ -34,23 +34,29 @@ const EmployeeTaskList = ({ employeeId, createdBy = 'admin', readOnly = false, e
   const [editTitle, setEditTitle] = useState('');
   const [editDesc, setEditDesc] = useState('');
   const [editDue, setEditDue] = useState('');
-  const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('all');
+  const [filter, setFilter] = useState<'all' | 'pending' | 'completed' | 'archived'>('all');
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
   const [detailTask, setDetailTask] = useState<any>(null);
 
   const activeEmployees = employees.filter(e => e.active !== false);
 
   const { data: tasks = [] } = useQuery({
-    queryKey: ['employee-tasks', employeeId],
+    queryKey: ['employee-tasks', employeeId, filter],
     queryFn: async () => {
       let q = (supabase.from('employee_tasks' as any) as any).select('*').order('created_at', { ascending: false });
       if (employeeId) q = q.eq('employee_id', employeeId);
+      if (filter === 'archived') {
+        q = q.not('archived_at', 'is', null);
+      } else {
+        q = q.is('archived_at', null);
+      }
       const { data } = await q;
       return (data || []) as any[];
     },
   });
 
   const filtered = tasks.filter(t => {
+    if (filter === 'archived') return true;
     if (filter === 'pending') return t.status !== 'completed';
     if (filter === 'completed') return t.status === 'completed';
     return true;
@@ -184,10 +190,16 @@ const EmployeeTaskList = ({ employeeId, createdBy = 'admin', readOnly = false, e
     toast.success('Task updated');
   };
 
-  const deleteTask = async (id: string) => {
-    await (supabase.from('employee_tasks' as any) as any).delete().eq('id', id);
+  const archiveTask = async (id: string) => {
+    await (supabase.from('employee_tasks' as any) as any).update({ archived_at: new Date().toISOString() }).eq('id', id);
     qc.invalidateQueries({ queryKey: ['employee-tasks'] });
-    toast.success('Task deleted');
+    toast.success('Task archived');
+  };
+
+  const restoreTask = async (id: string) => {
+    await (supabase.from('employee_tasks' as any) as any).update({ archived_at: null }).eq('id', id);
+    qc.invalidateQueries({ queryKey: ['employee-tasks'] });
+    toast.success('Task restored');
   };
 
   const getEmployeeName = (id: string) => {
@@ -199,7 +211,7 @@ const EmployeeTaskList = ({ employeeId, createdBy = 'admin', readOnly = false, e
     <div className="space-y-3">
       {/* Filter + Add */}
       <div className="flex gap-1 flex-wrap">
-        {(['all', 'pending', 'completed'] as const).map(f => (
+        {(['all', 'pending', 'completed', 'archived'] as const).map(f => (
           <Button key={f} size="sm" variant={filter === f ? 'default' : 'outline'}
             onClick={() => setFilter(f)} className="font-body text-xs flex-1 capitalize">{f}</Button>
         ))}
@@ -385,8 +397,13 @@ const EmployeeTaskList = ({ employeeId, createdBy = 'admin', readOnly = false, e
                           setEditId(task.id); setEditTitle(task.title); setEditDesc(task.description || '');
                           setEditDue(task.due_date ? format(new Date(task.due_date), "yyyy-MM-dd'T'HH:mm") : '');
                         }}><Pencil className="w-5 h-5" /></Button>
-                        <Button size="icon" variant="ghost" className="h-10 w-10 text-muted-foreground hover:text-destructive"
-                          onClick={() => deleteTask(task.id)}><Trash2 className="w-5 h-5" /></Button>
+                        {filter === 'archived' ? (
+                          <Button size="icon" variant="ghost" className="h-10 w-10 text-primary"
+                            onClick={() => restoreTask(task.id)} title="Restore task"><Upload className="w-5 h-5" /></Button>
+                        ) : (
+                          <Button size="icon" variant="ghost" className="h-10 w-10 text-muted-foreground hover:text-destructive"
+                            onClick={() => archiveTask(task.id)} title="Archive task"><Trash2 className="w-5 h-5" /></Button>
+                        )}
                         <Button size="icon" variant="ghost" className="h-10 w-10 text-muted-foreground"
                           title="Send via Messenger"
                           disabled={(() => { const emp = employees.find(e => e.id === task.employee_id); return !emp?.messenger_link || emp?.active === false; })()}

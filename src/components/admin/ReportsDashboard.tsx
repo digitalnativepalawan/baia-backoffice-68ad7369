@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { startOfDay, startOfWeek, startOfMonth, startOfYear, subDays, endOfDay, format } from 'date-fns';
 import { DollarSign, ShoppingCart, TrendingUp, Lock, Download, CalendarIcon, Percent, PiggyBank, Receipt, ChevronDown, ChevronUp } from 'lucide-react';
+import AccountingExport from './AccountingExport';
 import { cn } from '@/lib/utils';
 
 const TYPE_LABELS: Record<string, string> = {
@@ -500,6 +501,9 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
           </div>
         )}
       </section>
+
+      {/* Accounting Export */}
+      <AccountingExport />
 
       {/* Coming Soon - Tours */}
       <section className="p-4 border border-dashed border-border rounded-lg opacity-60">

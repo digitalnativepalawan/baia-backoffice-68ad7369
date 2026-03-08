@@ -418,12 +418,12 @@ const WeeklyScheduleManager = ({ readOnly = false }: { readOnly?: boolean }) => 
     qc.invalidateQueries({ queryKey: ['week-hk-orders'] });
   };
 
-  // Delete task
+  // Archive task (soft delete)
   const deleteTask = async (taskId: string) => {
-    await supabase.from('employee_tasks').delete().eq('id', taskId);
+    await (supabase.from('employee_tasks') as any).update({ archived_at: new Date().toISOString() }).eq('id', taskId);
     qc.invalidateQueries({ queryKey: ['week-tasks'] });
     qc.invalidateQueries({ queryKey: ['undated-tasks'] });
-    toast.success('Task deleted');
+    toast.success('Task archived');
   };
 
   // Update task
