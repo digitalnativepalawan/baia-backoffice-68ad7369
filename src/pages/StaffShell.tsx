@@ -107,6 +107,9 @@ const StaffShell = () => {
           </div>
         )}
 
+        {/* Action Required — always visible, sorted by urgency */}
+        <ActionRequiredPanel />
+
         {/* Role-specific home screen */}
         {activeRole === 'reception' && <ReceptionHome />}
         {activeRole === 'housekeeping' && <HousekeepingHome />}
