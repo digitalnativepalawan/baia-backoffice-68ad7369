@@ -242,16 +242,18 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
   };
 
   return (
-    <div className="min-h-screen bg-navy-texture p-4 max-w-2xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <Button size="sm" variant="ghost" onClick={() => navigate('/')}>
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
-        <div>
-          <h1 className="font-display text-xl tracking-wider text-foreground">Experiences</h1>
-          <p className="font-body text-xs text-muted-foreground">{format(today, 'EEEE, MMM d, yyyy')}</p>
+    <div className={embedded ? 'space-y-4' : 'min-h-screen bg-navy-texture p-4 max-w-2xl mx-auto'}>
+      {!embedded && (
+        <div className="flex items-center gap-3 mb-6">
+          <Button size="sm" variant="ghost" onClick={() => navigate('/')}>
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <div>
+            <h1 className="font-display text-xl tracking-wider text-foreground">Experiences</h1>
+            <p className="font-body text-xs text-muted-foreground">{format(today, 'EEEE, MMM d, yyyy')}</p>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ── Summary ── */}
       <div className="grid grid-cols-3 gap-2 mb-6">
