@@ -320,7 +320,7 @@ const WeeklyScheduleManager = ({ readOnly = false }: { readOnly?: boolean }) => 
   };
 
   const confirmDelete = async (scheduleId?: string) => {
-    const idToDelete = scheduleId || deleteId;
+    const idToDelete = scheduleId || deleteIdRef.current;
     if (!idToDelete) {
       toast.error('No shift selected for deletion');
       return;
