@@ -41,16 +41,22 @@ const EmployeeTaskList = ({ employeeId, createdBy = 'admin', readOnly = false, e
   const activeEmployees = employees.filter(e => e.active !== false);
 
   const { data: tasks = [] } = useQuery({
-    queryKey: ['employee-tasks', employeeId],
+    queryKey: ['employee-tasks', employeeId, filter],
     queryFn: async () => {
       let q = (supabase.from('employee_tasks' as any) as any).select('*').order('created_at', { ascending: false });
       if (employeeId) q = q.eq('employee_id', employeeId);
+      if (filter === 'archived') {
+        q = q.not('archived_at', 'is', null);
+      } else {
+        q = q.is('archived_at', null);
+      }
       const { data } = await q;
       return (data || []) as any[];
     },
   });
 
   const filtered = tasks.filter(t => {
+    if (filter === 'archived') return true;
     if (filter === 'pending') return t.status !== 'completed';
     if (filter === 'completed') return t.status === 'completed';
     return true;
