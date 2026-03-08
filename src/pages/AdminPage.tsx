@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Plus, ArrowLeft, Home, Eye, EyeOff, Receipt, Search, Download, Upload, Package, Trash2, Minus } from 'lucide-react';
+import { Plus, Home, Eye, EyeOff, Receipt, Search, Download, Upload, Trash2, Minus } from 'lucide-react';
 import MenuBulkImportModal from '@/components/admin/MenuBulkImportModal';
 import ResortProfileForm from '@/components/admin/ResortProfileForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -25,7 +25,6 @@ import InvoiceSettingsForm from '@/components/admin/InvoiceSettingsForm';
 import StaffAccessManager from '@/components/admin/StaffAccessManager';
 import EmployeeContactConfig from '@/components/admin/EmployeeContactConfig';
 import RoomsDashboard from '@/components/admin/RoomsDashboard';
-import AdminLoginGate from '@/components/admin/AdminLoginGate';
 import TimesheetDashboard from '@/components/admin/TimesheetDashboard';
 import WeeklyScheduleManager from '@/components/admin/WeeklyScheduleManager';
 import HousekeepingConfig from '@/components/admin/HousekeepingConfig';
@@ -35,21 +34,78 @@ import BillingConfigForm from '@/components/admin/BillingConfigForm';
 import AuditLogView from '@/components/admin/AuditLogView';
 import OrderArchive from '@/components/admin/OrderArchive';
 import GuestPortalConfig from '@/components/admin/GuestPortalConfig';
+import DepartmentOrdersView from '@/components/DepartmentOrdersView';
 
 import { deductInventoryForOrder } from '@/lib/inventoryDeduction';
-
+import { hasAccess, canEdit, canViewDocuments } from '@/lib/permissions';
 
 import { formatDistanceToNow } from 'date-fns';
 import { useResortProfile } from '@/hooks/useResortProfile';
 
 type DateFilter = 'today' | 'yesterday' | 'all';
 
+// ── Session helpers ──────────────────────────────────────────────
+const SESSION_KEY = 'staff_home_session';
+const getSession = () => {
+  try {
+    const stored = sessionStorage.getItem(SESSION_KEY);
+    if (stored) {
+      const s = JSON.parse(stored);
+      if (s.expiresAt > Date.now()) return s;
+    }
+  } catch {}
+  return null;
+};
+
+// ── Tab / section definitions ────────────────────────────────────
+interface TabDef { value: string; label: string; perm: string | null }
+
+const OPERATIONS: TabDef[] = [
+  { value: 'orders', label: 'Orders', perm: 'orders' },
+  { value: 'kitchen', label: 'Kitchen', perm: 'kitchen' },
+  { value: 'bar', label: 'Bar', perm: 'bar' },
+  { value: 'rooms', label: 'Rooms', perm: 'rooms' },
+  { value: 'housekeeping', label: 'Housekeeping', perm: 'housekeeping' },
+];
+
+const PEOPLE: TabDef[] = [
+  { value: 'payroll', label: 'HR', perm: 'payroll' },
+  { value: 'schedules', label: 'Schedules', perm: 'schedules' },
+  { value: 'timesheet', label: 'Timesheet', perm: 'timesheet' },
+];
+
+const CONFIG: TabDef[] = [
+  { value: 'settings', label: 'Setup', perm: 'setup' },
+  { value: 'menu', label: 'Menu', perm: 'menu' },
+  { value: 'reports', label: 'Reports', perm: 'reports' },
+  { value: 'inventory', label: 'Inventory', perm: 'inventory' },
+  { value: 'resort-ops', label: 'Resort Ops', perm: 'resort_ops' },
+  { value: 'audit', label: 'Audit', perm: null },
+  { value: 'archive', label: 'Archive', perm: null },
+  { value: 'guest-portal', label: 'Guest Portal', perm: null },
+];
+
 const AdminPage = () => {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { data: resortProfile } = useResortProfile();
 
-  // Realtime subscription for orders and tabs
+  // ── Permissions ────────────────────────────────────────────────
+  const session = getSession();
+  const perms: string[] = session?.permissions || [];
+  const isAdmin = perms.includes('admin');
+
+  const allowed = (t: TabDef) => isAdmin || (t.perm !== null && hasAccess(perms, t.perm));
+  const opsTabs = OPERATIONS.filter(allowed);
+  const peopleTabs = PEOPLE.filter(allowed);
+  const cfgTabs = CONFIG.filter(allowed);
+  const allTabs = [...opsTabs, ...peopleTabs, ...cfgTabs];
+  const defaultTab = allTabs[0]?.value || 'orders';
+
+  const readOnly = (section: string) => !isAdmin && !canEdit(perms, section);
+  const docsAllowed = isAdmin || canViewDocuments(perms);
+
+  // ── Realtime ───────────────────────────────────────────────────
   useEffect(() => {
     const channel = supabase
       .channel('admin-realtime')
@@ -64,9 +120,10 @@ const AdminPage = () => {
     return () => { supabase.removeChannel(channel); };
   }, [qc]);
 
-  // Data queries
+  // ── Data queries ───────────────────────────────────────────────
   const { data: settings } = useQuery({
     queryKey: ['settings'],
+    enabled: isAdmin || hasAccess(perms, 'setup'),
     queryFn: async () => {
       const { data } = await supabase.from('settings').select('*').limit(1).maybeSingle();
       return data;
@@ -75,6 +132,7 @@ const AdminPage = () => {
 
   const { data: units = [] } = useQuery({
     queryKey: ['units-admin'],
+    enabled: isAdmin || hasAccess(perms, 'setup'),
     queryFn: async () => {
       const { data } = await supabase.from('units').select('*').order('unit_name');
       return data || [];
@@ -83,6 +141,7 @@ const AdminPage = () => {
 
   const { data: tables = [] } = useQuery({
     queryKey: ['tables-admin'],
+    enabled: isAdmin || hasAccess(perms, 'setup'),
     queryFn: async () => {
       const { data } = await supabase.from('resort_tables').select('*').order('table_name');
       return data || [];
@@ -91,6 +150,7 @@ const AdminPage = () => {
 
   const { data: orderTypes = [] } = useQuery({
     queryKey: ['order-types-admin'],
+    enabled: isAdmin || hasAccess(perms, 'setup'),
     queryFn: async () => {
       const { data } = await supabase.from('order_types').select('*').order('sort_order');
       return data || [];
@@ -99,6 +159,7 @@ const AdminPage = () => {
 
   const { data: menuCategories = [] } = useQuery({
     queryKey: ['menu-categories-admin'],
+    enabled: isAdmin || hasAccess(perms, 'menu') || hasAccess(perms, 'setup'),
     queryFn: async () => {
       const { data } = await supabase.from('menu_categories').select('*').order('sort_order');
       return data || [];
@@ -107,6 +168,7 @@ const AdminPage = () => {
 
   const { data: menuItems = [] } = useQuery({
     queryKey: ['menu-admin'],
+    enabled: isAdmin || hasAccess(perms, 'menu') || hasAccess(perms, 'orders'),
     queryFn: async () => {
       const { data } = await supabase.from('menu_items').select('*').order('category').order('sort_order');
       return data || [];
@@ -115,6 +177,7 @@ const AdminPage = () => {
 
   const { data: orders = [] } = useQuery({
     queryKey: ['orders-admin'],
+    enabled: isAdmin || hasAccess(perms, 'orders'),
     queryFn: async () => {
       const { data } = await supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(200);
       return data || [];
@@ -123,13 +186,14 @@ const AdminPage = () => {
 
   const { data: tabs = [] } = useQuery({
     queryKey: ['tabs-admin'],
+    enabled: isAdmin || hasAccess(perms, 'orders'),
     queryFn: async () => {
       const { data } = await supabase.from('tabs').select('*').order('created_at', { ascending: false }).limit(100);
       return data || [];
     },
   });
 
-  // Settings state
+  // ── Settings state ─────────────────────────────────────────────
   const [whatsapp, setWhatsapp] = useState('');
   const [brkStart, setBrkStart] = useState('');
   const [brkEnd, setBrkEnd] = useState('');
@@ -157,7 +221,7 @@ const AdminPage = () => {
     toast.success('Settings saved');
   };
 
-  // Units
+  // ── Units ──────────────────────────────────────────────────────
   const [newUnit, setNewUnit] = useState('');
   const addUnit = async () => {
     if (!newUnit.trim()) return;
@@ -166,7 +230,7 @@ const AdminPage = () => {
     qc.invalidateQueries({ queryKey: ['units-admin'] });
   };
 
-  // Tables
+  // ── Tables ─────────────────────────────────────────────────────
   const [newTable, setNewTable] = useState('');
   const addTable = async () => {
     if (!newTable.trim()) return;
@@ -175,7 +239,7 @@ const AdminPage = () => {
     qc.invalidateQueries({ queryKey: ['tables-admin'] });
   };
 
-  // Order Types
+  // ── Order Types ────────────────────────────────────────────────
   const [newOrderType, setNewOrderType] = useState('');
   const addOrderType = async () => {
     if (!newOrderType.trim()) return;
@@ -191,7 +255,7 @@ const AdminPage = () => {
     qc.invalidateQueries({ queryKey: ['order-types-admin'] });
   };
 
-  // Menu Categories
+  // ── Menu Categories ────────────────────────────────────────────
   const [newCategory, setNewCategory] = useState('');
   const addCategory = async () => {
     if (!newCategory.trim()) return;
@@ -201,7 +265,7 @@ const AdminPage = () => {
     qc.invalidateQueries({ queryKey: ['menu-categories-admin'] });
   };
 
-  // Menu item editor
+  // ── Menu item editor ──────────────────────────────────────────
   const [menuSearch, setMenuSearch] = useState('');
   const [editItem, setEditItem] = useState<any>(null);
   const [recipeCost, setRecipeCost] = useState(0);
@@ -244,7 +308,7 @@ const AdminPage = () => {
     toast.success('Menu item saved');
   };
 
-  // Delete menu item
+  // ── Delete menu item ──────────────────────────────────────────
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const deleteItem = async () => {
@@ -262,7 +326,7 @@ const AdminPage = () => {
     toast.success('Menu item deleted');
   };
 
-  // Orders pipeline state
+  // ── Orders pipeline state ─────────────────────────────────────
   const [dateFilter, setDateFilter] = useState<DateFilter>('today');
   const [showClosed, setShowClosed] = useState(false);
   const [activeStatus, setActiveStatus] = useState('New');
@@ -270,8 +334,6 @@ const AdminPage = () => {
   const [selectedTabId, setSelectedTabId] = useState<string | null>(null);
   const filteredOrders = useMemo(() => {
     let filtered = orders;
-
-    // Date filter
     const now = new Date();
     if (dateFilter === 'today') {
       const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -284,13 +346,8 @@ const AdminPage = () => {
         return d >= start && d < end;
       });
     }
-
-    // Status filter
-    if (activeStatus === 'Closed' || showClosed) {
-      return filtered.filter(o => o.status === activeStatus);
-    }
     return filtered.filter(o => o.status === activeStatus);
-  }, [orders, dateFilter, activeStatus, showClosed]);
+  }, [orders, dateFilter, activeStatus]);
 
   const statusCounts = useMemo(() => {
     const now = new Date();
@@ -317,8 +374,6 @@ const AdminPage = () => {
       updateData.closed_at = new Date().toISOString();
     }
     await supabase.from('orders').update(updateData).eq('id', orderId);
-
-    // Deduct inventory when moving to Preparing
     if (nextStatus === 'Preparing') {
       const order = orders.find(o => o.id === orderId);
       if (order) {
@@ -327,19 +382,17 @@ const AdminPage = () => {
         qc.invalidateQueries({ queryKey: ['ingredients'] });
       }
     }
-
     qc.invalidateQueries({ queryKey: ['orders-admin'] });
     toast.success(`Order → ${nextStatus}`);
   };
 
-  // Delete order
   const deleteOrder = async (orderId: string) => {
     await supabase.from('orders').delete().eq('id', orderId);
     qc.invalidateQueries({ queryKey: ['orders-admin'] });
     toast.success('Order deleted');
   };
 
-  // Add items to order (admin)
+  // ── Add items to order ─────────────────────────────────────────
   const [addingToOrder, setAddingToOrder] = useState<any>(null);
   const [addCart, setAddCart] = useState<Record<string, { name: string; price: number; qty: number }>>({});
   const [addCat, setAddCat] = useState('');
@@ -357,7 +410,7 @@ const AdminPage = () => {
     if (!addingToOrder || addCartTotal === 0) return;
     const newItems = Object.entries(addCart).map(([, c]) => ({ name: c.name, price: c.price, qty: c.qty }));
     const newTotal = newItems.reduce((s, i) => s + i.price * i.qty, 0);
-    const newServiceCharge = Math.round(newTotal * 0.1); // TODO: use billing config
+    const newServiceCharge = Math.round(newTotal * 0.1);
     await supabase.from('orders').insert({
       items: newItems,
       total: newTotal,
@@ -372,465 +425,561 @@ const AdminPage = () => {
     toast.success('New items sent to kitchen');
   };
 
-  // View tab invoice
   const [viewingTabId, setViewingTabId] = useState<string | null>(null);
 
   const statuses = showClosed
     ? ['New', 'Preparing', 'Served', 'Paid', 'Closed']
     : ['New', 'Preparing', 'Served', 'Paid'];
 
+  // ── No access guard ────────────────────────────────────────────
+  if (allTabs.length === 0) {
+    return (
+      <div className="min-h-screen bg-navy-texture flex items-center justify-center px-4">
+        <div className="text-center space-y-3">
+          <p className="font-body text-sm text-muted-foreground">No dashboard access granted.</p>
+          <Button onClick={() => navigate('/employee-portal')} variant="outline" className="font-display text-xs tracking-wider">
+            Back to Portal
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Section header helper ──────────────────────────────────────
+  const SectionLabel = ({ label }: { label: string }) => (
+    <p className="font-display text-[10px] tracking-widest text-muted-foreground uppercase pt-1">{label}</p>
+  );
+
   return (
-    <AdminLoginGate>
     <div className="min-h-screen bg-navy-texture overflow-x-hidden">
       <div className="max-w-2xl mx-auto px-4 py-6">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
-          <button onClick={() => navigate('/')} className="text-cream-dim hover:text-foreground min-w-[44px] min-h-[44px] flex items-center justify-center">
+          <button onClick={() => navigate(isAdmin ? '/' : '/employee-portal')} className="text-muted-foreground hover:text-foreground min-w-[44px] min-h-[44px] flex items-center justify-center">
             <Home className="w-5 h-5" />
           </button>
-          <a href="https://scan.palawancollective.com/" target="_blank" rel="noopener noreferrer" className="text-cream-dim hover:text-foreground min-w-[44px] min-h-[44px] flex items-center justify-center">
-            <Receipt className="w-5 h-5" />
-          </a>
-          <h1 className="font-display text-xl tracking-wider text-foreground">Admin Dashboard</h1>
+          <h1 className="font-display text-lg tracking-wider text-foreground">Dashboard</h1>
         </div>
 
-        <Tabs defaultValue="settings" className="w-full">
-          <TabsList className="w-full bg-secondary mb-6 flex-wrap h-auto">
-            <TabsTrigger value="settings" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Setup</TabsTrigger>
-            <TabsTrigger value="menu" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Menu</TabsTrigger>
-            <TabsTrigger value="orders" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Orders</TabsTrigger>
-            <TabsTrigger value="reports" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Reports</TabsTrigger>
-            <TabsTrigger value="inventory" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Inventory</TabsTrigger>
-            
-            <TabsTrigger value="payroll" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">HR</TabsTrigger>
-            <TabsTrigger value="resort-ops" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Resort Ops</TabsTrigger>
-            <TabsTrigger value="rooms" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Rooms</TabsTrigger>
-            <TabsTrigger value="timesheet" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Timesheet</TabsTrigger>
-            <TabsTrigger value="schedules" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Schedules</TabsTrigger>
-            <TabsTrigger value="audit" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Audit Log</TabsTrigger>
-            <TabsTrigger value="archive" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Archive</TabsTrigger>
-            <TabsTrigger value="guest-portal" className="font-display text-xs tracking-wider flex-1 min-h-[44px]">Guest Portal</TabsTrigger>
-          </TabsList>
-
-          {/* SETTINGS TAB */}
-          <TabsContent value="settings" className="space-y-8">
-            <ResortProfileForm />
-
-            <section>
-              <h3 className="font-display text-sm tracking-wider text-foreground mb-4">Kitchen Settings</h3>
-              <div className="space-y-3">
-                <div>
-                  <label className="font-body text-xs text-cream-dim">WhatsApp Number (with country code)</label>
-                  <Input value={whatsapp} onChange={e => setWhatsapp(e.target.value)}
-                    className="bg-secondary border-border text-foreground font-body mt-1" placeholder="639171234567" />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <TimePicker label="Breakfast Start" value={brkStart} onChange={setBrkStart} />
-                  <TimePicker label="Breakfast End" value={brkEnd} onChange={setBrkEnd} />
-                </div>
-                <Button onClick={saveSettings} className="font-display tracking-wider w-full">Save Settings</Button>
-              </div>
-            </section>
-
-            <InvoiceSettingsForm />
-
-            <BillingConfigForm />
-
-            <section>
-              <h3 className="font-display text-sm tracking-wider text-foreground mb-4">Units / Rooms</h3>
-              <div className="space-y-0">
-                {units.map(u => (
-                  <EditableRow key={u.id} id={u.id} name={u.unit_name} active={u.active}
-                    onRename={async (id, newName) => { await supabase.from('units').update({ unit_name: newName }).eq('id', id); qc.invalidateQueries({ queryKey: ['units-admin'] }); toast.success('Unit renamed'); }}
-                    onDelete={async (id) => { await supabase.from('units').delete().eq('id', id); qc.invalidateQueries({ queryKey: ['units-admin'] }); toast.success('Unit deleted'); }}
-                    onToggle={async (id, checked) => { await supabase.from('units').update({ active: checked }).eq('id', id); qc.invalidateQueries({ queryKey: ['units-admin'] }); }}
-                  />
-                ))}
-                <div className="flex gap-2 mt-3">
-                  <Input value={newUnit} onChange={e => setNewUnit(e.target.value)} placeholder="New unit name"
-                    className="bg-secondary border-border text-foreground font-body" />
-                  <Button onClick={addUnit} size="icon" variant="outline"><Plus className="w-4 h-4" /></Button>
+        <Tabs defaultValue={defaultTab} className="w-full">
+          {/* ── Grouped tab triggers ─────────────────────────── */}
+          <div className="space-y-2 mb-6">
+            {opsTabs.length > 0 && (
+              <div>
+                <SectionLabel label="Operations" />
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {opsTabs.map(t => (
+                    <TabsTrigger key={t.value} value={t.value}
+                      className="font-display text-xs tracking-wider min-h-[44px] px-3 py-1.5 rounded-md border border-border data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary bg-secondary text-muted-foreground">
+                      {t.label}
+                    </TabsTrigger>
+                  ))}
                 </div>
               </div>
-            </section>
-
-            <section>
-              <h3 className="font-display text-sm tracking-wider text-foreground mb-4">Dine-In Tables</h3>
-              <div className="space-y-0">
-                {tables.map(t => (
-                  <EditableRow key={t.id} id={t.id} name={t.table_name} active={t.active}
-                    onRename={async (id, newName) => { await supabase.from('resort_tables').update({ table_name: newName }).eq('id', id); qc.invalidateQueries({ queryKey: ['tables-admin'] }); toast.success('Table renamed'); }}
-                    onDelete={async (id) => { await supabase.from('resort_tables').delete().eq('id', id); qc.invalidateQueries({ queryKey: ['tables-admin'] }); toast.success('Table deleted'); }}
-                    onToggle={async (id, checked) => { await supabase.from('resort_tables').update({ active: checked }).eq('id', id); qc.invalidateQueries({ queryKey: ['tables-admin'] }); }}
-                  />
-                ))}
-                <div className="flex gap-2 mt-3">
-                  <Input value={newTable} onChange={e => setNewTable(e.target.value)} placeholder="New table name"
-                    className="bg-secondary border-border text-foreground font-body" />
-                  <Button onClick={addTable} size="icon" variant="outline"><Plus className="w-4 h-4" /></Button>
+            )}
+            {peopleTabs.length > 0 && (
+              <div>
+                <SectionLabel label="People" />
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {peopleTabs.map(t => (
+                    <TabsTrigger key={t.value} value={t.value}
+                      className="font-display text-xs tracking-wider min-h-[44px] px-3 py-1.5 rounded-md border border-border data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary bg-secondary text-muted-foreground">
+                      {t.label}
+                    </TabsTrigger>
+                  ))}
                 </div>
               </div>
-            </section>
+            )}
+            {cfgTabs.length > 0 && (
+              <div>
+                <SectionLabel label="Config" />
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {cfgTabs.map(t => (
+                    <TabsTrigger key={t.value} value={t.value}
+                      className="font-display text-xs tracking-wider min-h-[44px] px-3 py-1.5 rounded-md border border-border data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary bg-secondary text-muted-foreground">
+                      {t.label}
+                    </TabsTrigger>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
 
-            <section>
-              <h3 className="font-display text-sm tracking-wider text-foreground mb-4">Order Types</h3>
-              <div className="space-y-3">
-                {orderTypes.map(ot => (
-                  <div key={ot.id} className="space-y-2 border border-border rounded-lg p-3">
-                    <EditableRow id={ot.id} name={ot.label} active={ot.active}
-                      onRename={async (id, newName) => { await supabase.from('order_types').update({ label: newName }).eq('id', id); qc.invalidateQueries({ queryKey: ['order-types-admin'] }); toast.success('Order type renamed'); }}
-                      onDelete={async (id) => { await supabase.from('order_types').delete().eq('id', id); qc.invalidateQueries({ queryKey: ['order-types-admin'] }); toast.success('Order type deleted'); }}
-                      onToggle={async (id, checked) => { await supabase.from('order_types').update({ active: checked }).eq('id', id); qc.invalidateQueries({ queryKey: ['order-types-admin'] }); }}
-                    />
-                    <div className="flex gap-2 pl-2">
-                      <Select value={ot.input_mode} onValueChange={async (val) => {
-                        const update: any = { input_mode: val };
-                        if (val === 'text') update.source_table = null;
-                        await supabase.from('order_types').update(update).eq('id', ot.id);
-                        qc.invalidateQueries({ queryKey: ['order-types-admin'] });
-                      }}>
-                        <SelectTrigger className="bg-secondary border-border text-foreground font-body text-xs h-8 w-28">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-card border-border">
-                          <SelectItem value="text" className="text-foreground font-body text-xs">Text</SelectItem>
-                          <SelectItem value="select" className="text-foreground font-body text-xs">Dropdown</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {ot.input_mode === 'select' && (
-                        <Select value={ot.source_table || ''} onValueChange={async (val) => {
-                          await supabase.from('order_types').update({ source_table: val }).eq('id', ot.id);
-                          qc.invalidateQueries({ queryKey: ['order-types-admin'] });
-                        }}>
-                          <SelectTrigger className="bg-secondary border-border text-foreground font-body text-xs h-8 w-36">
-                            <SelectValue placeholder="Source table" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-card border-border">
-                            <SelectItem value="units" className="text-foreground font-body text-xs">Rooms/Units</SelectItem>
-                            <SelectItem value="resort_tables" className="text-foreground font-body text-xs">Tables</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
-                    </div>
+          {/* ═══════════════════════════════════════════════════
+              OPERATIONS TAB CONTENTS
+              ═══════════════════════════════════════════════════ */}
+
+          {/* ORDERS TAB */}
+          {(isAdmin || hasAccess(perms, 'orders')) && (
+            <TabsContent value="orders" className="space-y-4">
+              <div className="flex gap-2 mb-2">
+                <Button size="sm" variant={ordersSubView === 'pipeline' ? 'default' : 'outline'}
+                  onClick={() => { setOrdersSubView('pipeline'); setSelectedTabId(null); }}
+                  className="font-display text-xs tracking-wider flex-1">
+                  Kitchen Pipeline
+                </Button>
+                <Button size="sm" variant={ordersSubView === 'tabs' ? 'default' : 'outline'}
+                  onClick={() => setOrdersSubView('tabs')}
+                  className="font-display text-xs tracking-wider flex-1 gap-1">
+                  <Receipt className="w-3.5 h-3.5" /> Open Tabs
+                </Button>
+              </div>
+
+              {ordersSubView === 'pipeline' ? (
+                <>
+                  <div className="flex gap-2 items-center">
+                    {(['today', 'yesterday', 'all'] as DateFilter[]).map(df => (
+                      <Button key={df} size="sm" variant={dateFilter === df ? 'default' : 'outline'}
+                        onClick={() => setDateFilter(df)} className="font-body text-xs flex-1 capitalize">
+                        {df}
+                      </Button>
+                    ))}
+                    <Button size="icon" variant="ghost" onClick={() => setShowClosed(!showClosed)}
+                      className="text-muted-foreground" title={showClosed ? 'Hide Closed' : 'Show Closed'}>
+                      {showClosed ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </Button>
                   </div>
-                ))}
-                <div className="flex gap-2 mt-3">
-                  <Input value={newOrderType} onChange={e => setNewOrderType(e.target.value)} placeholder="New order type label"
-                    className="bg-secondary border-border text-foreground font-body" />
-                  <Button onClick={addOrderType} size="icon" variant="outline"><Plus className="w-4 h-4" /></Button>
-                </div>
-              </div>
-            </section>
 
-            <section>
-              <h3 className="font-display text-sm tracking-wider text-foreground mb-4">Menu Categories</h3>
-              <div className="space-y-2">
-                {menuCategories.map((cat: any) => (
-                  <div key={cat.id} className="flex items-center gap-2">
-                    <div className="flex-1">
-                      <EditableRow id={cat.id} name={cat.name} active={cat.active}
-                        onRename={async (id, newName) => { await supabase.from('menu_categories').update({ name: newName }).eq('id', id); qc.invalidateQueries({ queryKey: ['menu-categories-admin'] }); toast.success('Category renamed'); }}
-                        onDelete={async (id) => { await supabase.from('menu_categories').delete().eq('id', id); qc.invalidateQueries({ queryKey: ['menu-categories-admin'] }); toast.success('Category deleted'); }}
-                        onToggle={async (id, checked) => { await supabase.from('menu_categories').update({ active: checked }).eq('id', id); qc.invalidateQueries({ queryKey: ['menu-categories-admin'] }); }}
+                  <div className="flex flex-wrap gap-1">
+                    {statuses.map(s => (
+                      <button key={s} onClick={() => setActiveStatus(s)}
+                        className={`px-3 py-1.5 font-body text-xs rounded-md whitespace-nowrap transition-colors ${
+                          activeStatus === s
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-secondary text-muted-foreground hover:text-foreground'
+                        }`}>
+                        {s} {statusCounts[s] > 0 && <span className="ml-1 font-display">({statusCounts[s]})</span>}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="space-y-3">
+                    {filteredOrders.length === 0 && (
+                      <p className="font-body text-muted-foreground text-center py-8">No {activeStatus.toLowerCase()} orders</p>
+                    )}
+                    {filteredOrders.map(order => (
+                      <OrderCard key={order.id} order={order}
+                        onAdvance={readOnly('orders') ? undefined : advanceOrder}
+                        resortProfile={resortProfile}
+                        onAddItems={readOnly('orders') ? undefined : handleOpenAddItems}
+                        onViewTab={(tabId) => setViewingTabId(tabId)}
+                        onDelete={isAdmin ? deleteOrder : undefined}
                       />
-                    </div>
-                    <Select value={(cat as any).department || 'kitchen'} onValueChange={async (val) => {
-                      await supabase.from('menu_categories').update({ department: val } as any).eq('id', cat.id);
-                      qc.invalidateQueries({ queryKey: ['menu-categories-admin'] });
-                      toast.success('Department updated');
-                    }}>
-                      <SelectTrigger className="bg-secondary border-border text-foreground font-body text-xs h-8 w-24">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-card border-border">
-                        <SelectItem value="kitchen" className="text-foreground font-body text-xs">Kitchen</SelectItem>
-                        <SelectItem value="bar" className="text-foreground font-body text-xs">Bar</SelectItem>
-                        <SelectItem value="both" className="text-foreground font-body text-xs">Both</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    ))}
                   </div>
-                ))}
-                <div className="flex gap-2 mt-3">
-                  <Input value={newCategory} onChange={e => setNewCategory(e.target.value)} placeholder="New category name"
-                    className="bg-secondary border-border text-foreground font-body" />
-                  <Button onClick={addCategory} size="icon" variant="outline"><Plus className="w-4 h-4" /></Button>
+                </>
+              ) : selectedTabId ? (
+                <TabInvoice tabId={selectedTabId} onClose={() => setSelectedTabId(null)} />
+              ) : (
+                <div className="space-y-3">
+                  {(() => {
+                    const openTabs = tabs.filter(t => t.status === 'Open');
+                    const closedTabs = tabs.filter(t => t.status === 'Closed');
+                    return (
+                      <>
+                        {openTabs.length === 0 && closedTabs.length === 0 && (
+                          <p className="font-body text-muted-foreground text-center py-8">No tabs yet</p>
+                        )}
+                        {openTabs.length > 0 && (
+                          <>
+                            <p className="font-display text-xs tracking-wider text-muted-foreground uppercase">Open Tabs ({openTabs.length})</p>
+                            {openTabs.map(tab => {
+                              const tabOrders = orders.filter(o => o.tab_id === tab.id);
+                              const tabTotal = tabOrders.reduce((s, o) => s + Number(o.total) + Number(o.service_charge || 0), 0);
+                              return (
+                                <button key={tab.id} onClick={() => setSelectedTabId(tab.id)}
+                                  className="w-full text-left p-3 border border-border hover:border-primary/50 transition-colors rounded-lg">
+                                  <div className="flex justify-between items-start">
+                                    <div>
+                                      <p className="font-display text-sm text-foreground">{tab.location_detail}</p>
+                                      <p className="font-body text-xs text-muted-foreground">
+                                        {tab.location_type} · {tabOrders.length} order{tabOrders.length !== 1 ? 's' : ''} · {formatDistanceToNow(new Date(tab.created_at), { addSuffix: true })}
+                                      </p>
+                                    </div>
+                                    <span className="font-display text-sm text-foreground">₱{tabTotal.toLocaleString()}</span>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </>
+                        )}
+                        {closedTabs.length > 0 && (
+                          <>
+                            <p className="font-display text-xs tracking-wider text-muted-foreground uppercase mt-4">Closed Tabs ({closedTabs.length})</p>
+                            {closedTabs.slice(0, 20).map(tab => {
+                              const tabOrders = orders.filter(o => o.tab_id === tab.id);
+                              const tabTotal = tabOrders.reduce((s, o) => s + Number(o.total) + Number(o.service_charge || 0), 0);
+                              return (
+                                <button key={tab.id} onClick={() => setSelectedTabId(tab.id)}
+                                  className="w-full text-left p-3 border border-border/50 transition-colors rounded-lg opacity-60">
+                                  <div className="flex justify-between items-start">
+                                    <div>
+                                      <p className="font-display text-sm text-foreground">{tab.location_detail}</p>
+                                      <p className="font-body text-xs text-muted-foreground">
+                                        {tab.payment_method} · {tabOrders.length} order{tabOrders.length !== 1 ? 's' : ''}
+                                      </p>
+                                    </div>
+                                    <span className="font-display text-sm text-foreground">₱{tabTotal.toLocaleString()}</span>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
-              </div>
-            </section>
-            <DeviceManager />
-            <RoomSetup />
-            <HousekeepingConfig />
-            <StaffAccessManager />
-            <EmployeeContactConfig />
-          </TabsContent>
+              )}
+            </TabsContent>
+          )}
 
-          {/* MENU TAB */}
-          <TabsContent value="menu" className="space-y-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-cream-dim" />
-              <Input
-                value={menuSearch}
-                onChange={e => setMenuSearch(e.target.value)}
-                placeholder="Search menu items..."
-                className="bg-secondary border-border text-foreground font-body pl-9"
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button onClick={openNewItem} className="font-display tracking-wider flex-1" variant="outline">
-                <Plus className="w-4 h-4 mr-2" /> Add Menu Item
-              </Button>
-              <Button variant="outline" onClick={() => setBulkImportOpen(true)} title="Bulk Import">
-                <Upload className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="outline"
-                className="font-display tracking-wider"
-                onClick={() => {
-                  let csv = 'Category,Name,Description,Price,Food Cost\n';
-                  menuItems.forEach(item => {
-                    csv += `"${item.category}","${item.name}","${(item.description || '').replace(/"/g, '""')}",${item.price},${item.food_cost || 0}\n`;
-                  });
-                  const blob = new Blob([csv], { type: 'text/csv' });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = `menu-items-${new Date().toISOString().slice(0, 10)}.csv`;
-                  a.click();
-                  URL.revokeObjectURL(url);
-                }}
-              >
-                <Download className="w-4 h-4" />
-              </Button>
-            </div>
-            <MenuBulkImportModal
-              open={bulkImportOpen}
-              onOpenChange={setBulkImportOpen}
-              onComplete={() => qc.invalidateQueries({ queryKey: ['menu-admin'] })}
-              categories={menuCategories.map((c: any) => c.name)}
-            />
-            {menuItems
-              .filter(item => {
-                if (!menuSearch.trim()) return true;
-                const q = menuSearch.toLowerCase();
-                return item.name.toLowerCase().includes(q) || item.category.toLowerCase().includes(q);
-              })
-              .map(item => {
-                const foodCost = item.food_cost || 0;
-                const margin = item.price > 0 && foodCost > 0
-                  ? Math.round(((item.price - foodCost) / item.price) * 100)
-                  : null;
-                return (
-                  <button key={item.id} onClick={() => openEditItem(item)}
-                    className="w-full text-left p-3 border border-border hover:border-gold/50 transition-colors">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-display text-sm text-foreground">{item.name}</p>
-                        <div className="flex items-center gap-2">
-                          <p className="font-body text-xs text-cream-dim">{item.category}</p>
-                          <span className={`font-body text-[10px] px-1.5 py-0.5 rounded ${
-                            (item as any).department === 'bar' ? 'bg-purple-500/20 text-purple-400' :
-                            (item as any).department === 'both' ? 'bg-blue-500/20 text-blue-400' :
-                            'bg-orange-500/20 text-orange-400'
-                          }`}>
-                            {((item as any).department || 'kitchen')}
-                          </span>
-                          {foodCost > 0 ? (
-                            <span className="font-body text-xs text-cream-dim">
-                              · Cost ₱{foodCost} · {margin}% margin
-                            </span>
-                          ) : (
-                            <span className="font-body text-xs text-amber-400">· No cost data</span>
+          {/* KITCHEN TAB */}
+          {(isAdmin || hasAccess(perms, 'kitchen')) && (
+            <TabsContent value="kitchen">
+              <DepartmentOrdersView department="kitchen" />
+            </TabsContent>
+          )}
+
+          {/* BAR TAB */}
+          {(isAdmin || hasAccess(perms, 'bar')) && (
+            <TabsContent value="bar">
+              <DepartmentOrdersView department="bar" />
+            </TabsContent>
+          )}
+
+          {/* ROOMS TAB */}
+          {(isAdmin || hasAccess(perms, 'rooms')) && (
+            <TabsContent value="rooms">
+              <RoomsDashboard readOnly={readOnly('rooms')} canViewDocuments={docsAllowed} />
+            </TabsContent>
+          )}
+
+          {/* HOUSEKEEPING TAB */}
+          {(isAdmin || hasAccess(perms, 'housekeeping')) && (
+            <TabsContent value="housekeeping">
+              <div className={readOnly('housekeeping') ? 'pointer-events-none opacity-70' : ''}>
+                <HousekeepingConfig />
+              </div>
+            </TabsContent>
+          )}
+
+          {/* ═══════════════════════════════════════════════════
+              PEOPLE TAB CONTENTS
+              ═══════════════════════════════════════════════════ */}
+
+          {(isAdmin || hasAccess(perms, 'payroll')) && (
+            <TabsContent value="payroll">
+              <PayrollDashboard readOnly={readOnly('payroll')} />
+            </TabsContent>
+          )}
+
+          {(isAdmin || hasAccess(perms, 'schedules')) && (
+            <TabsContent value="schedules">
+              <WeeklyScheduleManager readOnly={readOnly('schedules')} />
+            </TabsContent>
+          )}
+
+          {(isAdmin || hasAccess(perms, 'timesheet')) && (
+            <TabsContent value="timesheet">
+              <div className={readOnly('timesheet') ? 'pointer-events-none opacity-70' : ''}>
+                <TimesheetDashboard />
+              </div>
+            </TabsContent>
+          )}
+
+          {/* ═══════════════════════════════════════════════════
+              CONFIG TAB CONTENTS
+              ═══════════════════════════════════════════════════ */}
+
+          {/* SETUP TAB */}
+          {(isAdmin || hasAccess(perms, 'setup')) && (
+            <TabsContent value="settings" className="space-y-8">
+              <div className={readOnly('setup') ? 'pointer-events-none opacity-70' : ''}>
+                <ResortProfileForm />
+
+                <section className="mt-8">
+                  <h3 className="font-display text-sm tracking-wider text-foreground mb-4">Kitchen Settings</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="font-body text-xs text-muted-foreground">WhatsApp Number (with country code)</label>
+                      <Input value={whatsapp} onChange={e => setWhatsapp(e.target.value)}
+                        className="bg-secondary border-border text-foreground font-body mt-1" placeholder="639171234567" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <TimePicker label="Breakfast Start" value={brkStart} onChange={setBrkStart} />
+                      <TimePicker label="Breakfast End" value={brkEnd} onChange={setBrkEnd} />
+                    </div>
+                    <Button onClick={saveSettings} className="font-display tracking-wider w-full">Save Settings</Button>
+                  </div>
+                </section>
+
+                <div className="mt-8"><InvoiceSettingsForm /></div>
+                <div className="mt-8"><BillingConfigForm /></div>
+
+                <section className="mt-8">
+                  <h3 className="font-display text-sm tracking-wider text-foreground mb-4">Units / Rooms</h3>
+                  <div className="space-y-0">
+                    {units.map(u => (
+                      <EditableRow key={u.id} id={u.id} name={u.unit_name} active={u.active}
+                        onRename={async (id, newName) => { await supabase.from('units').update({ unit_name: newName }).eq('id', id); qc.invalidateQueries({ queryKey: ['units-admin'] }); toast.success('Unit renamed'); }}
+                        onDelete={async (id) => { await supabase.from('units').delete().eq('id', id); qc.invalidateQueries({ queryKey: ['units-admin'] }); toast.success('Unit deleted'); }}
+                        onToggle={async (id, checked) => { await supabase.from('units').update({ active: checked }).eq('id', id); qc.invalidateQueries({ queryKey: ['units-admin'] }); }}
+                      />
+                    ))}
+                    <div className="flex gap-2 mt-3">
+                      <Input value={newUnit} onChange={e => setNewUnit(e.target.value)} placeholder="New unit name"
+                        className="bg-secondary border-border text-foreground font-body" />
+                      <Button onClick={addUnit} size="icon" variant="outline"><Plus className="w-4 h-4" /></Button>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="mt-8">
+                  <h3 className="font-display text-sm tracking-wider text-foreground mb-4">Dine-In Tables</h3>
+                  <div className="space-y-0">
+                    {tables.map(t => (
+                      <EditableRow key={t.id} id={t.id} name={t.table_name} active={t.active}
+                        onRename={async (id, newName) => { await supabase.from('resort_tables').update({ table_name: newName }).eq('id', id); qc.invalidateQueries({ queryKey: ['tables-admin'] }); toast.success('Table renamed'); }}
+                        onDelete={async (id) => { await supabase.from('resort_tables').delete().eq('id', id); qc.invalidateQueries({ queryKey: ['tables-admin'] }); toast.success('Table deleted'); }}
+                        onToggle={async (id, checked) => { await supabase.from('resort_tables').update({ active: checked }).eq('id', id); qc.invalidateQueries({ queryKey: ['tables-admin'] }); }}
+                      />
+                    ))}
+                    <div className="flex gap-2 mt-3">
+                      <Input value={newTable} onChange={e => setNewTable(e.target.value)} placeholder="New table name"
+                        className="bg-secondary border-border text-foreground font-body" />
+                      <Button onClick={addTable} size="icon" variant="outline"><Plus className="w-4 h-4" /></Button>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="mt-8">
+                  <h3 className="font-display text-sm tracking-wider text-foreground mb-4">Order Types</h3>
+                  <div className="space-y-3">
+                    {orderTypes.map(ot => (
+                      <div key={ot.id} className="space-y-2 border border-border rounded-lg p-3">
+                        <EditableRow id={ot.id} name={ot.label} active={ot.active}
+                          onRename={async (id, newName) => { await supabase.from('order_types').update({ label: newName }).eq('id', id); qc.invalidateQueries({ queryKey: ['order-types-admin'] }); toast.success('Order type renamed'); }}
+                          onDelete={async (id) => { await supabase.from('order_types').delete().eq('id', id); qc.invalidateQueries({ queryKey: ['order-types-admin'] }); toast.success('Order type deleted'); }}
+                          onToggle={async (id, checked) => { await supabase.from('order_types').update({ active: checked }).eq('id', id); qc.invalidateQueries({ queryKey: ['order-types-admin'] }); }}
+                        />
+                        <div className="flex gap-2 pl-2">
+                          <Select value={ot.input_mode} onValueChange={async (val) => {
+                            const update: any = { input_mode: val };
+                            if (val === 'text') update.source_table = null;
+                            await supabase.from('order_types').update(update).eq('id', ot.id);
+                            qc.invalidateQueries({ queryKey: ['order-types-admin'] });
+                          }}>
+                            <SelectTrigger className="bg-secondary border-border text-foreground font-body text-xs h-8 w-28">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-card border-border">
+                              <SelectItem value="text" className="text-foreground font-body text-xs">Text</SelectItem>
+                              <SelectItem value="select" className="text-foreground font-body text-xs">Dropdown</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {ot.input_mode === 'select' && (
+                            <Select value={ot.source_table || ''} onValueChange={async (val) => {
+                              await supabase.from('order_types').update({ source_table: val }).eq('id', ot.id);
+                              qc.invalidateQueries({ queryKey: ['order-types-admin'] });
+                            }}>
+                              <SelectTrigger className="bg-secondary border-border text-foreground font-body text-xs h-8 w-36">
+                                <SelectValue placeholder="Source table" />
+                              </SelectTrigger>
+                              <SelectContent className="bg-card border-border">
+                                <SelectItem value="units" className="text-foreground font-body text-xs">Rooms/Units</SelectItem>
+                                <SelectItem value="resort_tables" className="text-foreground font-body text-xs">Tables</SelectItem>
+                              </SelectContent>
+                            </Select>
                           )}
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="font-display text-sm text-foreground">₱{item.price}</p>
-                        {!item.available && <span className="font-body text-xs text-destructive">Unavailable</span>}
-                      </div>
+                    ))}
+                    <div className="flex gap-2 mt-3">
+                      <Input value={newOrderType} onChange={e => setNewOrderType(e.target.value)} placeholder="New order type label"
+                        className="bg-secondary border-border text-foreground font-body" />
+                      <Button onClick={addOrderType} size="icon" variant="outline"><Plus className="w-4 h-4" /></Button>
                     </div>
-                  </button>
-                );
-              })}
-          </TabsContent>
+                  </div>
+                </section>
 
-          {/* ORDERS TAB — Kitchen Pipeline + Tabs */}
-          <TabsContent value="orders" className="space-y-4">
-            {/* Sub-view toggle */}
-            <div className="flex gap-2 mb-2">
-              <Button size="sm" variant={ordersSubView === 'pipeline' ? 'default' : 'outline'}
-                onClick={() => { setOrdersSubView('pipeline'); setSelectedTabId(null); }}
-                className="font-display text-xs tracking-wider flex-1">
-                Kitchen Pipeline
-              </Button>
-              <Button size="sm" variant={ordersSubView === 'tabs' ? 'default' : 'outline'}
-                onClick={() => setOrdersSubView('tabs')}
-                className="font-display text-xs tracking-wider flex-1 gap-1">
-                <Receipt className="w-3.5 h-3.5" /> Open Tabs
-              </Button>
-            </div>
+                <section className="mt-8">
+                  <h3 className="font-display text-sm tracking-wider text-foreground mb-4">Menu Categories</h3>
+                  <div className="space-y-2">
+                    {menuCategories.map((cat: any) => (
+                      <div key={cat.id} className="flex items-center gap-2">
+                        <div className="flex-1">
+                          <EditableRow id={cat.id} name={cat.name} active={cat.active}
+                            onRename={async (id, newName) => { await supabase.from('menu_categories').update({ name: newName }).eq('id', id); qc.invalidateQueries({ queryKey: ['menu-categories-admin'] }); toast.success('Category renamed'); }}
+                            onDelete={async (id) => { await supabase.from('menu_categories').delete().eq('id', id); qc.invalidateQueries({ queryKey: ['menu-categories-admin'] }); toast.success('Category deleted'); }}
+                            onToggle={async (id, checked) => { await supabase.from('menu_categories').update({ active: checked }).eq('id', id); qc.invalidateQueries({ queryKey: ['menu-categories-admin'] }); }}
+                          />
+                        </div>
+                        <Select value={(cat as any).department || 'kitchen'} onValueChange={async (val) => {
+                          await supabase.from('menu_categories').update({ department: val } as any).eq('id', cat.id);
+                          qc.invalidateQueries({ queryKey: ['menu-categories-admin'] });
+                          toast.success('Department updated');
+                        }}>
+                          <SelectTrigger className="bg-secondary border-border text-foreground font-body text-xs h-8 w-24">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="bg-card border-border">
+                            <SelectItem value="kitchen" className="text-foreground font-body text-xs">Kitchen</SelectItem>
+                            <SelectItem value="bar" className="text-foreground font-body text-xs">Bar</SelectItem>
+                            <SelectItem value="both" className="text-foreground font-body text-xs">Both</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ))}
+                    <div className="flex gap-2 mt-3">
+                      <Input value={newCategory} onChange={e => setNewCategory(e.target.value)} placeholder="New category name"
+                        className="bg-secondary border-border text-foreground font-body" />
+                      <Button onClick={addCategory} size="icon" variant="outline"><Plus className="w-4 h-4" /></Button>
+                    </div>
+                  </div>
+                </section>
+                <div className="mt-8"><DeviceManager /></div>
+                <div className="mt-8"><RoomSetup /></div>
+                <div className="mt-8"><HousekeepingConfig /></div>
+                <div className="mt-8"><StaffAccessManager /></div>
+                <div className="mt-8"><EmployeeContactConfig /></div>
+              </div>
+            </TabsContent>
+          )}
 
-            {ordersSubView === 'pipeline' ? (
-              <>
-                {/* Date filter + closed toggle */}
-                <div className="flex gap-2 items-center">
-                  {(['today', 'yesterday', 'all'] as DateFilter[]).map(df => (
-                    <Button key={df} size="sm" variant={dateFilter === df ? 'default' : 'outline'}
-                      onClick={() => setDateFilter(df)} className="font-body text-xs flex-1 capitalize">
-                      {df}
-                    </Button>
-                  ))}
-                  <Button size="icon" variant="ghost" onClick={() => setShowClosed(!showClosed)}
-                    className="text-cream-dim" title={showClosed ? 'Hide Closed' : 'Show Closed'}>
-                    {showClosed ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          {/* MENU TAB */}
+          {(isAdmin || hasAccess(perms, 'menu')) && (
+            <TabsContent value="menu" className="space-y-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  value={menuSearch}
+                  onChange={e => setMenuSearch(e.target.value)}
+                  placeholder="Search menu items..."
+                  className="bg-secondary border-border text-foreground font-body pl-9"
+                />
+              </div>
+              {!readOnly('menu') && (
+                <div className="flex gap-2">
+                  <Button onClick={openNewItem} className="font-display tracking-wider flex-1" variant="outline">
+                    <Plus className="w-4 h-4 mr-2" /> Add Menu Item
+                  </Button>
+                  <Button variant="outline" onClick={() => setBulkImportOpen(true)} title="Bulk Import">
+                    <Upload className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      let csv = 'Category,Name,Description,Price,Food Cost\n';
+                      menuItems.forEach(item => {
+                        csv += `\"${item.category}\",\"${item.name}\",\"${(item.description || '').replace(/"/g, '""')}\",${item.price},${item.food_cost || 0}\n`;
+                      });
+                      const blob = new Blob([csv], { type: 'text/csv' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `menu-items-${new Date().toISOString().slice(0, 10)}.csv`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                  >
+                    <Download className="w-4 h-4" />
                   </Button>
                 </div>
-
-                {/* Status tabs */}
-                <div className="flex flex-wrap gap-1">
-                  {statuses.map(s => (
-                    <button key={s} onClick={() => setActiveStatus(s)}
-                      className={`px-3 py-1.5 font-body text-xs rounded-md whitespace-nowrap transition-colors ${
-                        activeStatus === s
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-secondary text-cream-dim hover:text-foreground'
-                      }`}>
-                      {s} {statusCounts[s] > 0 && <span className="ml-1 font-display">({statusCounts[s]})</span>}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Order cards */}
-                <div className="space-y-3">
-                  {filteredOrders.length === 0 && (
-                    <p className="font-body text-cream-dim text-center py-8">No {activeStatus.toLowerCase()} orders</p>
-                  )}
-                  {filteredOrders.map(order => (
-                    <OrderCard key={order.id} order={order} onAdvance={advanceOrder}
-                      resortProfile={resortProfile}
-                      onAddItems={handleOpenAddItems}
-                      onViewTab={(tabId) => setViewingTabId(tabId)}
-                      onDelete={deleteOrder}
-                    />
-                  ))}
-                </div>
-              </>
-            ) : selectedTabId ? (
-              <TabInvoice tabId={selectedTabId} onClose={() => setSelectedTabId(null)} />
-            ) : (
-              /* Tabs list */
-              <div className="space-y-3">
-                {/* Filter open/closed tabs */}
-                {(() => {
-                  const openTabs = tabs.filter(t => t.status === 'Open');
-                  const closedTabs = tabs.filter(t => t.status === 'Closed');
+              )}
+              <MenuBulkImportModal
+                open={bulkImportOpen}
+                onOpenChange={setBulkImportOpen}
+                onComplete={() => qc.invalidateQueries({ queryKey: ['menu-admin'] })}
+                categories={menuCategories.map((c: any) => c.name)}
+              />
+              {menuItems
+                .filter(item => {
+                  if (!menuSearch.trim()) return true;
+                  const q = menuSearch.toLowerCase();
+                  return item.name.toLowerCase().includes(q) || item.category.toLowerCase().includes(q);
+                })
+                .map(item => {
+                  const foodCost = item.food_cost || 0;
+                  const margin = item.price > 0 && foodCost > 0
+                    ? Math.round(((item.price - foodCost) / item.price) * 100)
+                    : null;
                   return (
-                    <>
-                      {openTabs.length === 0 && closedTabs.length === 0 && (
-                        <p className="font-body text-cream-dim text-center py-8">No tabs yet</p>
-                      )}
-                      {openTabs.length > 0 && (
-                        <>
-                          <p className="font-display text-xs tracking-wider text-cream-dim uppercase">Open Tabs ({openTabs.length})</p>
-                          {openTabs.map(tab => {
-                            const tabOrders = orders.filter(o => o.tab_id === tab.id);
-                            const tabTotal = tabOrders.reduce((s, o) => s + Number(o.total) + Number(o.service_charge || 0), 0);
-                            return (
-                              <button key={tab.id} onClick={() => setSelectedTabId(tab.id)}
-                                className="w-full text-left p-3 border border-border hover:border-gold/50 transition-colors rounded-lg">
-                                <div className="flex justify-between items-start">
-                                  <div>
-                                    <p className="font-display text-sm text-foreground">{tab.location_detail}</p>
-                                    <p className="font-body text-xs text-cream-dim">
-                                      {tab.location_type} · {tabOrders.length} order{tabOrders.length !== 1 ? 's' : ''} · {formatDistanceToNow(new Date(tab.created_at), { addSuffix: true })}
-                                    </p>
-                                  </div>
-                                  <span className="font-display text-sm text-foreground">₱{tabTotal.toLocaleString()}</span>
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </>
-                      )}
-                      {closedTabs.length > 0 && (
-                        <>
-                          <p className="font-display text-xs tracking-wider text-cream-dim uppercase mt-4">Closed Tabs ({closedTabs.length})</p>
-                          {closedTabs.slice(0, 20).map(tab => {
-                            const tabOrders = orders.filter(o => o.tab_id === tab.id);
-                            const tabTotal = tabOrders.reduce((s, o) => s + Number(o.total) + Number(o.service_charge || 0), 0);
-                            return (
-                              <button key={tab.id} onClick={() => setSelectedTabId(tab.id)}
-                                className="w-full text-left p-3 border border-border/50 transition-colors rounded-lg opacity-60">
-                                <div className="flex justify-between items-start">
-                                  <div>
-                                    <p className="font-display text-sm text-foreground">{tab.location_detail}</p>
-                                    <p className="font-body text-xs text-cream-dim">
-                                      {tab.payment_method} · {tabOrders.length} order{tabOrders.length !== 1 ? 's' : ''}
-                                    </p>
-                                  </div>
-                                  <span className="font-display text-sm text-foreground">₱{tabTotal.toLocaleString()}</span>
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </>
-                      )}
-                    </>
+                    <button key={item.id} onClick={() => !readOnly('menu') ? openEditItem(item) : null}
+                      className="w-full text-left p-3 border border-border hover:border-primary/50 transition-colors">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-display text-sm text-foreground">{item.name}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-body text-xs text-muted-foreground">{item.category}</p>
+                            <span className={`font-body text-[10px] px-1.5 py-0.5 rounded ${
+                              (item as any).department === 'bar' ? 'bg-purple-500/20 text-purple-400' :
+                              (item as any).department === 'both' ? 'bg-blue-500/20 text-blue-400' :
+                              'bg-orange-500/20 text-orange-400'
+                            }`}>
+                              {((item as any).department || 'kitchen')}
+                            </span>
+                            {foodCost > 0 ? (
+                              <span className="font-body text-xs text-muted-foreground">
+                                · Cost ₱{foodCost} · {margin}% margin
+                              </span>
+                            ) : (
+                              <span className="font-body text-xs text-amber-400">· No cost data</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-display text-sm text-foreground">₱{item.price}</p>
+                          {!item.available && <span className="font-body text-xs text-destructive">Unavailable</span>}
+                        </div>
+                      </div>
+                    </button>
                   );
-                })()}
-              </div>
-            )}
-          </TabsContent>
+                })}
+            </TabsContent>
+          )}
 
           {/* REPORTS TAB */}
-          <TabsContent value="reports">
-            <ReportsDashboard />
-          </TabsContent>
+          {(isAdmin || hasAccess(perms, 'reports')) && (
+            <TabsContent value="reports">
+              <ReportsDashboard readOnly={readOnly('reports')} />
+            </TabsContent>
+          )}
 
           {/* INVENTORY TAB */}
-          <TabsContent value="inventory">
-            <InventoryDashboard />
-          </TabsContent>
-
-
-          {/* PAYROLL TAB */}
-          <TabsContent value="payroll">
-            <PayrollDashboard />
-          </TabsContent>
+          {(isAdmin || hasAccess(perms, 'inventory')) && (
+            <TabsContent value="inventory">
+              <InventoryDashboard readOnly={readOnly('inventory')} />
+            </TabsContent>
+          )}
 
           {/* RESORT OPS TAB */}
-          <TabsContent value="resort-ops">
-            <ResortOpsDashboard />
-          </TabsContent>
-
-          {/* ROOMS TAB */}
-          <TabsContent value="rooms">
-            <RoomsDashboard />
-          </TabsContent>
-
-          {/* TIMESHEET TAB */}
-          <TabsContent value="timesheet">
-            <TimesheetDashboard />
-          </TabsContent>
-
-          {/* SCHEDULES TAB */}
-          <TabsContent value="schedules">
-            <WeeklyScheduleManager />
-          </TabsContent>
+          {(isAdmin || hasAccess(perms, 'resort_ops')) && (
+            <TabsContent value="resort-ops">
+              <ResortOpsDashboard readOnly={readOnly('resort_ops')} />
+            </TabsContent>
+          )}
 
           {/* AUDIT LOG TAB */}
-          <TabsContent value="audit">
-            <AuditLogView />
-          </TabsContent>
+          {isAdmin && (
+            <TabsContent value="audit">
+              <AuditLogView />
+            </TabsContent>
+          )}
 
           {/* ORDER ARCHIVE TAB */}
-          <TabsContent value="archive">
-            <OrderArchive />
-          </TabsContent>
+          {isAdmin && (
+            <TabsContent value="archive">
+              <OrderArchive />
+            </TabsContent>
+          )}
 
           {/* GUEST PORTAL CONFIG TAB */}
-          <TabsContent value="guest-portal">
-            <GuestPortalConfig />
-          </TabsContent>
+          {isAdmin && (
+            <TabsContent value="guest-portal">
+              <GuestPortalConfig />
+            </TabsContent>
+          )}
         </Tabs>
       </div>
 
@@ -857,25 +1006,25 @@ const AdminPage = () => {
               placeholder="Description" className="bg-secondary border-border text-foreground font-body" />
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="font-body text-xs text-cream-dim">Price (₱)</label>
+                <label className="font-body text-xs text-muted-foreground">Price (₱)</label>
                 <Input value={itemForm.price} onChange={e => setItemForm(f => ({ ...f, price: e.target.value }))}
                   type="number" className="bg-secondary border-border text-foreground font-body mt-1" />
               </div>
               <div>
-                <label className="font-body text-xs text-cream-dim">Food Cost Override (₱)</label>
+                <label className="font-body text-xs text-muted-foreground">Food Cost Override (₱)</label>
                 <Input value={itemForm.food_cost} onChange={e => setItemForm(f => ({ ...f, food_cost: e.target.value }))}
                   type="number" placeholder="Leave empty for auto"
                   className="bg-secondary border-border text-foreground font-body mt-1" />
-                <p className="font-body text-[10px] text-cream-dim mt-0.5">Only fill this to ignore recipe calculation</p>
+                <p className="font-body text-[10px] text-muted-foreground mt-0.5">Only fill this to ignore recipe calculation</p>
               </div>
             </div>
             <div>
-              <label className="font-body text-xs text-cream-dim">Sort Order</label>
+              <label className="font-body text-xs text-muted-foreground">Sort Order</label>
               <Input value={itemForm.sort_order} onChange={e => setItemForm(f => ({ ...f, sort_order: e.target.value }))}
                 type="number" className="bg-secondary border-border text-foreground font-body mt-1" />
             </div>
             <div>
-              <label className="font-body text-xs text-cream-dim">Department</label>
+              <label className="font-body text-xs text-muted-foreground">Department</label>
               <Select value={itemForm.department} onValueChange={v => setItemForm(f => ({ ...f, department: v }))}>
                 <SelectTrigger className="bg-secondary border-border text-foreground font-body mt-1">
                   <SelectValue />
@@ -887,7 +1036,6 @@ const AdminPage = () => {
                 </SelectContent>
               </Select>
             </div>
-            {/* Recipe editor — only for existing items */}
             {editItem && editItem !== 'new' && (
               <div className="pt-3 border-t border-border">
                 <RecipeEditor
@@ -924,7 +1072,7 @@ const AdminPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Add Items Dialog (Admin) */}
+      {/* Add Items Dialog */}
       <Dialog open={!!addingToOrder} onOpenChange={() => setAddingToOrder(null)}>
         <DialogContent className="bg-card border-border max-w-md max-h-[85vh] flex flex-col">
           <DialogHeader>
@@ -937,8 +1085,8 @@ const AdminPage = () => {
               <button key={cat.id} onClick={() => setAddCat(cat.name)}
                 className={`font-display text-xs tracking-wider px-3 py-1.5 rounded-full transition-colors ${
                   activeCat === cat.name
-                    ? 'bg-gold/20 text-gold border border-gold/40'
-                    : 'text-cream-dim border border-transparent hover:text-foreground'
+                    ? 'bg-primary/20 text-primary border border-primary/40'
+                    : 'text-muted-foreground border border-transparent hover:text-foreground'
                 }`}>
                 {cat.name}
               </button>
@@ -951,7 +1099,7 @@ const AdminPage = () => {
                 <div key={item.id} className="flex items-center justify-between py-2 px-1">
                   <div className="flex-1 min-w-0">
                     <span className="font-display text-sm text-foreground block">{item.name}</span>
-                    <span className="font-display text-xs text-gold">₱{item.price.toLocaleString()}</span>
+                    <span className="font-display text-xs text-primary">₱{item.price.toLocaleString()}</span>
                   </div>
                   {inCart ? (
                     <div className="flex items-center gap-2">
@@ -970,7 +1118,7 @@ const AdminPage = () => {
                     </div>
                   ) : (
                     <button onClick={() => setAddCart({ ...addCart, [item.id]: { name: item.name, price: item.price, qty: 1 } })}
-                      className="w-8 h-8 rounded-full border border-gold/40 flex items-center justify-center text-gold">
+                      className="w-8 h-8 rounded-full border border-primary/40 flex items-center justify-center text-primary">
                       <Plus className="w-3 h-3" />
                     </button>
                   )}
@@ -986,7 +1134,7 @@ const AdminPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Tab Invoice Dialog (Admin) */}
+      {/* Tab Invoice Dialog */}
       <Dialog open={!!viewingTabId} onOpenChange={() => setViewingTabId(null)}>
         <DialogContent className="bg-card border-border max-w-md max-h-[90vh] overflow-y-auto">
           {viewingTabId && (
@@ -995,7 +1143,6 @@ const AdminPage = () => {
         </DialogContent>
       </Dialog>
     </div>
-    </AdminLoginGate>
   );
 };
 
