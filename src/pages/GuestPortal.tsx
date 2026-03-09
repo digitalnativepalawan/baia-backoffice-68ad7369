@@ -694,6 +694,7 @@ const ReviewView = ({ session, qc, onDone }: { session: GuestPortalSession; qc: 
 const ORDER_STATUS_MAP: Record<string, { label: string; color: string }> = {
   'New': { label: 'Received', color: 'bg-blue-500/20 text-blue-400' },
   'Preparing': { label: 'Preparing', color: 'bg-amber-500/20 text-amber-400' },
+  'Ready': { label: 'Ready', color: 'bg-emerald-500/20 text-emerald-400' },
   'Served': { label: 'Served', color: 'bg-green-500/20 text-green-400' },
   'Paid': { label: 'Complete', color: 'bg-muted text-muted-foreground' },
   'Closed': { label: 'Closed', color: 'bg-muted text-muted-foreground' },
