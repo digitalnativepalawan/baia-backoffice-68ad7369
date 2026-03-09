@@ -759,7 +759,7 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 mb-6">
+      <div className="grid grid-cols-4 gap-2 mb-6">
         <div className="border border-border rounded-lg p-3 text-center">
           <p className="font-display text-2xl text-foreground">{todayArrivals.length}</p>
           <p className="font-body text-xs text-muted-foreground">Arrivals</p>
@@ -771,6 +771,10 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
         <div className="border border-border rounded-lg p-3 text-center">
           <p className="font-display text-2xl text-foreground">{readyUnits.length}</p>
           <p className="font-body text-xs text-muted-foreground">Available</p>
+        </div>
+        <div className="border border-blue-500/30 bg-blue-500/10 rounded-lg p-3 text-center">
+          <p className="font-display text-2xl text-blue-400">{weekArrivals.length}</p>
+          <p className="font-body text-xs text-blue-400/70">Week</p>
         </div>
       </div>
 
