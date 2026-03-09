@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { Home, LogOut } from 'lucide-react';
 import { deductInventoryForOrder } from '@/lib/inventoryDeduction';
 import { canEdit } from '@/lib/permissions';
+import { getStaffSession, clearStaffSession } from '@/lib/session';
 
 interface DepartmentOrdersViewProps {
   department: 'kitchen' | 'bar';
@@ -41,10 +42,9 @@ const DepartmentOrdersView = ({ department, embedded = false }: DepartmentOrders
 
   // Read session permissions for edit access
   const sessionPerms = (() => {
-    try {
-      const s = JSON.parse(sessionStorage.getItem('staff_home_session') || '{}');
-      return { isAdmin: s.isAdmin || false, permissions: s.permissions || [] as string[] };
-    } catch { return { isAdmin: false, permissions: [] as string[] }; }
+    const s = getStaffSession();
+    if (s) return { isAdmin: s.isAdmin || false, permissions: s.permissions || [] as string[] };
+    return { isAdmin: false, permissions: [] as string[] };
   })();
   const canAct = sessionPerms.isAdmin || canEdit(sessionPerms.permissions, department);
 
@@ -200,9 +200,7 @@ const DepartmentOrdersView = ({ department, embedded = false }: DepartmentOrders
   };
 
   const handleLogout = () => {
-    sessionStorage.removeItem('staff_home_session');
-    localStorage.removeItem('emp_id');
-    localStorage.removeItem('emp_name');
+    clearStaffSession();
     navigate('/');
   };
 

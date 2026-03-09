@@ -1,38 +1,22 @@
 import { useEffect, useRef, useState, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { hasAccess } from '@/lib/permissions';
+import { getStaffSession, clearStaffSession } from '@/lib/session';
 import { toast } from 'sonner';
 
-const SESSION_KEY = 'staff_home_session';
 const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 
 interface RequireAuthProps {
   children: ReactNode;
-  /** Single permission key or array (any match grants access) */
   requiredPermission?: string | string[];
   adminOnly?: boolean;
 }
 
-const getSession = () => {
-  try {
-    const stored = sessionStorage.getItem(SESSION_KEY);
-    if (stored) {
-      const s = JSON.parse(stored);
-      if (s.expiresAt > Date.now()) return s;
-      sessionStorage.removeItem(SESSION_KEY);
-    }
-  } catch {
-    sessionStorage.removeItem(SESSION_KEY);
-  }
-  return null;
-};
-
 const RequireAuth = ({ children, requiredPermission, adminOnly }: RequireAuthProps) => {
   const navigate = useNavigate();
-  const [session, setSession] = useState(getSession);
+  const [session, setSession] = useState(getStaffSession);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Redirect if no session or insufficient permissions
   useEffect(() => {
     if (!session) {
       navigate('/', { replace: true });
@@ -62,9 +46,7 @@ const RequireAuth = ({ children, requiredPermission, adminOnly }: RequireAuthPro
     const resetTimer = () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       timeoutRef.current = setTimeout(() => {
-        sessionStorage.removeItem(SESSION_KEY);
-        localStorage.removeItem('emp_id');
-        localStorage.removeItem('emp_name');
+        clearStaffSession();
         setSession(null);
       }, INACTIVITY_TIMEOUT);
     };

@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { LogOut, Flame, GlassWater, BellRing, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useMemo } from 'react';
+import { getStaffSession, clearStaffSession } from '@/lib/session';
 
 const DEPT_CONFIG: Record<string, { label: string; icon: React.ReactNode; gradient: string }> = {
   kitchen: { label: 'Kitchen', icon: <Flame className="w-4 h-4" />, gradient: 'from-[hsl(25,85%,55%)] to-[hsl(15,80%,45%)]' },
@@ -18,19 +19,14 @@ const ServiceHeader = ({ department }: ServiceHeaderProps) => {
   const config = DEPT_CONFIG[department];
 
   const staffName = useMemo(() => {
-    try {
-      const raw = sessionStorage.getItem('staff_home_session');
-      if (raw) return JSON.parse(raw).name || '';
-    } catch {}
-    return '';
+    const s = getStaffSession();
+    return s?.name || '';
   }, []);
 
   const handleBack = () => navigate('/service');
 
   const handleLogout = () => {
-    sessionStorage.removeItem('staff_home_session');
-    localStorage.removeItem('emp_id');
-    localStorage.removeItem('emp_name');
+    clearStaffSession();
     navigate('/');
   };
 

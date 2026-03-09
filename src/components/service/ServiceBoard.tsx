@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { deductInventoryForOrder } from '@/lib/inventoryDeduction';
+import { getStaffSession } from '@/lib/session';
 import { toast } from 'sonner';
 import { useResortProfile } from '@/hooks/useResortProfile';
 import ServiceOrderCard from './ServiceOrderCard';
@@ -29,14 +30,8 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
 
   // Read staff permissions from session
   const permissions = useMemo(() => {
-    try {
-      const raw = sessionStorage.getItem('staff_home_session');
-      if (raw) {
-        const session = JSON.parse(raw);
-        return (session.permissions as string[]) || [];
-      }
-    } catch {}
-    return ['admin']; // fallback for admin users
+    const s = getStaffSession();
+    return s?.permissions || ['admin'];
   }, []);
 
   // Audio unlock

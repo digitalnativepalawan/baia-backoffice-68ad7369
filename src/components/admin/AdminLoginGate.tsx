@@ -4,13 +4,13 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Lock, LogOut } from 'lucide-react';
 import { toast } from 'sonner';
+import { getStaffSession } from '@/lib/session';
 
 interface AdminLoginGateProps {
   children: React.ReactNode;
 }
 
 const SESSION_KEY = 'admin_session';
-const STAFF_SESSION_KEY = 'staff_home_session';
 const SESSION_DURATION = 8 * 60 * 60 * 1000; // 8 hours
 
 const AdminLoginGate = ({ children }: AdminLoginGateProps) => {
@@ -21,10 +21,9 @@ const AdminLoginGate = ({ children }: AdminLoginGateProps) => {
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
 
-  // Check existing session on mount — reuse home staff session if admin
   useEffect(() => {
     try {
-      // First check dedicated admin session
+      // Check dedicated admin session
       const stored = sessionStorage.getItem(SESSION_KEY);
       if (stored) {
         const session = JSON.parse(stored);
@@ -37,23 +36,19 @@ const AdminLoginGate = ({ children }: AdminLoginGateProps) => {
           sessionStorage.removeItem(SESSION_KEY);
         }
       }
-      // Then check if staff home session is admin — skip double login
-      const staffStored = sessionStorage.getItem(STAFF_SESSION_KEY);
-      if (staffStored) {
-        const staffSession = JSON.parse(staffStored);
-        if (staffSession.expiresAt > Date.now() && staffSession.isAdmin) {
-          // Mirror into admin session so logout works independently
-          const adminSession = {
-            name: staffSession.name,
-            employeeId: staffSession.employeeId,
-            expiresAt: staffSession.expiresAt,
-          };
-          sessionStorage.setItem(SESSION_KEY, JSON.stringify(adminSession));
-          setAuthenticated(true);
-          setAdminName(staffSession.name);
-          setChecking(false);
-          return;
-        }
+      // Check if staff session is admin — skip double login
+      const staffSession = getStaffSession();
+      if (staffSession && staffSession.isAdmin) {
+        const adminSession = {
+          name: staffSession.name,
+          employeeId: staffSession.employeeId,
+          expiresAt: staffSession.expiresAt,
+        };
+        sessionStorage.setItem(SESSION_KEY, JSON.stringify(adminSession));
+        setAuthenticated(true);
+        setAdminName(staffSession.name);
+        setChecking(false);
+        return;
       }
     } catch {
       sessionStorage.removeItem(SESSION_KEY);
@@ -70,7 +65,6 @@ const AdminLoginGate = ({ children }: AdminLoginGateProps) => {
       });
       const data = res.data;
 
-      // Success path first
       if (data?.isAdmin && data?.employee) {
         const session = {
           name: data.employee.name,
@@ -86,7 +80,6 @@ const AdminLoginGate = ({ children }: AdminLoginGateProps) => {
         return;
       }
 
-      // Error path
       toast.error(data?.error || 'Login failed');
     } catch {
       toast.error('Login failed');
@@ -156,7 +149,6 @@ const AdminLoginGate = ({ children }: AdminLoginGateProps) => {
 
   return (
     <div className="relative">
-      {/* Logout button */}
       <button
         onClick={handleLogout}
         className="fixed top-4 right-4 z-50 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary/80 backdrop-blur border border-border text-muted-foreground hover:text-foreground transition-colors"

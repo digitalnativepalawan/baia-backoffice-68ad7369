@@ -12,6 +12,7 @@ import EmployeeTaskList from '@/components/employee/EmployeeTaskList';
 import EmployeeScheduleView from '@/components/employee/EmployeeScheduleView';
 import { hasAccess, canEdit } from '@/lib/permissions';
 import StaffNavBar from '@/components/StaffNavBar';
+import { getStaffSession } from '@/lib/session';
 
 type Tab = 'clock' | 'schedule' | 'tasks' | 'pay' | 'settings' | 'dashboard';
 
@@ -24,17 +25,12 @@ const EmployeePortal = () => {
   const [empId, setEmpId] = useState<string | null>(() => {
     const stored = localStorage.getItem('emp_id');
     if (stored) return stored;
-    try {
-      const staffSession = sessionStorage.getItem('staff_home_session');
-      if (staffSession) {
-        const s = JSON.parse(staffSession);
-        if (s.expiresAt > Date.now()) {
-          localStorage.setItem('emp_id', s.employeeId);
-          localStorage.setItem('emp_name', s.name);
-          return s.employeeId;
-        }
-      }
-    } catch {}
+    const staffSession = getStaffSession();
+    if (staffSession) {
+      localStorage.setItem('emp_id', staffSession.employeeId);
+      localStorage.setItem('emp_name', staffSession.name);
+      return staffSession.employeeId;
+    }
     return null;
   });
   const [empName, setEmpName] = useState<string>(() => localStorage.getItem('emp_name') || '');

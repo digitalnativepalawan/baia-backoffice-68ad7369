@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useMemo } from 'react';
+import { getStaffSession } from '@/lib/session';
 
 const departments = [
   {
@@ -43,11 +44,8 @@ const ServiceModePage = () => {
 
   // Get staff name from session
   const staffName = useMemo(() => {
-    try {
-      const raw = sessionStorage.getItem('staff_home_session');
-      if (raw) return JSON.parse(raw).name || '';
-    } catch {}
-    return '';
+    const s = getStaffSession();
+    return s?.name || '';
   }, []);
 
   // Fetch today's active orders for live counts

@@ -1,61 +1,37 @@
 
 
-## Add "Remember Me on This Device" for Staff Login
+## Plan: Fix Schedule Delete & Enhance Task/Assignment Scheduling
 
-### Problem
+### Issues Found
 
-Currently all staff sessions use `sessionStorage`, which is wiped when the browser tab/window closes. Staff have to re-enter name + PIN every time they open the app — frustrating on dedicated tablets and phones.
+1. **Delete button bug**: The trash icon on shift blocks triggers `setDeleteId(s.id)`, but the parent div's `onClick={() => openEdit(s)}` fires simultaneously despite `stopPropagation`. On mobile, the tiny button (3x3 icon) is nearly impossible to tap. The AlertDialog `onOpenChange={() => setDeleteId(null)}` also races with the confirm action.
 
-### Solution
-
-Add a "Remember me on this device" checkbox to the login screen. When checked, store the session in `localStorage` instead of `sessionStorage`, so it persists across browser restarts. The session still expires after 8 hours (or can be extended to 24h/7d for remembered devices). When unchecked, behavior stays the same as today.
+2. **Missing scheduling features**: The schedule only manages time shifts. There's no way to assign tasks like housecleaning, reception duty, or track completion from within the schedule view.
 
 ### Changes
 
-**1. Create a shared session helper — `src/lib/session.ts`**
+**1. Fix Delete Button** (`WeeklyScheduleManager.tsx`)
+- Make `confirmDelete` capture `deleteId` before the dialog closes by saving it in a ref or local variable
+- Increase touch target size for edit/delete buttons on shift blocks
+- Prevent edit modal from opening when clicking edit/delete icons (the `stopPropagation` exists but the parent click handler on the entire timeline area also fires)
 
-A single module that all components import instead of directly calling `sessionStorage`:
+**2. Add Task/Assignment Creation from Schedule** (`WeeklyScheduleManager.tsx`)
+- Add an "Assign Task" button alongside "Add Shift" 
+- New modal to create a task assignment: select employee, pick type (Housecleaning, Reception, Custom), set date/time, add notes
+- For housecleaning: select a room/unit to clean, auto-creates a `housekeeping_orders` entry assigned to the selected employee
+- For other tasks: creates an `employee_tasks` entry with due date and description
+- Tasks appear as colored pills on the timeline (already partially implemented)
 
-- `getStaffSession()` — checks `localStorage` first (remembered), then `sessionStorage`, validates expiry
-- `setStaffSession(session, remember: boolean)` — writes to the correct storage; if `remember`, also store a `staff_remember` flag in `localStorage`
-- `clearStaffSession()` — removes from both storages
-- `isRemembered()` — checks if `staff_remember` flag exists
+**3. Show Completion Info on Task Detail** (`WeeklyScheduleManager.tsx`)
+- In the task detail dialog, show who completed the task and when (`completed_at`)
+- For housekeeping pills, show completion status (`cleaning_completed_at`, `completed_by_name`)
+- Make housekeeping pills clickable to show full details (room, status, who inspected/cleaned)
 
-This centralizes the ~15 scattered `sessionStorage.getItem/setItem/removeItem('staff_home_session')` calls across the codebase.
+**4. Enhance Task Detail Dialog** (`WeeklyScheduleManager.tsx`)
+- Add edit capability: change title, description, due date, reassign to different employee
+- Add delete capability for tasks
+- Show completion audit trail
 
-**2. Update `src/pages/Index.tsx` — Add checkbox + use helper**
-
-- Add a "Remember me on this device" checkbox below the PIN field
-- Pass `remember` boolean to `setStaffSession()`
-- When remembered, extend session to 7 days instead of 8 hours
-- Replace direct `sessionStorage` calls with the helper
-
-**3. Update all session consumers to use the helper**
-
-Files that read/write the session directly:
-- `src/components/RequireAuth.tsx` — `getStaffSession()` / `clearStaffSession()`
-- `src/components/admin/AdminLoginGate.tsx` — `getStaffSession()` / `setStaffSession()` / `clearStaffSession()`
-- `src/components/StaffNavBar.tsx` — `clearStaffSession()`
-- `src/components/DepartmentOrdersView.tsx` — read session + `clearStaffSession()`
-- `src/components/service/ServiceHeader.tsx` — read session + `clearStaffSession()`
-- `src/components/service/ServiceBoard.tsx` — read session permissions
-- `src/pages/EmployeePortal.tsx` — read session
-- `src/pages/ServiceModePage.tsx` — read session
-
-### File Summary
-
-```
-CREATE: src/lib/session.ts                          — centralized session read/write/clear
-EDIT:   src/pages/Index.tsx                          — add "Remember me" checkbox, use helper
-EDIT:   src/components/RequireAuth.tsx                — use helper
-EDIT:   src/components/admin/AdminLoginGate.tsx       — use helper
-EDIT:   src/components/StaffNavBar.tsx                — use helper
-EDIT:   src/components/DepartmentOrdersView.tsx       — use helper
-EDIT:   src/components/service/ServiceHeader.tsx      — use helper
-EDIT:   src/components/service/ServiceBoard.tsx       — use helper
-EDIT:   src/pages/EmployeePortal.tsx                  — use helper
-EDIT:   src/pages/ServiceModePage.tsx                 — use helper
-```
-
-No database changes needed.
+### Files to Edit
+- `src/components/admin/WeeklyScheduleManager.tsx` — all changes in this single file
 

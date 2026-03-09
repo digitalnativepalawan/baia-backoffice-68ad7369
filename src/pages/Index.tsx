@@ -4,26 +4,10 @@ import { useResortProfile } from '@/hooks/useResortProfile';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { DoorOpen, Users, Shield, LogIn } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { DoorOpen, Users, Shield } from 'lucide-react';
 import { toast } from 'sonner';
-
-const SESSION_KEY = 'staff_home_session';
-
-const SESSION_KEY_CHECK = 'staff_home_session';
-
-const getExistingSession = () => {
-  try {
-    const stored = sessionStorage.getItem(SESSION_KEY_CHECK);
-    if (stored) {
-      const s = JSON.parse(stored);
-      if (s.expiresAt > Date.now()) return s;
-      sessionStorage.removeItem(SESSION_KEY_CHECK);
-    }
-  } catch {
-    sessionStorage.removeItem(SESSION_KEY_CHECK);
-  }
-  return null;
-};
+import { getStaffSession, setStaffSession, isRemembered } from '@/lib/session';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -33,11 +17,12 @@ const Index = () => {
   const [mode, setMode] = useState<null | 'staff' | 'admin'>(null);
   const [name, setName] = useState('');
   const [pin, setPin] = useState('');
+  const [remember, setRemember] = useState(() => isRemembered());
   const [loading, setLoading] = useState(false);
 
   // Auto-redirect if already logged in
   useEffect(() => {
-    const existing = getExistingSession();
+    const existing = getStaffSession();
     if (existing) {
       const perms: string[] = existing.permissions || [];
       const isAdmin = existing.isAdmin || perms.includes('admin');
@@ -61,20 +46,23 @@ const Index = () => {
         setLoading(false);
         return;
       }
-      const s = {
-        name: data.employee.name,
-        employeeId: data.employee.id,
-        isAdmin: data.isAdmin || false,
-        permissions: data.permissions || [],
-        expiresAt: Date.now() + 8 * 60 * 60 * 1000,
-      };
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify(s));
+
+      setStaffSession(
+        {
+          name: data.employee.name,
+          employeeId: data.employee.id,
+          isAdmin: data.isAdmin || false,
+          permissions: data.permissions || [],
+        },
+        remember,
+      );
       localStorage.setItem('emp_id', data.employee.id);
       localStorage.setItem('emp_name', data.employee.name);
       toast.success(`Welcome, ${data.employee.name}`);
 
       if (mode === 'admin') {
-        if (s.isAdmin || s.permissions.includes('admin')) {
+        const perms = data.permissions || [];
+        if (data.isAdmin || perms.includes('admin')) {
           navigate('/admin');
         } else {
           toast.error('Admin access required');
@@ -162,6 +150,16 @@ const Index = () => {
             className="bg-secondary border-border text-foreground font-body text-center text-2xl tracking-[0.5em] h-14"
             onKeyDown={e => { if (e.key === 'Enter') handleLogin(); }}
           />
+          <div className="flex items-center gap-2 px-1">
+            <Checkbox
+              id="remember-me"
+              checked={remember}
+              onCheckedChange={(v) => setRemember(v === true)}
+            />
+            <label htmlFor="remember-me" className="font-body text-sm text-muted-foreground cursor-pointer select-none">
+              Remember me on this device
+            </label>
+          </div>
           <Button
             onClick={handleLogin}
             disabled={loading || !name.trim() || !pin}

@@ -6,26 +6,7 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/s
 import { hasAccess } from '@/lib/permissions';
 import { getHomeRoute } from '@/lib/getHomeRoute';
 import { Badge } from '@/components/ui/badge';
-
-const SESSION_KEY = 'staff_home_session';
-
-interface Session {
-  name: string;
-  employeeId: string;
-  permissions: string[];
-  expiresAt: number;
-}
-
-const getSession = (): Session | null => {
-  try {
-    const stored = sessionStorage.getItem(SESSION_KEY);
-    if (stored) {
-      const s = JSON.parse(stored);
-      if (s.expiresAt > Date.now()) return s;
-    }
-  } catch {}
-  return null;
-};
+import { getStaffSession, clearStaffSession } from '@/lib/session';
 
 /** Color map for department badges — HSL values from design tokens where possible */
 const DEPT_COLORS: Record<string, string> = {
@@ -58,7 +39,7 @@ interface StaffNavBarProps {
 const StaffNavBar = ({ activeDepartment }: StaffNavBarProps) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const session = getSession();
+  const session = getStaffSession();
   const [menuOpen, setMenuOpen] = useState(false);
 
   if (!session) return null;
@@ -88,9 +69,7 @@ const StaffNavBar = ({ activeDepartment }: StaffNavBarProps) => {
   const hasDashboardAccess = isAdmin || MANAGER_SECTIONS.some(s => hasAccess(perms, s));
 
   const handleLogout = () => {
-    sessionStorage.removeItem(SESSION_KEY);
-    localStorage.removeItem('emp_id');
-    localStorage.removeItem('emp_name');
+    clearStaffSession();
     navigate('/');
   };
 
