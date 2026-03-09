@@ -1,22 +1,37 @@
 
 
-## Plan: Change CSV Template Column from "Total Amount Projected" to "Price Per Night"
+## Plan: Fix Schedule Delete & Enhance Task/Assignment Scheduling
 
-### Analysis
+### Issues Found
 
-The `room_rate` field in `resort_ops_bookings` is already used as a **per-night rate** throughout the entire app (ReceptionPage shows `₱X/night`, CheckoutModal calculates `nights × room_rate`, etc.). The current CSV import incorrectly labels this as "Total Amount Projected" and then divides it by number of units — but it should just be the nightly rate stored directly.
+1. **Delete button bug**: The trash icon on shift blocks triggers `setDeleteId(s.id)`, but the parent div's `onClick={() => openEdit(s)}` fires simultaneously despite `stopPropagation`. On mobile, the tiny button (3x3 icon) is nearly impossible to tap. The AlertDialog `onOpenChange={() => setDeleteId(null)}` also races with the confirm action.
 
-### Changes — Single File
+2. **Missing scheduling features**: The schedule only manages time shifts. There's no way to assign tasks like housecleaning, reception duty, or track completion from within the schedule view.
 
-**`src/components/admin/ImportReservationsModal.tsx`**
+### Changes
 
-1. **Rename CSV header**: `Total Amount Projected` → `Price Per Night`
-2. **Rename internal field**: `totalProjected` → `pricePerNight` (in the `ParsedRow` interface and all references)
-3. **Update template example**: Change example value to reflect a per-night rate (e.g., `1500` instead of `5000`)
-4. **Fix the insert logic**: Store `pricePerNight` directly as `room_rate` instead of splitting by unit count. Each unit booking gets the same nightly rate. The `paid_amount` (`paidRealized`) splitting by units can remain as-is since partial payment tracking per unit is still useful.
-5. **Update the preview row display**: Show `₱X/night` instead of `Projected: ₱X`
-6. **Update validation error message**: `totalProjected` → `pricePerNight` number check
-7. **Update DialogDescription text** to mention the new column name
+**1. Fix Delete Button** (`WeeklyScheduleManager.tsx`)
+- Make `confirmDelete` capture `deleteId` before the dialog closes by saving it in a ref or local variable
+- Increase touch target size for edit/delete buttons on shift blocks
+- Prevent edit modal from opening when clicking edit/delete icons (the `stopPropagation` exists but the parent click handler on the entire timeline area also fires)
 
-No other files affected — `room_rate` is already consumed as per-night everywhere else.
+**2. Add Task/Assignment Creation from Schedule** (`WeeklyScheduleManager.tsx`)
+- Add an "Assign Task" button alongside "Add Shift" 
+- New modal to create a task assignment: select employee, pick type (Housecleaning, Reception, Custom), set date/time, add notes
+- For housecleaning: select a room/unit to clean, auto-creates a `housekeeping_orders` entry assigned to the selected employee
+- For other tasks: creates an `employee_tasks` entry with due date and description
+- Tasks appear as colored pills on the timeline (already partially implemented)
+
+**3. Show Completion Info on Task Detail** (`WeeklyScheduleManager.tsx`)
+- In the task detail dialog, show who completed the task and when (`completed_at`)
+- For housekeeping pills, show completion status (`cleaning_completed_at`, `completed_by_name`)
+- Make housekeeping pills clickable to show full details (room, status, who inspected/cleaned)
+
+**4. Enhance Task Detail Dialog** (`WeeklyScheduleManager.tsx`)
+- Add edit capability: change title, description, due date, reassign to different employee
+- Add delete capability for tasks
+- Show completion audit trail
+
+### Files to Edit
+- `src/components/admin/WeeklyScheduleManager.tsx` — all changes in this single file
 

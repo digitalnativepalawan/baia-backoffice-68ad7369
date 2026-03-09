@@ -25,15 +25,15 @@ interface ParsedRow {
   platform: string;
   checkIn: string;
   checkOut: string;
-  totalProjected: string;
+  pricePerNight: string;
   paidRealized: string;
   notes: string;
   errors: string[];
   selected: boolean;
 }
 
-const TEMPLATE_HEADERS = 'Guest Name,Units,Guests,Platform,Check In,Check Out,Total Amount Projected,Paid So Far Realized,Notes';
-const TEMPLATE_EXAMPLE = 'John Doe,"Unit1,Unit2",2,Airbnb,01/15/2025,01/18/2025,5000,2500,First time guest';
+const TEMPLATE_HEADERS = 'Guest Name,Units,Guests,Platform,Check In,Check Out,Price Per Night,Paid So Far Realized,Notes';
+const TEMPLATE_EXAMPLE = 'John Doe,"Unit1,Unit2",2,Airbnb,01/15/2026,01/18/2026,1500,2500,First time guest';
 
 // Unit validation is now dynamic — derived from the `units` prop
 
@@ -94,7 +94,7 @@ function validateRow(row: ParsedRow, validUnits: string[]): string[] {
     const invalid = unitNames.filter(u => !validUnits.some(v => v.toLowerCase() === u.toLowerCase()));
     if (invalid.length > 0) errs.push(`Invalid unit(s): ${invalid.join(', ')} (valid: ${validUnits.join(', ')})`);
   }
-  if (row.totalProjected && isNaN(parseFloat(row.totalProjected))) errs.push('Total Amount must be a number');
+  if (row.pricePerNight && isNaN(parseFloat(row.pricePerNight))) errs.push('Price Per Night must be a number');
   if (row.paidRealized && isNaN(parseFloat(row.paidRealized))) errs.push('Paid must be a number');
   return errs;
 }
@@ -146,7 +146,7 @@ const ImportReservationsModal = ({ open, onOpenChange, guests, units, onComplete
           platform: mapPlatform(fields[3] || ''),
           checkIn: checkIn || '',
           checkOut: checkOut || '',
-          totalProjected: fields[6] || '0',
+          pricePerNight: fields[6] || '0',
           paidRealized: fields[7] || '0',
           notes: fields[8] || '',
           errors: [],
@@ -201,9 +201,8 @@ const ImportReservationsModal = ({ open, onOpenChange, guests, units, onComplete
         }
 
         const unitNames = row.units.split(',').map(u => u.trim()).filter(Boolean);
-        const totalProjected = parseFloat(row.totalProjected) || 0;
+        const nightlyRate = parseFloat(row.pricePerNight) || 0;
         const totalPaid = parseFloat(row.paidRealized) || 0;
-        const splitRate = unitNames.length > 0 ? totalProjected / unitNames.length : totalProjected;
         const splitPaid = unitNames.length > 0 ? totalPaid / unitNames.length : totalPaid;
 
         for (const uName of unitNames) {
@@ -219,7 +218,7 @@ const ImportReservationsModal = ({ open, onOpenChange, guests, units, onComplete
             check_in: row.checkIn,
             check_out: row.checkOut,
             adults: parseInt(row.guestCount) || 1,
-            room_rate: splitRate,
+            room_rate: nightlyRate,
             paid_amount: splitPaid,
           });
           if (bErr) { errors.push(`Row ${row.idx}: ${bErr.message}`); }
@@ -256,7 +255,7 @@ const ImportReservationsModal = ({ open, onOpenChange, guests, units, onComplete
       <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display text-sm tracking-wider">Import Reservations</DialogTitle>
-          <DialogDescription className="font-body text-xs text-muted-foreground">Upload a CSV file to batch-create reservations. Dates must be mm/dd/yyyy. Units: G1, G2, G3.</DialogDescription>
+          <DialogDescription className="font-body text-xs text-muted-foreground">Upload a CSV file to batch-create reservations. Dates must be mm/dd/yyyy. Price Per Night = nightly rate per unit.</DialogDescription>
         </DialogHeader>
 
         {/* Result summary */}
@@ -342,7 +341,7 @@ const ImportReservationsModal = ({ open, onOpenChange, guests, units, onComplete
                           </div>
                           <p className="font-body text-xs text-muted-foreground">Units: {row.units} · {row.guestCount} guests</p>
                           <p className="font-body text-xs text-muted-foreground">{row.checkIn} → {row.checkOut}</p>
-                          <p className="font-body text-xs text-muted-foreground">Projected: ₱{row.totalProjected} · Paid: ₱{row.paidRealized}</p>
+                          <p className="font-body text-xs text-muted-foreground">₱{row.pricePerNight}/night · Paid: ₱{row.paidRealized}</p>
                           {row.notes && <p className="font-body text-xs text-muted-foreground italic">{row.notes}</p>}
                           {row.errors.map((e, i) => (
                             <p key={i} className="font-body text-xs text-destructive">{e}</p>
