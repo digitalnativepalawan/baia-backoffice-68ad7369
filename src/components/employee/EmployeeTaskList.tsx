@@ -55,6 +55,24 @@ const EmployeeTaskList = ({ employeeId, createdBy = 'admin', readOnly = false, e
     },
   });
 
+  // Fetch comment counts for all tasks
+  const taskIds = tasks.map((t: any) => t.id);
+  const { data: commentCounts = {} } = useQuery({
+    queryKey: ['task-comment-counts', taskIds.join(',')],
+    queryFn: async () => {
+      if (taskIds.length === 0) return {};
+      const { data } = await (supabase.from('task_comments' as any) as any)
+        .select('task_id')
+        .in('task_id', taskIds);
+      const counts: Record<string, number> = {};
+      (data || []).forEach((c: any) => {
+        counts[c.task_id] = (counts[c.task_id] || 0) + 1;
+      });
+      return counts;
+    },
+    enabled: taskIds.length > 0,
+  });
+
   const filtered = tasks.filter(t => {
     if (filter === 'archived') return true;
     if (filter === 'pending') return t.status !== 'completed';
