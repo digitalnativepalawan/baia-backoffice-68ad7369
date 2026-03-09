@@ -1346,29 +1346,10 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
                       className="bg-secondary border-border text-foreground font-body" />
                   </div>
                 )}
-                {/* Assign Housekeeper */}
-                <div className="border border-amber-500/30 bg-amber-500/5 rounded-lg p-3 space-y-2">
-                  <p className="font-display text-xs tracking-wider text-amber-400 uppercase">🧹 Assign Housekeeper</p>
-                  <Select onValueChange={setCheckOutHousekeeper} value={checkOutHousekeeper}>
-                    <SelectTrigger className="bg-secondary border-border text-foreground font-body">
-                      <SelectValue placeholder="Select housekeeper (optional)" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border-border">
-                      {hkEmployeesForCheckout.map((e: any) => (
-                        <SelectItem key={e.id} value={e.id} className="text-foreground font-body">
-                          {e.display_name || e.name}{e.whatsapp_number ? ' 📱' : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {checkOutHousekeeper && (() => {
-                    const emp = hkEmployeesForCheckout.find((e: any) => e.id === checkOutHousekeeper);
-                    return emp?.whatsapp_number ? (
-                      <p className="font-body text-xs text-emerald-400">✓ Will notify via WhatsApp on checkout</p>
-                    ) : (
-                      <p className="font-body text-xs text-muted-foreground">No WhatsApp number — assignment only</p>
-                    );
-                  })()}
+                {/* Housekeeping broadcast notice */}
+                <div className="border border-amber-500/30 bg-amber-500/5 rounded-lg p-3">
+                  <p className="font-display text-xs tracking-wider text-amber-400 uppercase">🧹 Housekeeping</p>
+                  <p className="font-body text-xs text-muted-foreground mt-1">All on-duty housekeepers will be notified and can accept the assignment.</p>
                 </div>
               </div>
             );
