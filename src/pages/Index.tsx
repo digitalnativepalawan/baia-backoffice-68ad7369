@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useResortProfile } from '@/hooks/useResortProfile';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,6 +9,22 @@ import { toast } from 'sonner';
 
 const SESSION_KEY = 'staff_home_session';
 
+const SESSION_KEY_CHECK = 'staff_home_session';
+
+const getExistingSession = () => {
+  try {
+    const stored = sessionStorage.getItem(SESSION_KEY_CHECK);
+    if (stored) {
+      const s = JSON.parse(stored);
+      if (s.expiresAt > Date.now()) return s;
+      sessionStorage.removeItem(SESSION_KEY_CHECK);
+    }
+  } catch {
+    sessionStorage.removeItem(SESSION_KEY_CHECK);
+  }
+  return null;
+};
+
 const Index = () => {
   const navigate = useNavigate();
   const { data: profile } = useResortProfile();
@@ -18,6 +34,20 @@ const Index = () => {
   const [name, setName] = useState('');
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Auto-redirect if already logged in
+  useEffect(() => {
+    const existing = getExistingSession();
+    if (existing) {
+      const perms: string[] = existing.permissions || [];
+      const isAdmin = existing.isAdmin || perms.includes('admin');
+      if (isAdmin) {
+        navigate('/admin', { replace: true });
+      } else {
+        navigate('/staff', { replace: true });
+      }
+    }
+  }, [navigate]);
 
   const handleLogin = async () => {
     if (!name.trim() || !pin) return;
