@@ -886,7 +886,56 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
         </div>
       )}
 
-      {/* ── Walk-In / Sell Room (edit level) ── */}
+      {/* ── Upcoming This Week ── */}
+      {weekArrivals.length > 0 && (
+        <Collapsible defaultOpen={false} className="mb-6">
+          <CollapsibleTrigger className="flex items-center gap-2 w-full">
+            <h2 className="font-display text-xs tracking-wider text-blue-400 uppercase">📅 Upcoming This Week ({weekArrivals.length} arrivals · {weekDepartures.length} departures)</h2>
+            <ChevronDown className="w-3.5 h-3.5 text-blue-400 ml-auto" />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-3 mt-2">
+            {Object.entries(weekArrivalsByDate).map(([date, dayBookings]) => (
+              <div key={date} className="space-y-1.5">
+                <p className="font-display text-xs text-muted-foreground tracking-wider">
+                  {format(new Date(date + 'T00:00:00'), 'EEE, MMM d')} — {(dayBookings as any[]).length} arrival{(dayBookings as any[]).length !== 1 ? 's' : ''}
+                </p>
+                {(dayBookings as any[]).map((b: any) => {
+                  const guest = b.resort_ops_guests;
+                  const unitName = getUnitNameForBooking(b);
+                  return (
+                    <div key={b.id} className="border border-blue-500/20 bg-blue-500/5 rounded-lg p-2.5">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-display text-sm text-foreground tracking-wider">{unitName}</p>
+                          <p className="font-body text-xs text-muted-foreground">{guest?.full_name || 'Guest'} · {b.adults} adult{b.adults > 1 ? 's' : ''}{b.children > 0 ? `, ${b.children} child` : ''}</p>
+                          <p className="font-body text-[10px] text-muted-foreground">{b.platform} · ₱{Number(b.room_rate).toLocaleString()}/night · until {format(new Date(b.check_out + 'T00:00:00'), 'MMM d')}</p>
+                        </div>
+                        <Badge className="font-body text-[10px] bg-blue-500/20 text-blue-400 border-blue-500/40">Upcoming</Badge>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+            {weekDepartures.length > 0 && (
+              <div className="space-y-1.5 pt-2 border-t border-border">
+                <p className="font-display text-xs text-muted-foreground tracking-wider uppercase">Upcoming Departures</p>
+                {weekDepartures.map((b: any) => {
+                  const guest = b.resort_ops_guests;
+                  const unitName = getUnitNameForBooking(b);
+                  return (
+                    <div key={b.id} className="border border-border rounded-lg p-2.5">
+                      <p className="font-display text-sm text-foreground tracking-wider">{unitName}</p>
+                      <p className="font-body text-xs text-muted-foreground">{guest?.full_name || 'Guest'} · out {format(new Date(b.check_out + 'T00:00:00'), 'EEE, MMM d')}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+
       {readyUnits.length > 0 && (
         <div className="mb-6 space-y-2">
           <div className="flex justify-between items-center">
