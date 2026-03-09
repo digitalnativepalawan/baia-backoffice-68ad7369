@@ -68,13 +68,16 @@ const ServiceOrderCard = ({ order, department, permissions, onAction, onOpenDeta
     else if (order.bar_status === 'preparing') primaryAction = { label: 'Mark Ready', action: 'bar-ready', icon: <CheckCircle2 className="w-5 h-5" /> };
   }
 
-  // Serve/Pay actions — any department staff can do this
+  const canMarkPaid = canEdit(permissions, 'reception') || canManage(permissions, 'orders');
+
+  // Serve/Pay actions — any department staff can serve, only reception/admin can mark paid
   if (!primaryAction && canServe) {
     if (order.status === 'Ready') {
       primaryAction = { label: isAutoPayable ? 'Serve & Close' : 'Mark Served', action: 'mark-served', icon: <Truck className="w-5 h-5" /> };
-    } else if (order.status === 'Served' && !isAutoPayable) {
-      primaryAction = { label: 'Mark Paid', action: 'mark-paid', icon: <CreditCard className="w-5 h-5" /> };
     }
+  }
+  if (!primaryAction && canMarkPaid && order.status === 'Served' && !isAutoPayable) {
+    primaryAction = { label: 'Mark Paid', action: 'mark-paid', icon: <CreditCard className="w-5 h-5" /> };
   }
 
   // Secondary cross-dept actions

@@ -152,7 +152,7 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
 
   const refreshAll = () => {
     refetch();
-    qc.invalidateQueries({ queryKey: ['billing-unpaid-orders'] });
+    qc.invalidateQueries({ queryKey: ['billing-room-orders'] });
     qc.invalidateQueries({ queryKey: ['billing-tours'] });
     qc.invalidateQueries({ queryKey: ['billing-requests'] });
   };
