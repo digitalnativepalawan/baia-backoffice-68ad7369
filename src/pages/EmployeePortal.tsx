@@ -5,12 +5,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Home, Clock, LogOut, ListTodo, Banknote, Settings, Star, LayoutDashboard, CalendarDays, KeyRound } from 'lucide-react';
+import { Clock, LogOut, ListTodo, Banknote, Settings, Star, LayoutDashboard, CalendarDays, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import EmployeeTaskList from '@/components/employee/EmployeeTaskList';
 import EmployeeScheduleView from '@/components/employee/EmployeeScheduleView';
 import { hasAccess, canEdit } from '@/lib/permissions';
+import StaffNavBar from '@/components/StaffNavBar';
 
 type Tab = 'clock' | 'schedule' | 'tasks' | 'pay' | 'settings' | 'dashboard';
 
