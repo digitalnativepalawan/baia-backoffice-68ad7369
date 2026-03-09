@@ -191,7 +191,7 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
         const d = i.department || 'kitchen';
         return d === 'bar' || d === 'both';
       });
-      if (items.length > 0) await deductInventoryForOrder(orderId, items);
+      if (items.length > 0) await deductInventoryForOrder(orderId, items, 'bar');
     } else if (action === 'bar-ready') {
       updateData.bar_status = 'ready';
       const kitchenItems = ((order.items as any[]) || []).some((i: any) => {
