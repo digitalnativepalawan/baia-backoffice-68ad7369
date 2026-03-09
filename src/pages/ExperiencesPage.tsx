@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
-import { ArrowLeft, MapPin, CheckCircle, Palmtree, Car, Bike, ChevronDown, History } from 'lucide-react';
+import { ArrowLeft, MapPin, CheckCircle, Palmtree, Car, Bike, ChevronDown, History, MessageCircle, Droplets, ConciergeBell } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { toast } from 'sonner';
 import { canEdit } from '@/lib/permissions';
@@ -235,10 +235,13 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
   };
 
   const getRequestIcon = (type: string) => {
-    if (type?.toLowerCase().includes('transport')) return <Car className="w-3.5 h-3.5 text-primary" />;
-    if (type?.toLowerCase().includes('rent') || type?.toLowerCase().includes('scooter') || type?.toLowerCase().includes('bike'))
+    const t = type?.toLowerCase() || '';
+    if (t.includes('transport')) return <Car className="w-3.5 h-3.5 text-primary" />;
+    if (t.includes('rent') || t.includes('scooter') || t.includes('bike'))
       return <Bike className="w-3.5 h-3.5 text-primary" />;
-    return <Palmtree className="w-3.5 h-3.5 text-primary" />;
+    if (t.includes('message')) return <MessageCircle className="w-3.5 h-3.5 text-primary" />;
+    if (t.includes('towel') || t.includes('linen')) return <Droplets className="w-3.5 h-3.5 text-primary" />;
+    return <ConciergeBell className="w-3.5 h-3.5 text-primary" />;
   };
 
   return (

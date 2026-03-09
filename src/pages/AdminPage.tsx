@@ -22,6 +22,7 @@ import TabInvoice from '@/components/admin/TabInvoice';
 import RecipeEditor from '@/components/admin/RecipeEditor';
 import InventoryDashboard from '@/components/admin/InventoryDashboard';
 import ResortOpsDashboard from '@/components/admin/ResortOpsDashboard';
+import ExperiencesPage from '@/pages/ExperiencesPage';
 import InvoiceSettingsForm from '@/components/admin/InvoiceSettingsForm';
 import StaffAccessManager from '@/components/admin/StaffAccessManager';
 import EmployeeContactConfig from '@/components/admin/EmployeeContactConfig';
@@ -66,6 +67,7 @@ const OPERATIONS: TabDef[] = [
   { value: 'kitchen', label: 'Kitchen', perm: 'kitchen' },
   { value: 'bar', label: 'Bar', perm: 'bar' },
   { value: 'rooms', label: 'Rooms', perm: 'rooms' },
+  { value: 'guest-services', label: 'Guest Services', perm: 'reception' },
   { value: 'housekeeping', label: 'Housekeeping', perm: 'housekeeping' },
 ];
 
@@ -984,6 +986,13 @@ const AdminPage = () => {
           {(isAdmin || hasAccess(perms, 'inventory')) && (
             <TabsContent value="inventory">
               <InventoryDashboard readOnly={readOnly('inventory')} />
+            </TabsContent>
+          )}
+
+          {/* GUEST SERVICES TAB */}
+          {(isAdmin || hasAccess(perms, 'experiences') || hasAccess(perms, 'reception')) && (
+            <TabsContent value="guest-services">
+              <ExperiencesPage embedded />
             </TabsContent>
           )}
 
