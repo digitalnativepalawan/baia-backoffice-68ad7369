@@ -443,14 +443,23 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
 
 
   const addBooking = async () => {
-    if (!newBooking.guest_id || !newBooking.unit_id || !newBooking.check_in || !newBooking.check_out) return;
+    let guestId = newBooking.guest_id;
+    // If no guest_id but we have a name, create a new guest
+    if (!guestId && newBooking.guest_name.trim()) {
+      const { data: newGuest, error } = await from('resort_ops_guests').insert({ full_name: newBooking.guest_name.trim() }).select('id').single();
+      if (error || !newGuest) { toast.error('Failed to create guest'); return; }
+      guestId = (newGuest as any).id;
+      qc.invalidateQueries({ queryKey: ['resort-ops-guests'] });
+    }
+    if (!guestId || !newBooking.unit_id || !newBooking.check_in || !newBooking.check_out) { toast.error('Fill in all required fields'); return; }
     await from('resort_ops_bookings').insert({
-      guest_id: newBooking.guest_id, unit_id: newBooking.unit_id, platform: newBooking.platform,
+      guest_id: guestId, unit_id: newBooking.unit_id, platform: newBooking.platform,
       check_in: newBooking.check_in, check_out: newBooking.check_out, adults: parseInt(newBooking.adults) || 1,
       room_rate: parseFloat(newBooking.room_rate) || 0, addons_total: parseFloat(newBooking.addons_total) || 0,
       paid_amount: parseFloat(newBooking.paid_amount) || 0, commission_applied: parseFloat(newBooking.commission_applied) || 0,
     });
-    setNewBooking({ guest_id: '', unit_id: '', platform: '', check_in: '', check_out: '', adults: '1', room_rate: '', addons_total: '0', paid_amount: '0', commission_applied: '0' });
+    setNewBooking({ guest_id: '', guest_name: '', unit_id: '', platform: '', check_in: '', check_out: '', adults: '1', room_rate: '', addons_total: '0', paid_amount: '0', commission_applied: '0' });
+    setGuestSearch('');
     invalidateAll();
     toast.success('Booking added');
   };
