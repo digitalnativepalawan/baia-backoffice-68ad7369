@@ -18,6 +18,10 @@ import ReceptionPage from "./pages/ReceptionPage";
 import ExperiencesPage from "./pages/ExperiencesPage";
 import StaffShell from "./pages/StaffShell";
 import RequireAuth from "./components/RequireAuth";
+import ServiceModePage from "./pages/ServiceModePage";
+import ServiceKitchenPage from "./pages/ServiceKitchenPage";
+import ServiceBarPage from "./pages/ServiceBarPage";
+import ServiceReceptionPage from "./pages/ServiceReceptionPage";
 
 const queryClient = new QueryClient();
 
@@ -31,6 +35,12 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/menu" element={<MenuPage />} />
           <Route path="/guest-portal" element={<GuestPortalPage />} />
+
+          {/* Service Mode — live operational boards */}
+          <Route path="/service" element={<RequireAuth><ServiceModePage /></RequireAuth>} />
+          <Route path="/service/kitchen" element={<RequireAuth requiredPermission={['kitchen', 'orders']}><ServiceKitchenPage /></RequireAuth>} />
+          <Route path="/service/bar" element={<RequireAuth requiredPermission={['bar', 'orders']}><ServiceBarPage /></RequireAuth>} />
+          <Route path="/service/reception" element={<RequireAuth requiredPermission={['reception', 'orders']}><ServiceReceptionPage /></RequireAuth>} />
 
           {/* Staff Shell — role-aware action console */}
           <Route path="/staff" element={<RequireAuth><StaffShell /></RequireAuth>} />

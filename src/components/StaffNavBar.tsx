@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, Briefcase, LayoutDashboard, LogOut, Menu } from 'lucide-react';
+import { Home, Briefcase, LayoutDashboard, LogOut, Menu, Monitor } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 import { hasAccess } from '@/lib/permissions';
@@ -121,6 +121,11 @@ const StaffNavBar = ({ activeDepartment }: StaffNavBarProps) => {
     );
   };
 
+  const goService = () => {
+    navigate('/service');
+    setMenuOpen(false);
+  };
+
   // Shared nav items
   const NavItems = ({ mobile = false }: { mobile?: boolean }) => (
     <>
@@ -141,6 +146,15 @@ const StaffNavBar = ({ activeDepartment }: StaffNavBarProps) => {
       >
         <Briefcase className="w-4 h-4" />
         My Work
+      </Button>
+      <Button
+        variant={location.pathname.startsWith('/service') ? 'default' : 'ghost'}
+        size="sm"
+        onClick={goService}
+        className={`font-display text-xs tracking-wider gap-1.5 ${mobile ? 'w-full justify-start' : ''}`}
+      >
+        <Monitor className="w-4 h-4" />
+        Service
       </Button>
       {hasDashboardAccess && (
         <Button

@@ -712,13 +712,11 @@ const OrdersView = ({ session }: { session: GuestPortalSession }) => {
   const { data: orders = [] } = useQuery({
     queryKey: ['guest-orders', session.room_id],
     queryFn: async () => {
-      const start = new Date();
-      start.setHours(0, 0, 0, 0);
+      // Show all orders during the stay, not just today
       const { data } = await supabase
         .from('orders')
         .select('*')
         .eq('room_id', session.room_id)
-        .gte('created_at', start.toISOString())
         .order('created_at', { ascending: false });
       return data || [];
     },
@@ -744,18 +742,20 @@ const OrdersView = ({ session }: { session: GuestPortalSession }) => {
     <div className="space-y-4">
       <h2 className="font-display text-lg text-foreground">My Orders</h2>
       {orders.length === 0 ? (
-        <p className="font-body text-sm text-muted-foreground text-center py-8">No orders today.</p>
+        <p className="font-body text-sm text-muted-foreground text-center py-8">No orders during your stay.</p>
       ) : (
         orders.map((order: any) => {
           const statusInfo = ORDER_STATUS_MAP[order.status] || { label: order.status, color: 'bg-muted text-muted-foreground' };
           const items = Array.isArray(order.items) ? order.items : [];
           const hasKitchenItems = items.some((i: any) => (i.department || 'kitchen') === 'kitchen' || (i.department || 'kitchen') === 'both');
           const hasBarItems = items.some((i: any) => i.department === 'bar' || i.department === 'both');
+          const timeStr = new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          const dateStr = new Date(order.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' });
           return (
             <div key={order.id} className="bg-card border border-border rounded-lg p-4 space-y-2">
               <div className="flex justify-between items-start">
                 <span className="font-body text-xs text-muted-foreground">
-                  {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {dateStr} · {timeStr}
                 </span>
                 <div className="flex flex-wrap gap-1 justify-end">
                   <span className={`font-body text-xs px-2 py-0.5 rounded-full ${statusInfo.color}`}>
@@ -786,13 +786,32 @@ const OrdersView = ({ session }: { session: GuestPortalSession }) => {
                   )}
                 </div>
               )}
-              <div className="space-y-1">
-                {items.map((item: any, idx: number) => (
-                  <div key={idx} className="flex justify-between">
-                    <span className="font-body text-sm text-foreground">{item.qty || item.quantity || 1}× {item.name}</span>
-                    <span className="font-body text-sm text-muted-foreground">₱{((item.price || 0) * (item.qty || item.quantity || 1)).toLocaleString()}</span>
-                  </div>
-                ))}
+              {/* Per-item list with individual status */}
+              <div className="space-y-1.5">
+                {items.map((item: any, idx: number) => {
+                  const dept = item.department || 'kitchen';
+                  const itemStatus = dept === 'bar' || dept === 'both' 
+                    ? (order.bar_status === 'ready' ? 'Ready' : order.bar_status === 'preparing' ? 'Preparing' : order.status)
+                    : (order.kitchen_status === 'ready' ? 'Ready' : order.kitchen_status === 'preparing' ? 'Preparing' : order.status);
+                  const finalStatus = order.status === 'Served' ? 'Served' : order.status === 'Paid' ? 'Paid' : itemStatus;
+                  return (
+                    <div key={idx} className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <span className="font-body text-sm text-foreground">{item.qty || item.quantity || 1}× {item.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="font-body text-xs text-muted-foreground">₱{((item.price || 0) * (item.qty || item.quantity || 1)).toLocaleString()}</span>
+                        <span className={`font-body text-[10px] px-1.5 py-0.5 rounded ${
+                          finalStatus === 'Served' || finalStatus === 'Ready' ? 'text-green-400' :
+                          finalStatus === 'Preparing' ? 'text-amber-400' :
+                          finalStatus === 'Paid' ? 'text-muted-foreground' : 'text-blue-400'
+                        }`}>
+                          {finalStatus}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
               <div className="border-t border-border pt-2 flex justify-between">
                 <span className="font-body text-sm text-foreground font-medium">Total</span>
