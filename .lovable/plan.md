@@ -1,52 +1,37 @@
 
 
-## Fix: DineIn Orders Missing from Guest Portal + Missing Guest Name
+## Plan: Fix Schedule Delete & Enhance Task/Assignment Scheduling
 
-### Problem
+### Issues Found
 
-Two issues visible in the screenshots:
+1. **Delete button bug**: The trash icon on shift blocks triggers `setDeleteId(s.id)`, but the parent div's `onClick={() => openEdit(s)}` fires simultaneously despite `stopPropagation`. On mobile, the tiny button (3x3 icon) is nearly impossible to tap. The AlertDialog `onOpenChange={() => setDeleteId(null)}` also races with the confirm action.
 
-1. **Guest Portal only shows the Mango Daiquiri order** — the two DineIn orders for Double Room #3 are missing from "My Orders" and "My Bill"
-2. **Service board cards don't show who ordered** — DineIn orders have blank `guest_name`
+2. **Missing scheduling features**: The schedule only manages time shifts. There's no way to assign tasks like housecleaning, reception duty, or track completion from within the schedule view.
 
-### Root Cause
+### Changes
 
-In `CartDrawer.tsx` line 278: `room_id: roomUnit?.id || null` — `roomUnit` is only set when `selectedOrderType === 'Room'`. For DineIn orders to Double Room #3, `room_id` stays `null` even though the location is a room.
+**1. Fix Delete Button** (`WeeklyScheduleManager.tsx`)
+- Make `confirmDelete` capture `deleteId` before the dialog closes by saving it in a ref or local variable
+- Increase touch target size for edit/delete buttons on shift blocks
+- Prevent edit modal from opening when clicking edit/delete icons (the `stopPropagation` exists but the parent click handler on the entire timeline area also fires)
 
-Similarly, `guest_name` is only populated when the order flow captures it (Room orders with Charge to Room). DineIn orders placed by staff don't look up the guest.
+**2. Add Task/Assignment Creation from Schedule** (`WeeklyScheduleManager.tsx`)
+- Add an "Assign Task" button alongside "Add Shift" 
+- New modal to create a task assignment: select employee, pick type (Housecleaning, Reception, Custom), set date/time, add notes
+- For housecleaning: select a room/unit to clean, auto-creates a `housekeeping_orders` entry assigned to the selected employee
+- For other tasks: creates an `employee_tasks` entry with due date and description
+- Tasks appear as colored pills on the timeline (already partially implemented)
 
-The Guest Portal queries `orders WHERE room_id = session.room_id`, so DineIn orders with `null` room_id are invisible.
+**3. Show Completion Info on Task Detail** (`WeeklyScheduleManager.tsx`)
+- In the task detail dialog, show who completed the task and when (`completed_at`)
+- For housekeeping pills, show completion status (`cleaning_completed_at`, `completed_by_name`)
+- Make housekeeping pills clickable to show full details (room, status, who inspected/cleaned)
 
-### Fix
+**4. Enhance Task Detail Dialog** (`WeeklyScheduleManager.tsx`)
+- Add edit capability: change title, description, due date, reassign to different employee
+- Add delete capability for tasks
+- Show completion audit trail
 
-**`src/components/CartDrawer.tsx` — order insert logic**
-
-- When `selectedOrderType` is DineIn (or any type) and `selectedLocation` matches a unit name, set `room_id` to that unit's ID. Change the roomUnit lookup from:
-  ```typescript
-  const roomUnit = selectedOrderType === 'Room' ? units?.find(...) : null;
-  ```
-  to:
-  ```typescript
-  const roomUnit = units?.find(u => u.unit_name === selectedLocation) || null;
-  ```
-  This ensures any order placed against a room location gets the `room_id` set regardless of order type.
-
-- When `room_id` is being set and `guest_name` is empty, look up the active booking's guest name from `resort_ops_bookings` + `resort_ops_guests` for that unit and auto-populate `guest_name`.
-
-**`src/components/service/ServiceOrderCard.tsx` — guest name display**
-
-- Already shows `order.guest_name` when present (line 115-117). No change needed — fixing the data source fixes the display.
-
-**`src/pages/GuestPortal.tsx` — orders query fallback**
-
-- Add a secondary query for orders where `room_id IS NULL` but `location_detail` matches `session.room_name`, so historical orders placed before this fix also appear. Merge and deduplicate with the primary query.
-
-### Files Changed
-
-```
-EDIT  src/components/CartDrawer.tsx       — Always set room_id when location matches a unit; auto-populate guest_name from active booking
-EDIT  src/pages/GuestPortal.tsx           — Fallback query matching location_detail for orders with null room_id
-```
-
-No database changes needed.
+### Files to Edit
+- `src/components/admin/WeeklyScheduleManager.tsx` — all changes in this single file
 
