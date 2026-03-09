@@ -59,6 +59,10 @@ const HousekeeperPage = ({ embedded = false }: { embedded?: boolean }) => {
         playChime();
         qc.invalidateQueries({ queryKey: ['housekeeping-orders-all'] });
       })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'housekeeping_orders' }, () => {
+        playChime();
+        qc.invalidateQueries({ queryKey: ['housekeeping-orders-all'] });
+      })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [playChime, qc]);
