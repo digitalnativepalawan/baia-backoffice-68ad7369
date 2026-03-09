@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { deductInventoryForOrder } from '@/lib/inventoryDeduction';
 import { toast } from 'sonner';
 import ServiceOrderCard from './ServiceOrderCard';
+import ServiceOrderDetail from './ServiceOrderDetail';
 
 const KANBAN_COLS = ['New', 'Preparing', 'Ready', 'Served'] as const;
 
@@ -22,6 +23,19 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
   const qc = useQueryClient();
   const audioCtxRef = useRef<AudioContext | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [detailOrder, setDetailOrder] = useState<any | null>(null);
+
+  // Read staff permissions from session
+  const permissions = useMemo(() => {
+    try {
+      const raw = sessionStorage.getItem('staff_home_session');
+      if (raw) {
+        const session = JSON.parse(raw);
+        return (session.permissions as string[]) || [];
+      }
+    } catch {}
+    return ['admin']; // fallback for admin users
+  }, []);
 
   // Audio unlock
   useEffect(() => {
@@ -90,7 +104,7 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
     return orders.filter(o => {
       const items = (o.items as any[]) || [];
       return items.some(i => {
-        const d = i.department || 'kitchen';
+        const d = (i as any).department || 'kitchen';
         return d === department || d === 'both';
       });
     });
@@ -99,7 +113,7 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
   // Bucket into columns
   const columns = useMemo(() => {
     const cols: Record<string, any[]> = { New: [], Preparing: [], Ready: [], Served: [] };
-    
+
     if (department === 'kitchen' || department === 'bar') {
       const field = department === 'kitchen' ? 'kitchen_status' : 'bar_status';
       relevantOrders.forEach(o => {
@@ -110,26 +124,21 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
         else if (o.status === 'Served') cols.Served.push(o);
       });
     } else {
-      // Reception sees overall status
       relevantOrders.forEach(o => {
         if (o.status === 'New') cols.New.push(o);
         else if (o.status === 'Preparing') cols.Preparing.push(o);
         else if (o.status === 'Served') {
-          // Check if all depts ready — show in Ready if so
           const allReady = o.kitchen_status === 'ready' && o.bar_status === 'ready';
           if (allReady) cols.Ready.push(o);
           else cols.Preparing.push(o);
         }
       });
-      // Move items where both depts are ready but status isn't Served yet
       relevantOrders.forEach(o => {
         if (o.status === 'Preparing' && o.kitchen_status === 'ready' && o.bar_status === 'ready') {
-          // Move from Preparing to Ready
           cols.Preparing = cols.Preparing.filter(x => x.id !== o.id);
           cols.Ready.push(o);
         }
       });
-      // Show actually served orders
       relevantOrders.forEach(o => {
         if (o.status === 'Served' && !cols.Ready.some(x => x.id === o.id)) {
           cols.Served.push(o);
@@ -162,7 +171,6 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
     if (action === 'kitchen-start') {
       updateData.kitchen_status = 'preparing';
       if (order.status === 'New') updateData.status = 'Preparing';
-      // Deduct kitchen items
       const items = ((order.items as any[]) || []).filter((i: any) => {
         const d = i.department || 'kitchen';
         return d === 'kitchen' || d === 'both';
@@ -170,7 +178,6 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
       if (items.length > 0) await deductInventoryForOrder(orderId, items);
     } else if (action === 'kitchen-ready') {
       updateData.kitchen_status = 'ready';
-      // Check if bar is also ready
       const barItems = ((order.items as any[]) || []).some((i: any) => i.department === 'bar' || i.department === 'both');
       if (!barItems || order.bar_status === 'ready') {
         updateData.status = 'Served';
@@ -243,7 +250,9 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
                     key={order.id}
                     order={order}
                     department={department}
+                    permissions={permissions}
                     onAction={handleAction}
+                    onOpenDetail={setDetailOrder}
                     compact
                   />
                 ))}
@@ -256,17 +265,28 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
         </div>
 
         {/* Mobile: tabbed view */}
-        <MobileTabView columns={columns} department={department} onAction={handleAction} />
+        <MobileTabView columns={columns} department={department} permissions={permissions} onAction={handleAction} onOpenDetail={setDetailOrder} />
       </div>
+
+      {/* Detail drawer */}
+      <ServiceOrderDetail
+        order={detailOrder}
+        open={!!detailOrder}
+        onOpenChange={(open) => { if (!open) setDetailOrder(null); }}
+        permissions={permissions}
+        onAction={handleAction}
+      />
     </div>
   );
 };
 
 /** Mobile tab-based view for phones */
-const MobileTabView = ({ columns, department, onAction }: {
+const MobileTabView = ({ columns, department, permissions, onAction, onOpenDetail }: {
   columns: Record<string, any[]>;
   department: 'kitchen' | 'bar' | 'reception';
+  permissions: string[];
   onAction: (orderId: string, action: string) => Promise<void>;
+  onOpenDetail: (order: any) => void;
 }) => {
   const [tab, setTab] = useState<string>('New');
 
@@ -303,7 +323,9 @@ const MobileTabView = ({ columns, department, onAction }: {
             key={order.id}
             order={order}
             department={department}
+            permissions={permissions}
             onAction={onAction}
+            onOpenDetail={onOpenDetail}
           />
         ))}
       </div>
