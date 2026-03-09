@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { deductInventoryForOrder } from '@/lib/inventoryDeduction';
 import { toast } from 'sonner';
+import { useResortProfile } from '@/hooks/useResortProfile';
 import ServiceOrderCard from './ServiceOrderCard';
 import ServiceOrderDetail from './ServiceOrderDetail';
 
