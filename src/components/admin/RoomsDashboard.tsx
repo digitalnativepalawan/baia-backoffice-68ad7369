@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -6,17 +6,22 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Upload, Trash2, Plus, Users, FileText, UtensilsCrossed, MapPin, StickyNote, Sparkles, LogIn, LogOut, Camera, Download, Link as LinkIcon, ClipboardCheck, DollarSign } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { ArrowLeft, Upload, Trash2, Plus, Users, FileText, UtensilsCrossed, MapPin, StickyNote, Sparkles, LogIn, LogOut, Camera, Download, Link as LinkIcon, ClipboardCheck, DollarSign, Pencil, Clock, CalendarPlus, ArrowRightLeft, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { format, differenceInCalendarDays } from 'date-fns';
 import VibeCheckInForm from './vibe/VibeCheckInForm';
 import VibeDetailView from './vibe/VibeDetailView';
 import HousekeepingInspection from './HousekeepingInspection';
 import RoomBillingTab from '@/components/rooms/RoomBillingTab';
+import EditGuestModal from '@/components/rooms/EditGuestModal';
+import EditTourModal from '@/components/rooms/EditTourModal';
+import GuestActivityTimeline from '@/components/rooms/GuestActivityTimeline';
+import { compressImage } from '@/lib/imageCompress';
 
-const from = (table: string) => supabase.from(table as any);
+const from = (table: string) => supabase.from(table as any) as any;
 
-type DetailTab = 'info' | 'orders' | 'documents' | 'notes' | 'tours' | 'vibe' | 'billing';
+type DetailTab = 'info' | 'orders' | 'documents' | 'notes' | 'tours' | 'vibe' | 'billing' | 'timeline';
 
 interface RoomsDashboardProps {
   readOnly?: boolean;
@@ -25,6 +30,25 @@ interface RoomsDashboardProps {
   singleUnitMode?: boolean;
   onClose?: () => void;
 }
+
+const NOTE_CATEGORIES = [
+  { value: 'general', label: 'General' },
+  { value: 'guest_preference', label: 'Preference' },
+  { value: 'complaint', label: 'Complaint' },
+  { value: 'maintenance', label: 'Maintenance' },
+  { value: 'staff_note', label: 'Staff Note' },
+];
+
+const DOC_TYPES = [
+  { value: 'passport', label: 'Passport' },
+  { value: 'government_id', label: 'Government ID' },
+  { value: 'driver_license', label: 'Driver License' },
+  { value: 'id_card', label: 'ID Card' },
+  { value: 'waiver', label: 'Waiver' },
+  { value: 'contract', label: 'Contract' },
+  { value: 'booking_confirmation', label: 'Booking Confirmation' },
+  { value: 'other', label: 'Other' },
+];
 
 const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit, singleUnitMode = false, onClose }: RoomsDashboardProps) => {
   const qc = useQueryClient();
@@ -35,11 +59,19 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
   const [viewingVibeRecord, setViewingVibeRecord] = useState<any>(null);
   const [viewingHousekeepingOrder, setViewingHousekeepingOrder] = useState<any>(null);
 
+  // Modals
+  const [showEditGuest, setShowEditGuest] = useState(false);
+  const [editingTour, setEditingTour] = useState<any>(null);
+  const [showExtendStay, setShowExtendStay] = useState(false);
+  const [showChangeRoom, setShowChangeRoom] = useState(false);
+  const [extendDate, setExtendDate] = useState('');
+  const [changeRoomId, setChangeRoomId] = useState('');
+
   // Check-in form state
   const [checkInForm, setCheckInForm] = useState({
     guestName: '', phone: '', email: '',
     checkIn: new Date().toISOString().split('T')[0],
-    checkOut: '', adults: '1', children: '0', platform: 'Direct', roomRate: '0', notes: '', specialRequests: '',
+    checkOut: '', adults: '1', children: '0', platform: 'Hotel Guest', roomRate: '0', notes: '', specialRequests: '',
   });
   const [checkingIn, setCheckingIn] = useState(false);
   const [showCheckInForm, setShowCheckInForm] = useState(false);
@@ -64,6 +96,9 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
   // Note form
   const [noteContent, setNoteContent] = useState('');
   const [noteType, setNoteType] = useState('general');
+  const [noteImageUrl, setNoteImageUrl] = useState('');
+  const [showNoteUrl, setShowNoteUrl] = useState(false);
+  const noteTextRef = useRef<HTMLTextAreaElement>(null);
 
   // Room types (for base rates)
   const { data: roomTypes = [] } = useQuery({
@@ -139,7 +174,7 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
     },
   });
 
-  // Get unit status — must be declared before getActiveBooking which depends on it
+  // Get unit status
   const getUnitStatus = (unit: any): 'occupied' | 'to_clean' | 'ready' => {
     return (unit as any).status || 'ready';
   };
@@ -149,11 +184,10 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
     return resortUnits.find((ru: any) => ru.name.toLowerCase().trim() === roomName.toLowerCase().trim());
   };
 
-  // Active booking: only when unit is operationally occupied (not just date overlap)
+  // Active booking
   const getActiveBooking = (unit: any) => {
     if (!unit) return null;
     const unitStatus = getUnitStatus(unit);
-    // If unit has been checked out (to_clean or ready), don't show booking as active
     if (unitStatus !== 'occupied') return null;
     const today = new Date().toISOString().split('T')[0];
     const resortUnit = resolveResortUnit(unit.name);
@@ -164,7 +198,7 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
   const currentBooking = getActiveBooking(selectedUnit);
   const guestId = (currentBooking as any)?.guest_id;
 
-  // Orders for selected unit - only during current booking period
+  // Orders for selected unit
   const { data: unitOrders = [] } = useQuery({
     queryKey: ['rooms-orders', selectedUnit?.name, currentBooking?.id],
     enabled: !!selectedUnit && !!currentBooking,
@@ -180,7 +214,7 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
     },
   });
 
-  // Documents - only show for current booking's guest
+  // Documents
   const { data: documents = [] } = useQuery({
     queryKey: ['guest-documents', selectedUnit?.name, guestId],
     enabled: !!selectedUnit && !!guestId,
@@ -190,7 +224,7 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
     },
   });
 
-  // Guest notes - only for current booking
+  // Guest notes
   const { data: notes = [] } = useQuery({
     queryKey: ['guest-notes', selectedUnit?.name, currentBooking?.id],
     enabled: !!selectedUnit && !!currentBooking,
@@ -200,7 +234,7 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
     },
   });
 
-  // Guest tours - only for current booking
+  // Guest tours
   const { data: tours = [] } = useQuery({
     queryKey: ['guest-tours', selectedUnit?.name, currentBooking?.id],
     enabled: !!selectedUnit && !!currentBooking,
@@ -210,7 +244,6 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
     },
   });
 
-  // Vibe records for selected unit
   const unitVibeRecords = vibeRecords.filter((v: any) => v.unit_name === selectedUnit?.name);
 
   const getEmployeeName = (id: string) => {
@@ -218,19 +251,64 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
     return emp ? (emp.display_name || emp.name) : '';
   };
 
+  // --- STATUS LABELS ---
+  const getGuestStatusLabels = (booking: any) => {
+    if (!booking) return [];
+    const labels: { text: string; color: string }[] = [];
+    labels.push({ text: 'Checked In', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' });
+    const platform = booking.platform || '';
+    if (platform === 'Friends & Family') {
+      labels.push({ text: '👨‍👩‍👧 F&F', color: 'bg-purple-500/20 text-purple-400 border-purple-500/40' });
+    }
+    const stayDays = differenceInCalendarDays(new Date(booking.check_out + 'T00:00:00'), new Date(booking.check_in + 'T00:00:00'));
+    if (stayDays >= 7) {
+      labels.push({ text: 'Long Stay', color: 'bg-blue-500/20 text-blue-400 border-blue-500/40' });
+    }
+    if ((booking.notes || '').includes('[VIP]')) {
+      labels.push({ text: '⭐ VIP', color: 'bg-amber-500/20 text-amber-400 border-amber-500/40' });
+    }
+    // Problem Guest from vibe records
+    const unitVibes = vibeRecords.filter((v: any) => v.unit_name === selectedUnit?.name && !v.checked_out);
+    if (unitVibes.some((v: any) => (v.review_risk_level || []).includes('High'))) {
+      labels.push({ text: '⚠ Problem', color: 'bg-destructive/20 text-destructive border-destructive/40' });
+    }
+    return labels;
+  };
+
   const addNote = async () => {
     if (readOnly) { toast.error('View-only access'); return; }
-    if (!noteContent.trim() || !selectedUnit) return;
+    if (!noteContent.trim() && !noteImageUrl.trim()) return;
+    if (!selectedUnit) return;
+    const content = noteImageUrl.trim() ? `[IMAGE]:${noteImageUrl.trim()}` : noteContent.trim();
     await from('guest_notes').insert({
       booking_id: currentBooking?.id || null,
       unit_name: selectedUnit.name,
       note_type: noteType,
-      content: noteContent.trim(),
-      created_by: 'admin',
+      content,
+      created_by: localStorage.getItem('emp_name') || 'admin',
     });
-    setNoteContent('');
+    setNoteContent(''); setNoteImageUrl(''); setShowNoteUrl(false);
     qc.invalidateQueries({ queryKey: ['guest-notes', selectedUnit.name, currentBooking?.id] });
     toast.success('Note added');
+  };
+
+  const uploadNoteImage = async (file: File) => {
+    if (readOnly || !selectedUnit) return;
+    const compressed = await compressImage(file);
+    const ext = compressed.name.split('.').pop();
+    const path = `notes/${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from('guest-documents').upload(path, compressed);
+    if (error) { toast.error('Upload failed'); return; }
+    const { data: urlData } = supabase.storage.from('guest-documents').getPublicUrl(path);
+    await from('guest_notes').insert({
+      booking_id: currentBooking?.id || null,
+      unit_name: selectedUnit.name,
+      note_type: noteType,
+      content: `[IMAGE]:${urlData.publicUrl}`,
+      created_by: localStorage.getItem('emp_name') || 'admin',
+    });
+    qc.invalidateQueries({ queryKey: ['guest-notes', selectedUnit.name, currentBooking?.id] });
+    toast.success('Photo note added');
   };
 
   const deleteNote = async (id: string) => {
@@ -274,14 +352,15 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
     toast.success('Tour deleted');
   };
 
-  // Document upload (file or camera)
+  // Document upload with compression
   const uploadDocument = async (file: File) => {
     if (readOnly) { toast.error('View-only access'); return; }
     if (!selectedUnit) return;
-    const ext = file.name.split('.').pop();
+    const compressed = file.type.startsWith('image/') ? await compressImage(file) : file;
+    const ext = compressed.name.split('.').pop();
     const folder = guestId || selectedUnit.name.replace(/\s+/g, '_');
     const path = `${folder}/${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from('guest-documents').upload(path, file);
+    const { error } = await supabase.storage.from('guest-documents').upload(path, compressed);
     if (error) { toast.error('Upload failed'); return; }
     const { data: urlData } = supabase.storage.from('guest-documents').getPublicUrl(path);
     await from('guest_documents').insert({
@@ -322,7 +401,6 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
     toast.success('Document deleted');
   };
 
-  // Get current guest for a unit (grid view) — only when occupied
   const getUnitGuest = (unitName: string) => {
     const unit = units.find((u: any) => u.name === unitName);
     if (!unit || getUnitStatus(unit) !== 'occupied') return null;
@@ -332,15 +410,12 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
     return bookings.find((b: any) => b.unit_id === resortUnit.id && b.check_in <= today && b.check_out >= today) || null;
   };
 
-  // Check if unit has high-risk vibe record
   const getUnitVibeRisk = (unitName: string) => {
     const records = vibeRecords.filter((v: any) => v.unit_name === unitName && !v.checked_out);
     return records.some((v: any) => (v.review_risk_level || []).includes('High'));
   };
 
-  // Get latest housekeeping order for unit (only latest per unit)
   const getHousekeepingOrder = (unitName: string) => {
-    // housekeepingOrders is already sorted by created_at DESC, so first match is latest
     return housekeepingOrders.find((o: any) => o.unit_name === unitName);
   };
 
@@ -348,42 +423,29 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
   const handleCheckIn = async () => {
     if (readOnly) { toast.error('View-only access'); return; }
     if (!selectedUnit || !checkInForm.guestName.trim() || !checkInForm.checkOut) {
-      toast.error('Guest name and check-out date are required');
-      return;
+      toast.error('Guest name and check-out date are required'); return;
     }
-    // Prevent check-in if room is to_clean
     if (getUnitStatus(selectedUnit) === 'to_clean') {
-      toast.error('Complete housekeeping before check-in');
-      return;
+      toast.error('Complete housekeeping before check-in'); return;
     }
     if (checkInForm.checkOut <= checkInForm.checkIn) {
-      toast.error('Check-out must be after check-in');
-      return;
+      toast.error('Check-out must be after check-in'); return;
     }
     setCheckingIn(true);
     try {
-      // 1. Create or find guest
       const { data: existingGuest } = await from('resort_ops_guests')
         .select('id').ilike('full_name', checkInForm.guestName.trim()).maybeSingle() as any;
-
       let gId: string;
       if (existingGuest) {
         gId = existingGuest.id;
-        await from('resort_ops_guests').update({
-          phone: checkInForm.phone || null,
-          email: checkInForm.email || null,
-        }).eq('id', gId);
+        await from('resort_ops_guests').update({ phone: checkInForm.phone || null, email: checkInForm.email || null }).eq('id', gId);
       } else {
         const { data: newGuest, error: gErr } = await from('resort_ops_guests').insert({
-          full_name: checkInForm.guestName.trim(),
-          phone: checkInForm.phone || null,
-          email: checkInForm.email || null,
+          full_name: checkInForm.guestName.trim(), phone: checkInForm.phone || null, email: checkInForm.email || null,
         }).select('id').single() as any;
         if (gErr || !newGuest) throw new Error('Failed to create guest');
         gId = newGuest.id;
       }
-
-      // 2. Resolve or create resort_ops_unit
       let resortUnit = resolveResortUnit(selectedUnit.name);
       if (!resortUnit) {
         const { data: newUnit, error: uErr } = await from('resort_ops_units').insert({
@@ -393,40 +455,26 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
         resortUnit = { id: newUnit.id };
         qc.invalidateQueries({ queryKey: ['resort-ops-units'] });
       }
-
-      // 3. Use guest's last name as room password
       const roomPassword = checkInForm.guestName.trim().split(' ').pop()?.toLowerCase() || 'guest';
       const expiresAt = new Date(checkInForm.checkOut);
       expiresAt.setDate(expiresAt.getDate() + 1);
-
-      // 4. Insert booking with password
       const { error: bErr } = await from('resort_ops_bookings').insert({
-        guest_id: gId,
-        unit_id: resortUnit.id,
-        platform: checkInForm.platform,
-        check_in: checkInForm.checkIn,
-        check_out: checkInForm.checkOut,
-        adults: parseInt(checkInForm.adults) || 1,
-        children: parseInt(checkInForm.children) || 0,
-        room_rate: parseFloat(checkInForm.roomRate) || 0,
-        notes: checkInForm.notes || '',
+        guest_id: gId, unit_id: resortUnit.id, platform: checkInForm.platform,
+        check_in: checkInForm.checkIn, check_out: checkInForm.checkOut,
+        adults: parseInt(checkInForm.adults) || 1, children: parseInt(checkInForm.children) || 0,
+        room_rate: parseFloat(checkInForm.roomRate) || 0, notes: checkInForm.notes || '',
         special_requests: checkInForm.specialRequests || '',
-        room_password: roomPassword,
-        password_expires_at: expiresAt.toISOString(),
+        room_password: roomPassword, password_expires_at: expiresAt.toISOString(),
       });
       if (bErr) throw new Error(bErr.message);
-
-      // 5. Set unit status to occupied
       await supabase.from('units').update({ status: 'occupied' } as any).eq('id', selectedUnit.id);
-
-      // 6. Refresh
       qc.invalidateQueries({ queryKey: ['rooms-bookings'] });
       qc.invalidateQueries({ queryKey: ['rooms-units'] });
       setShowCheckInForm(false);
       setCheckInForm({
         guestName: '', phone: '', email: '',
         checkIn: new Date().toISOString().split('T')[0],
-        checkOut: '', adults: '1', children: '0', platform: 'Direct', roomRate: '0', notes: '', specialRequests: '',
+        checkOut: '', adults: '1', children: '0', platform: 'Hotel Guest', roomRate: '0', notes: '', specialRequests: '',
       });
       toast.success(`${checkInForm.guestName.trim()} checked in to ${selectedUnit.name}. Room password: ${roomPassword}`, { duration: 10000 });
     } catch (err: any) {
@@ -436,18 +484,14 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
     }
   };
 
-  // --- CHECK-OUT (idempotent — reuses existing housekeeping order) ---
+  // --- CHECK-OUT ---
   const handleCheckOut = async () => {
     if (readOnly) { toast.error('View-only access'); return; }
     if (!currentBooking) return;
     const today = new Date().toISOString().split('T')[0];
     const { error } = await from('resort_ops_bookings').update({ check_out: today }).eq('id', currentBooking.id);
     if (error) { toast.error('Checkout failed'); return; }
-
-    // Set unit status to 'to_clean'
     await supabase.from('units').update({ status: 'to_clean' } as any).eq('id', selectedUnit.id);
-
-    // Check for existing open housekeeping order before creating a new one
     const existingOrder = housekeepingOrders.find((o: any) => o.unit_name === selectedUnit.name);
     if (!existingOrder) {
       await from('housekeeping_orders').insert({
@@ -456,11 +500,38 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
         status: 'pending_inspection',
       });
     }
-
     qc.invalidateQueries({ queryKey: ['rooms-bookings'] });
     qc.invalidateQueries({ queryKey: ['rooms-units'] });
     qc.invalidateQueries({ queryKey: ['housekeeping-orders'] });
     toast.success('Guest checked out — housekeeping order created');
+  };
+
+  // --- EXTEND STAY ---
+  const handleExtendStay = async () => {
+    if (!currentBooking || !extendDate) return;
+    if (extendDate <= currentBooking.check_out) { toast.error('New date must be after current check-out'); return; }
+    await from('resort_ops_bookings').update({ check_out: extendDate }).eq('id', currentBooking.id);
+    qc.invalidateQueries({ queryKey: ['rooms-bookings'] });
+    setShowExtendStay(false);
+    toast.success(`Stay extended to ${format(new Date(extendDate + 'T00:00:00'), 'MMM d, yyyy')}`);
+  };
+
+  // --- CHANGE ROOM ---
+  const handleChangeRoom = async () => {
+    if (!currentBooking || !changeRoomId) return;
+    const newUnit = units.find((u: any) => u.id === changeRoomId);
+    if (!newUnit) return;
+    const newResortUnit = resolveResortUnit(newUnit.name);
+    if (!newResortUnit) { toast.error('Target room not found in resort ops'); return; }
+    await from('resort_ops_bookings').update({ unit_id: newResortUnit.id }).eq('id', currentBooking.id);
+    // Old unit → to_clean, new unit → occupied
+    await supabase.from('units').update({ status: 'to_clean' } as any).eq('id', selectedUnit.id);
+    await supabase.from('units').update({ status: 'occupied' } as any).eq('id', changeRoomId);
+    qc.invalidateQueries({ queryKey: ['rooms-bookings'] });
+    qc.invalidateQueries({ queryKey: ['rooms-units'] });
+    setShowChangeRoom(false);
+    setSelectedUnit(newUnit);
+    toast.success(`Guest moved to ${newUnit.name}`);
   };
 
   // ── HOUSEKEEPING INSPECTION VIEW ──
@@ -482,6 +553,8 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
     const booking = getActiveBooking(selectedUnit);
     const guest = (booking as any)?.resort_ops_guests;
     const unitHkOrder = getHousekeepingOrder(selectedUnit.name);
+    const statusLabels = getGuestStatusLabels(booking);
+    const readyUnitsForChange = units.filter((u: any) => getUnitStatus(u) === 'ready' && u.id !== selectedUnit.id);
 
     // Vibe sub-views
     if (detailTab === 'vibe' && vibeMode === 'form') {
@@ -493,7 +566,6 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
         />
       );
     }
-
     if (detailTab === 'vibe' && vibeMode === 'detail' && viewingVibeRecord) {
       return (
         <VibeDetailView
@@ -506,6 +578,7 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
 
     return (
       <div className="space-y-4">
+        {/* Header */}
         <div className="flex items-center gap-3">
           <Button size="sm" variant="ghost" onClick={() => { if (singleUnitMode && onClose) { onClose(); } else { setSelectedUnit(null); setShowCheckInForm(false); } }}>
             <ArrowLeft className="w-4 h-4" />
@@ -515,6 +588,39 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
             {booking ? 'Occupied' : getUnitStatus(selectedUnit) === 'to_clean' ? 'To Clean' : 'Vacant'}
           </Badge>
         </div>
+
+        {/* Status labels (PART 9) */}
+        {booking && statusLabels.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {statusLabels.map(l => (
+              <Badge key={l.text} variant="outline" className={`font-body text-xs ${l.color}`}>{l.text}</Badge>
+            ))}
+          </div>
+        )}
+
+        {/* Quick Action Bar (PART 8) */}
+        {booking && !readOnly && (
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
+            <Button size="sm" variant="outline" className="font-display text-xs tracking-wider gap-1 min-h-[36px] whitespace-nowrap flex-shrink-0"
+              onClick={() => { setExtendDate(booking.check_out); setShowExtendStay(true); }}>
+              <CalendarPlus className="w-3.5 h-3.5" /> Extend Stay
+            </Button>
+            {readyUnitsForChange.length > 0 && (
+              <Button size="sm" variant="outline" className="font-display text-xs tracking-wider gap-1 min-h-[36px] whitespace-nowrap flex-shrink-0"
+                onClick={() => setShowChangeRoom(true)}>
+                <ArrowRightLeft className="w-3.5 h-3.5" /> Change Room
+              </Button>
+            )}
+            <Button size="sm" variant="outline" className="font-display text-xs tracking-wider gap-1 min-h-[36px] whitespace-nowrap flex-shrink-0"
+              onClick={() => setDetailTab('tours')}>
+              <MapPin className="w-3.5 h-3.5" /> Add Tour
+            </Button>
+            <Button size="sm" variant="outline" className="font-display text-xs tracking-wider gap-1 min-h-[36px] whitespace-nowrap flex-shrink-0"
+              onClick={() => { setDetailTab('notes'); setTimeout(() => noteTextRef.current?.focus(), 200); }}>
+              <StickyNote className="w-3.5 h-3.5" /> Add Note
+            </Button>
+          </div>
+        )}
 
         {/* Housekeeping banner */}
         {unitHkOrder && !readOnly && (
@@ -529,14 +635,11 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
               </span>
             </div>
             {unitHkOrder.assigned_to && (
-              <p className="font-body text-xs text-muted-foreground mt-1">
-                Assigned to: {getEmployeeName(unitHkOrder.assigned_to)}
-              </p>
+              <p className="font-body text-xs text-muted-foreground mt-1">Assigned to: {getEmployeeName(unitHkOrder.assigned_to)}</p>
             )}
             <p className="font-body text-xs text-amber-400/70 mt-1">Tap to open →</p>
           </button>
         )}
-        {/* Read-only housekeeping status banner */}
         {unitHkOrder && readOnly && (
           <div className="w-full border-2 border-amber-500/50 bg-amber-500/10 rounded-lg p-3">
             <div className="flex items-center gap-2">
@@ -546,9 +649,7 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
               </span>
             </div>
             {unitHkOrder.assigned_to && (
-              <p className="font-body text-xs text-muted-foreground mt-1">
-                Assigned to: {getEmployeeName(unitHkOrder.assigned_to)}
-              </p>
+              <p className="font-body text-xs text-muted-foreground mt-1">Assigned to: {getEmployeeName(unitHkOrder.assigned_to)}</p>
             )}
           </div>
         )}
@@ -561,6 +662,7 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
             ...(canViewDocuments ? [{ key: 'documents' as DetailTab, label: 'Docs', icon: FileText }] : []),
             { key: 'notes' as DetailTab, label: 'Notes', icon: StickyNote },
             { key: 'tours' as DetailTab, label: 'Tours', icon: MapPin },
+            { key: 'timeline' as DetailTab, label: 'Timeline', icon: Clock },
             { key: 'vibe' as DetailTab, label: 'Vibe', icon: Sparkles },
             { key: 'billing' as DetailTab, label: 'Billing', icon: DollarSign },
           ]).map(({ key, label, icon: Icon }) => (
@@ -578,7 +680,20 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
             {booking ? (
               <>
                 <div className="border border-border rounded-lg p-4 space-y-2">
-                  <p className="font-display text-sm text-foreground">{guest?.full_name || 'Unknown Guest'}</p>
+                  <div className="flex justify-between items-start">
+                    <p className="font-display text-sm text-foreground">{guest?.full_name || 'Unknown Guest'}</p>
+                    {!readOnly && (
+                      <Button size="sm" variant="ghost" onClick={() => setShowEditGuest(true)} className="min-h-[36px]">
+                        <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                      </Button>
+                    )}
+                  </div>
+                  {/* Guest type badge */}
+                  {booking.platform && (
+                    <Badge variant="outline" className={`font-body text-xs ${booking.platform === 'Friends & Family' ? 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10' : ''}`}>
+                      {booking.platform}
+                    </Badge>
+                  )}
                   {guest?.email && <p className="font-body text-xs text-muted-foreground">Email: {guest.email}</p>}
                   {guest?.phone && <p className="font-body text-xs text-muted-foreground">Phone: {guest.phone}</p>}
                   <div className="flex gap-4 mt-2">
@@ -592,10 +707,6 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
                     </div>
                   </div>
                   <div className="flex gap-4">
-                    <div>
-                      <p className="font-body text-xs text-muted-foreground">Platform</p>
-                      <p className="font-body text-sm text-foreground">{booking.platform || '—'}</p>
-                    </div>
                     <div>
                       <p className="font-body text-xs text-muted-foreground">Adults</p>
                       <p className="font-body text-sm text-foreground">{booking.adults}</p>
@@ -620,7 +731,7 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
                   {booking.notes && (
                     <div>
                       <p className="font-body text-xs text-muted-foreground">Booking Notes</p>
-                      <p className="font-body text-sm text-foreground">{booking.notes}</p>
+                      <p className="font-body text-sm text-foreground">{(booking.notes || '').replace('[VIP]', '').trim()}</p>
                     </div>
                   )}
                   {(booking as any).special_requests && (
@@ -649,12 +760,9 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
                         <p className="font-body text-xs text-muted-foreground">Check in a guest to enable full room management.</p>
                         <Button size="sm" onClick={() => {
                           const rt = roomTypes.find((r: any) => r.id === selectedUnit?.room_type_id);
-                          if (rt?.base_rate) {
-                            setCheckInForm(prev => ({ ...prev, roomRate: String(rt.base_rate) }));
-                          }
+                          if (rt?.base_rate) setCheckInForm(prev => ({ ...prev, roomRate: String(rt.base_rate) }));
                           setShowCheckInForm(true);
-                        }}
-                          className="font-display text-xs tracking-wider min-h-[44px]">
+                        }} className="font-display text-xs tracking-wider min-h-[44px]">
                           <LogIn className="w-4 h-4 mr-2" /> Check In Guest
                         </Button>
                       </>
@@ -674,39 +782,25 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
                             const filtered = allGuests.filter((g: any) => g.full_name.toLowerCase().includes(val.toLowerCase())).slice(0, 5);
                             setGuestSearchResults(filtered);
                             setShowGuestDropdown(true);
-                          } else {
-                            setShowGuestDropdown(false);
-                          }
+                          } else { setShowGuestDropdown(false); }
                         }}
-                        onFocus={() => {
-                          if (checkInForm.guestName.length >= 2) setShowGuestDropdown(true);
-                        }}
+                        onFocus={() => { if (checkInForm.guestName.length >= 2) setShowGuestDropdown(true); }}
                         onBlur={() => setTimeout(() => setShowGuestDropdown(false), 200)}
                         placeholder="Guest full name *" className="bg-secondary border-border text-foreground font-body text-sm" />
                       {showGuestDropdown && guestSearchResults.length > 0 && (
                         <div className="absolute z-50 w-full mt-1 border border-border rounded-lg bg-card shadow-lg max-h-40 overflow-y-auto">
                           {guestSearchResults.map((g: any) => (
-                            <button key={g.id} type="button"
-                              onMouseDown={(e) => e.preventDefault()}
+                            <button key={g.id} type="button" onMouseDown={(e) => e.preventDefault()}
                               onClick={() => {
-                                setCheckInForm(p => ({
-                                  ...p,
-                                  guestName: g.full_name,
-                                  phone: g.phone || p.phone,
-                                  email: g.email || p.email,
-                                }));
+                                setCheckInForm(p => ({ ...p, guestName: g.full_name, phone: g.phone || p.phone, email: g.email || p.email }));
                                 setShowGuestDropdown(false);
                               }}
                               className="w-full px-3 py-2 text-left hover:bg-secondary transition-colors">
                               <p className="font-body text-sm text-foreground">{g.full_name}</p>
-                              {(g.phone || g.email) && (
-                                <p className="font-body text-[10px] text-muted-foreground">{g.phone} {g.email}</p>
-                              )}
+                              {(g.phone || g.email) && <p className="font-body text-[10px] text-muted-foreground">{g.phone} {g.email}</p>}
                             </button>
                           ))}
-                          <button type="button"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => setShowGuestDropdown(false)}
+                          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setShowGuestDropdown(false)}
                             className="w-full px-3 py-2 text-left hover:bg-secondary transition-colors border-t border-border">
                             <p className="font-body text-xs text-accent">+ Add "{checkInForm.guestName}" as new guest</p>
                           </button>
@@ -714,48 +808,44 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
                       )}
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                      <Input value={checkInForm.phone}
-                        onChange={e => setCheckInForm(p => ({ ...p, phone: e.target.value }))}
+                      <Input value={checkInForm.phone} onChange={e => setCheckInForm(p => ({ ...p, phone: e.target.value }))}
                         placeholder="Phone" className="bg-secondary border-border text-foreground font-body text-xs" />
-                      <Input value={checkInForm.email}
-                        onChange={e => setCheckInForm(p => ({ ...p, email: e.target.value }))}
+                      <Input value={checkInForm.email} onChange={e => setCheckInForm(p => ({ ...p, email: e.target.value }))}
                         placeholder="Email" className="bg-secondary border-border text-foreground font-body text-xs" />
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="font-body text-xs text-muted-foreground">Check-in</label>
-                        <Input type="date" value={checkInForm.checkIn}
-                          onChange={e => setCheckInForm(p => ({ ...p, checkIn: e.target.value }))}
+                        <Input type="date" value={checkInForm.checkIn} onChange={e => setCheckInForm(p => ({ ...p, checkIn: e.target.value }))}
                           className="bg-secondary border-border text-foreground font-body text-xs" />
                       </div>
                       <div>
                         <label className="font-body text-xs text-muted-foreground">Check-out *</label>
-                        <Input type="date" value={checkInForm.checkOut}
-                          onChange={e => setCheckInForm(p => ({ ...p, checkOut: e.target.value }))}
+                        <Input type="date" value={checkInForm.checkOut} onChange={e => setCheckInForm(p => ({ ...p, checkOut: e.target.value }))}
                           className="bg-secondary border-border text-foreground font-body text-xs" />
                       </div>
                     </div>
                     <div className="grid grid-cols-4 gap-2">
                       <div>
                         <label className="font-body text-xs text-muted-foreground">Adults</label>
-                        <Input type="number" value={checkInForm.adults}
-                          onChange={e => setCheckInForm(p => ({ ...p, adults: e.target.value }))}
+                        <Input type="number" value={checkInForm.adults} onChange={e => setCheckInForm(p => ({ ...p, adults: e.target.value }))}
                           className="bg-secondary border-border text-foreground font-body text-xs" />
                       </div>
                       <div>
                         <label className="font-body text-xs text-muted-foreground">Children</label>
-                        <Input type="number" value={checkInForm.children}
-                          onChange={e => setCheckInForm(p => ({ ...p, children: e.target.value }))}
+                        <Input type="number" value={checkInForm.children} onChange={e => setCheckInForm(p => ({ ...p, children: e.target.value }))}
                           className="bg-secondary border-border text-foreground font-body text-xs" />
                       </div>
                       <div>
-                        <label className="font-body text-xs text-muted-foreground">Platform</label>
-                        <Select value={checkInForm.platform}
-                          onValueChange={v => setCheckInForm(p => ({ ...p, platform: v }))}>
+                        <label className="font-body text-xs text-muted-foreground">Guest Type</label>
+                        <Select value={checkInForm.platform} onValueChange={v => setCheckInForm(p => ({ ...p, platform: v }))}>
                           <SelectTrigger className="bg-secondary border-border text-foreground font-body text-xs">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="Hotel Guest">Hotel Guest</SelectItem>
+                            <SelectItem value="Walk-In Guest">Walk-In</SelectItem>
+                            <SelectItem value="Friends & Family">F&F 👨‍👩‍👧</SelectItem>
                             <SelectItem value="Direct">Direct</SelectItem>
                             <SelectItem value="Airbnb">Airbnb</SelectItem>
                             <SelectItem value="Booking.com">Booking.com</SelectItem>
@@ -766,19 +856,15 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
                       </div>
                       <div>
                         <label className="font-body text-xs text-muted-foreground">Rate</label>
-                        <Input type="number" value={checkInForm.roomRate}
-                          onChange={e => setCheckInForm(p => ({ ...p, roomRate: e.target.value }))}
+                        <Input type="number" value={checkInForm.roomRate} onChange={e => setCheckInForm(p => ({ ...p, roomRate: e.target.value }))}
                           className="bg-secondary border-border text-foreground font-body text-xs" />
                       </div>
                     </div>
-                    <Textarea value={checkInForm.specialRequests}
-                      onChange={e => setCheckInForm(p => ({ ...p, specialRequests: e.target.value }))}
+                    <Textarea value={checkInForm.specialRequests} onChange={e => setCheckInForm(p => ({ ...p, specialRequests: e.target.value }))}
                       placeholder="Special requests (dietary, accessibility, etc.)"
                       className="bg-secondary border-border text-foreground font-body text-sm min-h-[50px]" />
-                    <Textarea value={checkInForm.notes}
-                      onChange={e => setCheckInForm(p => ({ ...p, notes: e.target.value }))}
-                      placeholder="Notes (optional)"
-                      className="bg-secondary border-border text-foreground font-body text-sm min-h-[50px]" />
+                    <Textarea value={checkInForm.notes} onChange={e => setCheckInForm(p => ({ ...p, notes: e.target.value }))}
+                      placeholder="Notes (optional)" className="bg-secondary border-border text-foreground font-body text-sm min-h-[50px]" />
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline" onClick={() => setShowCheckInForm(false)}
                         className="flex-1 font-display text-xs tracking-wider min-h-[44px]">Cancel</Button>
@@ -818,7 +904,7 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
           </div>
         )}
 
-        {/* DOCUMENTS - always available */}
+        {/* DOCUMENTS (PART 6 — expanded types) */}
         {detailTab === 'documents' && (
           <div className="space-y-3">
             {!readOnly && (
@@ -828,17 +914,13 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
                     <SelectValue placeholder="Document type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="passport">Passport</SelectItem>
-                    <SelectItem value="government_id">Government ID</SelectItem>
-                    <SelectItem value="booking_confirmation">Booking Confirmation</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
+                    {DOC_TYPES.map(dt => (
+                      <SelectItem key={dt.value} value={dt.value}>{dt.label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-
                 <Input value={docNotes} onChange={e => setDocNotes(e.target.value)}
-                  placeholder="Notes (e.g., expires March 2027)"
-                  className="bg-secondary border-border text-foreground font-body text-xs" />
-
+                  placeholder="Notes (e.g., expires March 2027)" className="bg-secondary border-border text-foreground font-body text-xs" />
                 <div className="grid grid-cols-2 gap-2">
                   <label className="flex items-center gap-2 cursor-pointer border border-dashed border-border rounded-lg p-3 justify-center hover:bg-secondary/50 min-h-[44px]">
                     <Camera className="w-4 h-4 text-muted-foreground" />
@@ -846,7 +928,6 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
                     <input type="file" accept="image/*" capture="environment" className="hidden"
                       onChange={e => { if (e.target.files?.[0]) uploadDocument(e.target.files[0]); }} />
                   </label>
-
                   <label className="flex items-center gap-2 cursor-pointer border border-dashed border-border rounded-lg p-3 justify-center hover:bg-secondary/50 min-h-[44px]">
                     <Upload className="w-4 h-4 text-muted-foreground" />
                     <span className="font-body text-xs text-muted-foreground">Upload File</span>
@@ -854,7 +935,6 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
                       onChange={e => { if (e.target.files?.[0]) uploadDocument(e.target.files[0]); }} />
                   </label>
                 </div>
-
                 {!showUrlInput ? (
                   <Button size="sm" variant="outline" onClick={() => setShowUrlInput(true)}
                     className="w-full font-display text-xs tracking-wider min-h-[44px]">
@@ -864,8 +944,7 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
                   <div className="flex gap-2">
                     <Input value={docUrl} onChange={e => setDocUrl(e.target.value)}
                       placeholder="https://..." className="bg-secondary border-border text-foreground font-body text-xs flex-1" />
-                    <Button size="sm" onClick={addDocumentUrl} disabled={!docUrl.trim()}
-                      className="font-display text-xs tracking-wider min-h-[44px]">
+                    <Button size="sm" onClick={addDocumentUrl} disabled={!docUrl.trim()} className="font-display text-xs tracking-wider min-h-[44px]">
                       <Plus className="w-3.5 h-3.5" />
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => { setShowUrlInput(false); setDocUrl(''); }}
@@ -874,8 +953,6 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
                 )}
               </div>
             )}
-
-            {/* Document list */}
             {documents.map((doc: any) => (
               <div key={doc.id} className="border border-border rounded-lg overflow-hidden">
                 {doc.image_url && !doc.image_url.startsWith('http://') && doc.image_url.includes('guest-documents') ? (
@@ -910,7 +987,7 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
           </div>
         )}
 
-        {/* NOTES */}
+        {/* NOTES (PART 5 — enhanced) */}
         {detailTab === 'notes' && (
           <div className="space-y-3">
             {!readOnly && (
@@ -921,43 +998,84 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="general">General</SelectItem>
-                      <SelectItem value="request">Request</SelectItem>
-                      <SelectItem value="allergy">Allergy</SelectItem>
-                      <SelectItem value="preference">Preference</SelectItem>
+                      {NOTE_CATEGORIES.map(c => (
+                        <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
-                <Textarea value={noteContent} onChange={e => setNoteContent(e.target.value)}
+                <Textarea ref={noteTextRef} value={noteContent} onChange={e => setNoteContent(e.target.value)}
                   placeholder="Add a note..." className="bg-secondary border-border text-foreground font-body text-sm min-h-[60px]" />
-                <Button size="sm" onClick={addNote} disabled={!noteContent.trim()} className="font-display text-xs tracking-wider w-full">
+
+                {/* Attachment options */}
+                <div className="flex gap-2 flex-wrap">
+                  <label className="flex items-center gap-1 cursor-pointer border border-dashed border-border rounded-lg px-3 py-2 hover:bg-secondary/50">
+                    <Camera className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span className="font-body text-xs text-muted-foreground">Photo</span>
+                    <input type="file" accept="image/*" capture="environment" className="hidden"
+                      onChange={e => { if (e.target.files?.[0]) uploadNoteImage(e.target.files[0]); }} />
+                  </label>
+                  <label className="flex items-center gap-1 cursor-pointer border border-dashed border-border rounded-lg px-3 py-2 hover:bg-secondary/50">
+                    <ImageIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span className="font-body text-xs text-muted-foreground">Image</span>
+                    <input type="file" accept="image/*" className="hidden"
+                      onChange={e => { if (e.target.files?.[0]) uploadNoteImage(e.target.files[0]); }} />
+                  </label>
+                  {!showNoteUrl ? (
+                    <button onClick={() => setShowNoteUrl(true)}
+                      className="flex items-center gap-1 border border-dashed border-border rounded-lg px-3 py-2 hover:bg-secondary/50">
+                      <LinkIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                      <span className="font-body text-xs text-muted-foreground">URL</span>
+                    </button>
+                  ) : (
+                    <div className="flex gap-1 flex-1">
+                      <Input value={noteImageUrl} onChange={e => setNoteImageUrl(e.target.value)}
+                        placeholder="https://..." className="bg-secondary border-border text-foreground font-body text-xs flex-1 h-8" />
+                      <Button size="sm" variant="ghost" onClick={() => { setShowNoteUrl(false); setNoteImageUrl(''); }}
+                        className="h-8 px-2 text-xs">✕</Button>
+                    </div>
+                  )}
+                </div>
+
+                <Button size="sm" onClick={addNote} disabled={!noteContent.trim() && !noteImageUrl.trim()}
+                  className="font-display text-xs tracking-wider w-full">
                   <Plus className="w-3.5 h-3.5 mr-1" /> Add Note
                 </Button>
               </div>
             )}
-            {notes.map((note: any) => (
-              <div key={note.id} className="border border-border rounded-lg p-3">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <Badge variant="outline" className="font-body text-xs mb-1">{note.note_type}</Badge>
-                    <p className="font-body text-sm text-foreground">{note.content}</p>
-                    <p className="font-body text-xs text-muted-foreground mt-1">
-                      {note.created_by} · {format(new Date(note.created_at), 'MMM d · h:mm a')}
-                    </p>
+            {notes.map((note: any) => {
+              const isImage = note.content?.startsWith('[IMAGE]:');
+              const imageUrl = isImage ? note.content.replace('[IMAGE]:', '') : null;
+              return (
+                <div key={note.id} className="border border-border rounded-lg p-3">
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1 min-w-0">
+                      <Badge variant="outline" className="font-body text-xs mb-1">{(note.note_type || 'general').replace('_', ' ')}</Badge>
+                      {isImage ? (
+                        <a href={imageUrl!} target="_blank" rel="noopener noreferrer">
+                          <img src={imageUrl!} alt="Note attachment" className="max-h-40 rounded mt-1 object-contain bg-secondary" />
+                        </a>
+                      ) : (
+                        <p className="font-body text-sm text-foreground">{note.content}</p>
+                      )}
+                      <p className="font-body text-xs text-muted-foreground mt-1">
+                        {note.created_by} · {format(new Date(note.created_at), 'MMM d · h:mm a')}
+                      </p>
+                    </div>
+                    {!readOnly && (
+                      <Button size="sm" variant="ghost" onClick={() => deleteNote(note.id)}>
+                        <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                      </Button>
+                    )}
                   </div>
-                  {!readOnly && (
-                    <Button size="sm" variant="ghost" onClick={() => deleteNote(note.id)}>
-                      <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                    </Button>
-                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
             {notes.length === 0 && <p className="font-body text-sm text-muted-foreground text-center py-2">No notes yet</p>}
           </div>
         )}
 
-        {/* TOURS - always available */}
+        {/* TOURS (PART 4 — editable) */}
         {detailTab === 'tours' && (
           <div className="space-y-3">
             {!readOnly && (
@@ -998,9 +1116,12 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
                     {tour.pickup_time && <p className="font-body text-xs text-muted-foreground">Pickup: {tour.pickup_time}</p>}
                     {tour.notes && <p className="font-body text-xs text-foreground mt-1">{tour.notes}</p>}
                   </div>
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 items-start">
                     {!readOnly ? (
                       <>
+                        <Button size="sm" variant="ghost" onClick={() => setEditingTour(tour)} className="min-h-[28px] h-7 w-7 p-0">
+                          <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                        </Button>
                         <Select value={tour.status} onValueChange={v => updateTourStatus(tour.id, v)}>
                           <SelectTrigger className="h-7 w-24 text-xs bg-secondary border-border text-foreground font-body">
                             <SelectValue />
@@ -1025,6 +1146,11 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
             ))}
             {tours.length === 0 && <p className="font-body text-sm text-muted-foreground text-center py-2">No tours booked</p>}
           </div>
+        )}
+
+        {/* TIMELINE (PART 3) */}
+        {detailTab === 'timeline' && (
+          <GuestActivityTimeline booking={booking} unit={selectedUnit} />
         )}
 
         {/* VIBE */}
@@ -1072,9 +1198,64 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
         {detailTab === 'billing' && (
           <RoomBillingTab unit={selectedUnit} booking={booking} guestName={guest?.full_name || null} readOnly={readOnly} />
         )}
+
+        {/* === MODALS === */}
+        {booking && guest && (
+          <EditGuestModal open={showEditGuest} onOpenChange={setShowEditGuest} guest={guest} booking={booking} />
+        )}
+        {editingTour && (
+          <EditTourModal open={!!editingTour} onOpenChange={o => { if (!o) setEditingTour(null); }}
+            tour={editingTour} unitName={selectedUnit.name} bookingId={currentBooking?.id || null} />
+        )}
+
+        {/* Extend Stay dialog */}
+        <Dialog open={showExtendStay} onOpenChange={setShowExtendStay}>
+          <DialogContent className="bg-card border-border max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="font-display tracking-wider text-sm">Extend Stay</DialogTitle>
+            </DialogHeader>
+            <div>
+              <label className="font-body text-xs text-muted-foreground">New Check-out Date</label>
+              <Input type="date" value={extendDate} onChange={e => setExtendDate(e.target.value)}
+                className="bg-secondary border-border text-foreground font-body mt-1" />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowExtendStay(false)} className="font-display text-xs tracking-wider">Cancel</Button>
+              <Button onClick={handleExtendStay} className="font-display text-xs tracking-wider">Extend</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Change Room dialog */}
+        <Dialog open={showChangeRoom} onOpenChange={setShowChangeRoom}>
+          <DialogContent className="bg-card border-border max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="font-display tracking-wider text-sm">Change Room</DialogTitle>
+            </DialogHeader>
+            <div>
+              <label className="font-body text-xs text-muted-foreground">Move guest to</label>
+              <Select value={changeRoomId} onValueChange={setChangeRoomId}>
+                <SelectTrigger className="bg-secondary border-border text-foreground font-body mt-1">
+                  <SelectValue placeholder="Select a ready room" />
+                </SelectTrigger>
+                <SelectContent>
+                  {readyUnitsForChange.map((u: any) => (
+                    <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowChangeRoom(false)} className="font-display text-xs tracking-wider">Cancel</Button>
+              <Button onClick={handleChangeRoom} disabled={!changeRoomId} className="font-display text-xs tracking-wider">Move Guest</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
+
+  // === GRID VIEW ===
   const occupiedUnits = units.filter((u: any) => getUnitStatus(u) === 'occupied' || getUnitGuest(u.name));
   const toCleanUnits = units.filter((u: any) => getUnitStatus(u) === 'to_clean');
   const readyUnits = units.filter((u: any) => getUnitStatus(u) === 'ready' && !getUnitGuest(u.name));
@@ -1104,7 +1285,7 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
         </div>
       </div>
 
-      {/* To Clean cards (most actionable) */}
+      {/* To Clean cards */}
       {toCleanUnits.length > 0 && (
         <div className="space-y-2">
           <h4 className="font-display text-xs tracking-wider text-amber-400 uppercase">🟨 To Clean</h4>
@@ -1116,9 +1297,7 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
                   <div>
                     <p className="font-display text-sm text-foreground tracking-wider">{unit.name}</p>
                     {hkOrder?.assigned_to && (
-                      <p className="font-body text-xs text-muted-foreground">
-                        Assigned: {getEmployeeName(hkOrder.assigned_to)}
-                      </p>
+                      <p className="font-body text-xs text-muted-foreground">Assigned: {getEmployeeName(hkOrder.assigned_to)}</p>
                     )}
                     {hkOrder && (
                       <Badge variant="outline" className="font-body text-xs mt-1 text-amber-400 border-amber-500/40">
@@ -1134,9 +1313,7 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
                       </Button>
                     )}
                     <Button size="sm" variant="outline" onClick={() => { setSelectedUnit(unit); setDetailTab('info'); setVibeMode('list'); setShowCheckInForm(false); }}
-                      className="font-display text-xs tracking-wider min-h-[44px]">
-                      View
-                    </Button>
+                      className="font-display text-xs tracking-wider min-h-[44px]">View</Button>
                   </div>
                 </div>
               </div>
@@ -1155,6 +1332,8 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
           const status = getUnitStatus(unit);
           const borderColor = status === 'occupied' ? 'border-red-500/40' : status === 'to_clean' ? 'border-amber-500/40' : 'border-emerald-500/40';
           const statusBg = status === 'occupied' ? 'bg-red-500/5' : status === 'to_clean' ? 'bg-amber-500/5' : '';
+          const isFnF = booking?.platform === 'Friends & Family';
+          const isVip = (booking?.notes || '').includes('[VIP]');
 
           return (
             <button key={unit.id} onClick={() => { setSelectedUnit(unit); setDetailTab('info'); setVibeMode('list'); setShowCheckInForm(false); }}
@@ -1167,6 +1346,10 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
                   <p className="font-body text-xs text-muted-foreground">
                     {format(new Date(booking.check_in + 'T00:00:00'), 'MMM d')} – {format(new Date(booking.check_out + 'T00:00:00'), 'MMM d')}
                   </p>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {isFnF && <Badge variant="outline" className="font-body text-[10px] border-emerald-500/40 text-emerald-400">F&F</Badge>}
+                    {isVip && <Badge variant="outline" className="font-body text-[10px] border-amber-500/40 text-amber-400">⭐ VIP</Badge>}
+                  </div>
                 </div>
               ) : status === 'to_clean' ? (
                 <Badge className="font-body text-xs mt-2 bg-amber-500/20 text-amber-400 border-amber-500/40">To Clean</Badge>
