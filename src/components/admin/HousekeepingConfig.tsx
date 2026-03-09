@@ -236,35 +236,35 @@ const HousekeepingConfig = () => {
 
             <div className="space-y-1">
               {filteredChecklist.map((item: any) => (
-                <div key={item.id} className="flex items-center gap-2 border border-border rounded p-2 flex-wrap">
+                <div key={item.id} className="flex items-center gap-2 border border-border rounded p-2">
                   <Checkbox checked disabled className="shrink-0" />
-                  <span className="font-body text-sm text-foreground flex-1 min-w-[100px]">{item.item_label}</span>
+                  <span className="font-body text-sm text-foreground flex-1 min-w-0 truncate">{item.item_label}</span>
                   <Button
                     variant={item.is_required ? 'default' : 'outline'}
                     size="sm"
-                    className="h-6 text-[10px] font-display px-2"
+                    className="h-7 text-[10px] font-display px-2 shrink-0"
                     onClick={() => toggleChecklistRequired(item)}
                   >
                     {item.is_required ? 'Required' : 'Optional'}
                   </Button>
                   {item.count_expected ? (
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 shrink-0">
                       <span className="text-[10px] text-muted-foreground font-body">Expected:</span>
                       <Input
                         type="number"
                         value={item.count_expected}
                         onChange={e => updateChecklistCount(item.id, parseInt(e.target.value) || null)}
-                        className="bg-secondary border-border text-foreground font-body h-6 w-14 text-xs"
+                        className="bg-secondary border-border text-foreground font-body h-7 w-14 text-xs"
                       />
                     </div>
                   ) : (
-                    <Button variant="ghost" size="sm" className="h-6 text-[10px] font-body text-muted-foreground px-2"
+                    <Button variant="ghost" size="sm" className="h-7 text-[10px] font-body text-muted-foreground px-2 shrink-0"
                       onClick={() => updateChecklistCount(item.id, 1)}>
                       + Count
                     </Button>
                   )}
-                  <Button variant="ghost" size="icon" onClick={() => deleteChecklistItem(item.id)} className="text-destructive h-6 w-6 shrink-0">
-                    <Trash2 className="w-3 h-3" />
+                  <Button variant="ghost" size="icon" onClick={() => deleteChecklistItem(item.id)} className="text-destructive h-7 w-7 shrink-0">
+                    <Trash2 className="w-3.5 h-3.5" />
                   </Button>
                 </div>
               ))}
