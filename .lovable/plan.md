@@ -1,37 +1,30 @@
 
 
-## Plan: Fix Schedule Delete & Enhance Task/Assignment Scheduling
+## Plan: Add Ping Sound for New Housekeeping Orders
 
-### Issues Found
+### Problem
+When reception or admin assigns a room for cleaning, the housekeeping staff's page shows the new order silently. There's no audio alert like the kitchen/bar get for F&B orders.
 
-1. **Delete button bug**: The trash icon on shift blocks triggers `setDeleteId(s.id)`, but the parent div's `onClick={() => openEdit(s)}` fires simultaneously despite `stopPropagation`. On mobile, the tiny button (3x3 icon) is nearly impossible to tap. The AlertDialog `onOpenChange={() => setDeleteId(null)}` also races with the confirm action.
+### How it works today
+- **Kitchen/Bar** (`DepartmentOrdersView.tsx`): Uses Web Audio API (`AudioContext`) to play a chime tone when a new order arrives via Supabase realtime subscription
+- **Housekeeping** (`HousekeeperPage.tsx`): Uses polling every 5 seconds (`refetchInterval: 5000`), no sound, no realtime
 
-2. **Missing scheduling features**: The schedule only manages time shifts. There's no way to assign tasks like housecleaning, reception duty, or track completion from within the schedule view.
+### Solution
+Add the same Web Audio API ping pattern from `DepartmentOrdersView` to `HousekeeperPage`:
 
-### Changes
+1. Create an `AudioContext` on first user interaction (touch/click) to unlock mobile audio
+2. Add a Supabase realtime subscription on `housekeeping_orders` table for INSERT events
+3. Play a distinct chime tone (different frequency from kitchen/bar, e.g. 520 Hz) when a new housekeeping order is inserted
+4. Keep the existing polling as a fallback
 
-**1. Fix Delete Button** (`WeeklyScheduleManager.tsx`)
-- Make `confirmDelete` capture `deleteId` before the dialog closes by saving it in a ref or local variable
-- Increase touch target size for edit/delete buttons on shift blocks
-- Prevent edit modal from opening when clicking edit/delete icons (the `stopPropagation` exists but the parent click handler on the entire timeline area also fires)
+### Files
+```
+EDIT  src/pages/HousekeeperPage.tsx  — Add AudioContext, realtime subscription, and ping sound on new housekeeping orders
+```
 
-**2. Add Task/Assignment Creation from Schedule** (`WeeklyScheduleManager.tsx`)
-- Add an "Assign Task" button alongside "Add Shift" 
-- New modal to create a task assignment: select employee, pick type (Housecleaning, Reception, Custom), set date/time, add notes
-- For housecleaning: select a room/unit to clean, auto-creates a `housekeeping_orders` entry assigned to the selected employee
-- For other tasks: creates an `employee_tasks` entry with due date and description
-- Tasks appear as colored pills on the timeline (already partially implemented)
-
-**3. Show Completion Info on Task Detail** (`WeeklyScheduleManager.tsx`)
-- In the task detail dialog, show who completed the task and when (`completed_at`)
-- For housekeeping pills, show completion status (`cleaning_completed_at`, `completed_by_name`)
-- Make housekeeping pills clickable to show full details (room, status, who inspected/cleaned)
-
-**4. Enhance Task Detail Dialog** (`WeeklyScheduleManager.tsx`)
-- Add edit capability: change title, description, due date, reassign to different employee
-- Add delete capability for tasks
-- Show completion audit trail
-
-### Files to Edit
-- `src/components/admin/WeeklyScheduleManager.tsx` — all changes in this single file
+### Technical Detail
+- Reuse the exact `AudioContext` + oscillator pattern from `DepartmentOrdersView` (lines 50-84)
+- Subscribe to `postgres_changes` INSERT events on `housekeeping_orders` table
+- Use a lower frequency (520 Hz) to distinguish from kitchen (880 Hz) and bar (660 Hz)
+- Unlock audio context on first touch/click for mobile compatibility
 
