@@ -231,9 +231,9 @@ const StaffOrdersView = () => {
           <OrderCard
             key={order.id}
             order={order}
-            onAdvance={advanceOrder}
+            onAdvance={canPipeline ? advanceOrder : undefined}
             resortProfile={resortProfile}
-            onAddItems={handleOpenAddItems}
+            onAddItems={canPipeline ? handleOpenAddItems : undefined}
             onViewTab={(tabId) => setViewingTabId(tabId)}
           />
         ))}
