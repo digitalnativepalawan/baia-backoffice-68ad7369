@@ -121,6 +121,11 @@ const StaffNavBar = ({ activeDepartment }: StaffNavBarProps) => {
     );
   };
 
+  const goService = () => {
+    navigate('/service');
+    setMenuOpen(false);
+  };
+
   // Shared nav items
   const NavItems = ({ mobile = false }: { mobile?: boolean }) => (
     <>
@@ -141,6 +146,15 @@ const StaffNavBar = ({ activeDepartment }: StaffNavBarProps) => {
       >
         <Briefcase className="w-4 h-4" />
         My Work
+      </Button>
+      <Button
+        variant={location.pathname.startsWith('/service') ? 'default' : 'ghost'}
+        size="sm"
+        onClick={goService}
+        className={`font-display text-xs tracking-wider gap-1.5 ${mobile ? 'w-full justify-start' : ''}`}
+      >
+        <Monitor className="w-4 h-4" />
+        Service
       </Button>
       {hasDashboardAccess && (
         <Button
