@@ -189,24 +189,27 @@ const CheckoutModal = ({ open, onOpenChange, unitId, unitName, guestName, bookin
           <DialogTitle className="font-display tracking-wider">Checkout — {unitName}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          {/* Unpaid F&B Orders Warning */}
+          {/* Unpaid F&B Orders — included in final settlement */}
           {unpaidOrders.length > 0 && (
-            <div className="border border-destructive/50 bg-destructive/10 rounded-lg p-3 space-y-2">
-              <p className="font-display text-xs tracking-wider text-destructive uppercase flex items-center gap-1">
-                ⚠️ {unpaidOrders.length} Unpaid Order{unpaidOrders.length > 1 ? 's' : ''} — ₱{unpaidTotal.toLocaleString()}
+            <div className="border border-amber-500/30 bg-amber-500/5 rounded-lg p-3 space-y-2">
+              <p className="font-display text-xs tracking-wider text-amber-400 uppercase flex items-center gap-1">
+                🍽 {unpaidOrders.length} Unsettled Order{unpaidOrders.length > 1 ? 's' : ''} — ₱{unpaidTotal.toLocaleString()}
               </p>
-              <p className="font-body text-xs text-muted-foreground">These orders must be paid before checkout.</p>
-              {unpaidOrders.map((o: any) => (
-                <div key={o.id} className="flex justify-between items-center bg-secondary/50 rounded p-2">
-                  <div>
-                    <p className="font-body text-xs text-foreground">F&B Order — ₱{(o.total || 0).toLocaleString()}</p>
-                    <p className="font-body text-[10px] text-muted-foreground">{new Date(o.created_at).toLocaleString()}</p>
+              <p className="font-body text-xs text-muted-foreground">These will be settled automatically at checkout.</p>
+              {unpaidOrders.map((o: any) => {
+                const items = Array.isArray(o.items) ? o.items : [];
+                return (
+                  <div key={o.id} className="flex justify-between items-center bg-secondary/50 rounded p-2">
+                    <div>
+                      <p className="font-body text-xs text-foreground">
+                        {items.map((i: any) => `${i.qty || 1}× ${i.name}`).join(', ') || 'F&B Order'}
+                      </p>
+                      <p className="font-body text-[10px] text-muted-foreground">{new Date(o.created_at).toLocaleString()}</p>
+                    </div>
+                    <span className="font-display text-xs text-foreground">₱{(o.total || 0).toLocaleString()}</span>
                   </div>
-                  <Button size="sm" variant="outline" onClick={() => markOrderPaid(o.id)} className="font-display text-[10px] tracking-wider h-7 px-2">
-                    Mark Paid
-                  </Button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
