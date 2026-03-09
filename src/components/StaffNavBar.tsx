@@ -39,7 +39,7 @@ interface StaffNavBarProps {
 const StaffNavBar = ({ activeDepartment }: StaffNavBarProps) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const session = getSession();
+  const session = getStaffSession();
   const [menuOpen, setMenuOpen] = useState(false);
 
   if (!session) return null;
