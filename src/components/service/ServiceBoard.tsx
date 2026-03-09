@@ -86,7 +86,7 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
       const { data } = await supabase
         .from('orders')
         .select('*')
-        .in('status', ['New', 'Preparing', 'Served', 'Paid'])
+        .in('status', ['New', 'Preparing', 'Ready', 'Served', 'Paid'])
         .gte('created_at', start.toISOString())
         .order('created_at', { ascending: true })
         .limit(300);
