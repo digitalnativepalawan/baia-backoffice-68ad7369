@@ -283,6 +283,7 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
         onOpenChange={(open) => { if (!open) setDetailOrder(null); }}
         permissions={permissions}
         onAction={handleAction}
+        resortProfile={resortProfile}
       />
     </div>
   );

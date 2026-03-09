@@ -191,10 +191,38 @@ const ServiceOrderDetail = ({ order, open, onOpenChange, permissions, onAction, 
             </>
           )}
 
-          {actions.length === 0 && (
+          {actions.length === 0 && !showInvoice && (
             <p className="font-body text-sm text-muted-foreground text-center py-2">
               {isAutoPayable && order.status === 'Served' ? 'Order auto-closed — charged to room/tab' : 'No actions available'}
             </p>
+          )}
+
+          {/* Invoice actions for walk-in/dine-in orders */}
+          {showInvoice && (
+            <>
+              <Separator />
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="flex-1 font-display tracking-wider gap-2 min-h-[52px] rounded-xl"
+                  onClick={() => generateInvoicePdf(order, resortProfile || null)}
+                >
+                  <FileText className="w-5 h-5" /> Download Invoice
+                </Button>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="flex-1 font-display tracking-wider gap-2 min-h-[52px] rounded-xl"
+                  onClick={() => {
+                    const text = buildInvoiceWhatsAppText(order, resortProfile || null);
+                    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+                  }}
+                >
+                  <MessageCircle className="w-5 h-5" /> WhatsApp
+                </Button>
+              </div>
+            </>
           )}
         </div>
       </DrawerContent>
