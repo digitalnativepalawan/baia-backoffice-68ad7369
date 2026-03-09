@@ -1,51 +1,37 @@
 
 
-## Fix Service Board Actions + Add Invoice to Service Mode
+## Plan: Fix Schedule Delete & Enhance Task/Assignment Scheduling
 
-### Problems
+### Issues Found
 
-1. **Kitchen/Bar can't push orders forward**: When kitchen marks food "Ready" and there are no bar items, the order auto-sets to `Served` status. But the order then sits in the "Ready" column on the kitchen board with no action button — because "Mark Served" requires `reception` permission. The same issue applies to bar.
+1. **Delete button bug**: The trash icon on shift blocks triggers `setDeleteId(s.id)`, but the parent div's `onClick={() => openEdit(s)}` fires simultaneously despite `stopPropagation`. On mobile, the tiny button (3x3 icon) is nearly impossible to tap. The AlertDialog `onOpenChange={() => setDeleteId(null)}` also races with the confirm action.
 
-2. **No invoice on service boards**: Walk-in, family & friends orders have no way to generate an invoice from the service screens. Invoice PDF/WhatsApp is only available in the Admin OrderCard. Kitchen/bar/reception staff need this too.
-
-3. **Guest portal orders already work**: The `OrdersView` in `GuestPortal.tsx` already queries all orders by `room_id` with realtime subscriptions. Room charges already flow to `room_transactions` for the bill view. This part is working correctly.
-
----
+2. **Missing scheduling features**: The schedule only manages time shifts. There's no way to assign tasks like housecleaning, reception duty, or track completion from within the schedule view.
 
 ### Changes
 
-**1. `ServiceOrderCard.tsx` — Allow all departments to serve/pay orders**
+**1. Fix Delete Button** (`WeeklyScheduleManager.tsx`)
+- Make `confirmDelete` capture `deleteId` before the dialog closes by saving it in a ref or local variable
+- Increase touch target size for edit/delete buttons on shift blocks
+- Prevent edit modal from opening when clicking edit/delete icons (the `stopPropagation` exists but the parent click handler on the entire timeline area also fires)
 
-The core bug: `mark-served` and `mark-paid` are gated behind `canEdit(permissions, 'reception')`. But a kitchen-only chef should be able to mark an order as served when all items are ready — especially in a small resort where one person handles everything.
+**2. Add Task/Assignment Creation from Schedule** (`WeeklyScheduleManager.tsx`)
+- Add an "Assign Task" button alongside "Add Shift" 
+- New modal to create a task assignment: select employee, pick type (Housecleaning, Reception, Custom), set date/time, add notes
+- For housecleaning: select a room/unit to clean, auto-creates a `housekeeping_orders` entry assigned to the selected employee
+- For other tasks: creates an `employee_tasks` entry with due date and description
+- Tasks appear as colored pills on the timeline (already partially implemented)
 
-Fix: Allow `mark-served` when the user has edit permission for **any** of `kitchen`, `bar`, or `reception` (not just reception). Similarly for `mark-paid`. The logic becomes:
-- `canServe = canEdit(perms, 'reception') || canEdit(perms, 'kitchen') || canEdit(perms, 'bar')`
-- Use `canServe` instead of `canEdit(perms, 'reception')` for serve/pay actions
+**3. Show Completion Info on Task Detail** (`WeeklyScheduleManager.tsx`)
+- In the task detail dialog, show who completed the task and when (`completed_at`)
+- For housekeeping pills, show completion status (`cleaning_completed_at`, `completed_by_name`)
+- Make housekeeping pills clickable to show full details (room, status, who inspected/cleaned)
 
-This applies to both primary actions and secondary actions, and in `ServiceOrderDetail.tsx` as well.
+**4. Enhance Task Detail Dialog** (`WeeklyScheduleManager.tsx`)
+- Add edit capability: change title, description, due date, reassign to different employee
+- Add delete capability for tasks
+- Show completion audit trail
 
-**2. `ServiceOrderCard.tsx` + `ServiceOrderDetail.tsx` — Add invoice buttons**
-
-For orders with status `Served` or `Paid` that are **not** Room/Tab (i.e., Walk-In, DineIn, Beach):
-- Show a small invoice icon button on the card
-- Show "Download Invoice" and "Send WhatsApp" buttons in the detail drawer
-- Import `generateInvoicePdf` and `buildInvoiceWhatsAppText` from `@/lib/generateInvoicePdf`
-- Need resort profile: add `useResortProfile` hook to `ServiceBoard.tsx` and pass it down
-
-**3. `ServiceBoard.tsx` — Pass resort profile**
-
-- Import `useResortProfile` hook
-- Pass `resortProfile` to `ServiceOrderCard` and `ServiceOrderDetail`
-
----
-
-### File Summary
-
-```
-EDIT: src/components/service/ServiceOrderCard.tsx  — broaden serve/pay perms, add invoice button
-EDIT: src/components/service/ServiceOrderDetail.tsx — broaden serve/pay perms, add invoice/WhatsApp buttons  
-EDIT: src/components/service/ServiceBoard.tsx       — pass resortProfile down
-```
-
-No database changes. No new files.
+### Files to Edit
+- `src/components/admin/WeeklyScheduleManager.tsx` — all changes in this single file
 

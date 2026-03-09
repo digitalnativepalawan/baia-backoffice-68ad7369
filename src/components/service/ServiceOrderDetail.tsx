@@ -3,9 +3,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { format } from 'date-fns';
-import { Flame, GlassWater, Truck, CreditCard, Clock, CheckCircle2, Home, Receipt, Info } from 'lucide-react';
+import { Flame, GlassWater, Truck, CreditCard, Clock, CheckCircle2, Home, Receipt, Info, FileText, MessageCircle } from 'lucide-react';
 import { useState } from 'react';
 import { canEdit } from '@/lib/permissions';
+import { generateInvoicePdf, buildInvoiceWhatsAppText } from '@/lib/generateInvoicePdf';
+import type { ResortProfile } from '@/hooks/useResortProfile';
 
 interface ServiceOrderDetailProps {
   order: any | null;
@@ -13,6 +15,7 @@ interface ServiceOrderDetailProps {
   onOpenChange: (open: boolean) => void;
   permissions: string[];
   onAction: (orderId: string, action: string) => Promise<void>;
+  resortProfile?: ResortProfile | null;
 }
 
 const STATUS_DOT: Record<string, string> = {
@@ -21,7 +24,7 @@ const STATUS_DOT: Record<string, string> = {
   ready: 'bg-emerald-400',
 };
 
-const ServiceOrderDetail = ({ order, open, onOpenChange, permissions, onAction }: ServiceOrderDetailProps) => {
+const ServiceOrderDetail = ({ order, open, onOpenChange, permissions, onAction, resortProfile }: ServiceOrderDetailProps) => {
   const [busy, setBusy] = useState<string | null>(null);
 
   if (!order) return null;
@@ -39,6 +42,8 @@ const ServiceOrderDetail = ({ order, open, onOpenChange, permissions, onAction }
     setBusy(action);
     try { await onAction(order.id, action); } finally { setBusy(null); }
   };
+
+  const canServe = canEdit(permissions, 'reception') || canEdit(permissions, 'kitchen') || canEdit(permissions, 'bar');
 
   // Build actions based on permissions + order state
   const actions: { label: string; action: string; icon: React.ReactNode; variant: 'default' | 'outline' }[] = [];
@@ -59,7 +64,7 @@ const ServiceOrderDetail = ({ order, open, onOpenChange, permissions, onAction }
     }
   }
 
-  if (canEdit(permissions, 'reception')) {
+  if (canServe) {
     const allReady = (foodItems.length === 0 || order.kitchen_status === 'ready') && (barItems.length === 0 || order.bar_status === 'ready');
     if (allReady && order.status !== 'Served' && order.status !== 'Paid') {
       actions.push({
@@ -73,6 +78,8 @@ const ServiceOrderDetail = ({ order, open, onOpenChange, permissions, onAction }
       actions.push({ label: 'Mark Paid', action: 'mark-paid', icon: <CreditCard className="w-5 h-5" />, variant: 'default' });
     }
   }
+
+  const showInvoice = !isAutoPayable && (order.status === 'Served' || order.status === 'Paid');
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
@@ -184,10 +191,38 @@ const ServiceOrderDetail = ({ order, open, onOpenChange, permissions, onAction }
             </>
           )}
 
-          {actions.length === 0 && (
+          {actions.length === 0 && !showInvoice && (
             <p className="font-body text-sm text-muted-foreground text-center py-2">
               {isAutoPayable && order.status === 'Served' ? 'Order auto-closed — charged to room/tab' : 'No actions available'}
             </p>
+          )}
+
+          {/* Invoice actions for walk-in/dine-in orders */}
+          {showInvoice && (
+            <>
+              <Separator />
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="flex-1 font-display tracking-wider gap-2 min-h-[52px] rounded-xl"
+                  onClick={() => generateInvoicePdf(order, resortProfile || null)}
+                >
+                  <FileText className="w-5 h-5" /> Download Invoice
+                </Button>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="flex-1 font-display tracking-wider gap-2 min-h-[52px] rounded-xl"
+                  onClick={() => {
+                    const text = buildInvoiceWhatsAppText(order, resortProfile || null);
+                    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+                  }}
+                >
+                  <MessageCircle className="w-5 h-5" /> WhatsApp
+                </Button>
+              </div>
+            </>
           )}
         </div>
       </DrawerContent>

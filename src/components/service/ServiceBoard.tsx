@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { deductInventoryForOrder } from '@/lib/inventoryDeduction';
 import { toast } from 'sonner';
+import { useResortProfile } from '@/hooks/useResortProfile';
 import ServiceOrderCard from './ServiceOrderCard';
 import ServiceOrderDetail from './ServiceOrderDetail';
 
@@ -21,6 +22,7 @@ interface ServiceBoardProps {
 
 const ServiceBoard = ({ department }: ServiceBoardProps) => {
   const qc = useQueryClient();
+  const { data: resortProfile } = useResortProfile();
   const audioCtxRef = useRef<AudioContext | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [detailOrder, setDetailOrder] = useState<any | null>(null);
@@ -251,13 +253,14 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
               </div>
               <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-2">
                 {columns[col].map(order => (
-                  <ServiceOrderCard
+                    <ServiceOrderCard
                     key={order.id}
                     order={order}
                     department={department}
                     permissions={permissions}
                     onAction={handleAction}
                     onOpenDetail={setDetailOrder}
+                    resortProfile={resortProfile}
                     compact
                   />
                 ))}
@@ -270,7 +273,7 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
         </div>
 
         {/* Mobile: tabbed view */}
-        <MobileTabView columns={columns} department={department} permissions={permissions} onAction={handleAction} onOpenDetail={setDetailOrder} />
+        <MobileTabView columns={columns} department={department} permissions={permissions} onAction={handleAction} onOpenDetail={setDetailOrder} resortProfile={resortProfile} />
       </div>
 
       {/* Detail drawer */}
@@ -280,18 +283,20 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
         onOpenChange={(open) => { if (!open) setDetailOrder(null); }}
         permissions={permissions}
         onAction={handleAction}
+        resortProfile={resortProfile}
       />
     </div>
   );
 };
 
 /** Mobile tab-based view for phones */
-const MobileTabView = ({ columns, department, permissions, onAction, onOpenDetail }: {
+const MobileTabView = ({ columns, department, permissions, onAction, onOpenDetail, resortProfile }: {
   columns: Record<string, any[]>;
   department: 'kitchen' | 'bar' | 'reception';
   permissions: string[];
   onAction: (orderId: string, action: string) => Promise<void>;
   onOpenDetail: (order: any) => void;
+  resortProfile?: any;
 }) => {
   const [tab, setTab] = useState<string>('New');
 
@@ -331,6 +336,7 @@ const MobileTabView = ({ columns, department, permissions, onAction, onOpenDetai
             permissions={permissions}
             onAction={onAction}
             onOpenDetail={onOpenDetail}
+            resortProfile={resortProfile}
           />
         ))}
       </div>

@@ -1,9 +1,11 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
-import { Flame, GlassWater, Truck, CreditCard, Clock, CheckCircle2, Home, Receipt } from 'lucide-react';
+import { Flame, GlassWater, Truck, CreditCard, Clock, CheckCircle2, Home, Receipt, FileText } from 'lucide-react';
 import { useState } from 'react';
 import { canEdit } from '@/lib/permissions';
+import { generateInvoicePdf, buildInvoiceWhatsAppText } from '@/lib/generateInvoicePdf';
+import type { ResortProfile } from '@/hooks/useResortProfile';
 
 const STATUS_BORDER: Record<string, string> = {
   New: 'border-l-gold',
@@ -25,9 +27,10 @@ interface ServiceOrderCardProps {
   onAction?: (orderId: string, action: string) => Promise<void>;
   onOpenDetail?: (order: any) => void;
   compact?: boolean;
+  resortProfile?: ResortProfile | null;
 }
 
-const ServiceOrderCard = ({ order, department, permissions, onAction, onOpenDetail, compact }: ServiceOrderCardProps) => {
+const ServiceOrderCard = ({ order, department, permissions, onAction, onOpenDetail, compact, resortProfile }: ServiceOrderCardProps) => {
   const [busy, setBusy] = useState(false);
   const items = (order.items as any[]) || [];
   const isNew = order.status === 'New';
@@ -52,6 +55,8 @@ const ServiceOrderCard = ({ order, department, permissions, onAction, onOpenDeta
     try { await onAction(order.id, action); } finally { setBusy(false); }
   };
 
+  const canServe = canEdit(permissions, 'reception') || canEdit(permissions, 'kitchen') || canEdit(permissions, 'bar');
+
   // Primary action for current department
   let primaryAction: { label: string; action: string; icon: React.ReactNode } | null = null;
 
@@ -61,7 +66,10 @@ const ServiceOrderCard = ({ order, department, permissions, onAction, onOpenDeta
   } else if (department === 'bar' && canEdit(permissions, 'bar')) {
     if (order.bar_status === 'pending' && barItems.length > 0) primaryAction = { label: 'Start Mixing', action: 'bar-start', icon: <GlassWater className="w-5 h-5" /> };
     else if (order.bar_status === 'preparing') primaryAction = { label: 'Mark Ready', action: 'bar-ready', icon: <CheckCircle2 className="w-5 h-5" /> };
-  } else if (department === 'reception' && canEdit(permissions, 'reception')) {
+  }
+
+  // Serve/Pay actions — any department staff can do this
+  if (!primaryAction && canServe) {
     const allReady = (foodItems.length === 0 || order.kitchen_status === 'ready') && (barItems.length === 0 || order.bar_status === 'ready');
     if (allReady && order.status !== 'Served' && order.status !== 'Paid') {
       primaryAction = { label: isAutoPayable ? 'Serve & Close' : 'Mark Served', action: 'mark-served', icon: <Truck className="w-5 h-5" /> };
@@ -81,14 +89,8 @@ const ServiceOrderCard = ({ order, department, permissions, onAction, onOpenDeta
     if (order.bar_status === 'pending') secondaryActions.push({ label: 'Start', action: 'bar-start', icon: <GlassWater className="w-4 h-4" /> });
     else if (order.bar_status === 'preparing') secondaryActions.push({ label: 'Ready', action: 'bar-ready', icon: <CheckCircle2 className="w-4 h-4" /> });
   }
-  if (department !== 'reception' && canEdit(permissions, 'reception')) {
-    const allReady = (foodItems.length === 0 || order.kitchen_status === 'ready') && (barItems.length === 0 || order.bar_status === 'ready');
-    if (allReady && order.status !== 'Served' && order.status !== 'Paid') {
-      secondaryActions.push({ label: isAutoPayable ? 'Serve & Close' : 'Served', action: 'mark-served', icon: <Truck className="w-4 h-4" /> });
-    } else if (order.status === 'Served' && !isAutoPayable) {
-      secondaryActions.push({ label: 'Paid', action: 'mark-paid', icon: <CreditCard className="w-4 h-4" /> });
-    }
-  }
+  // Show invoice button for non-room/tab served/paid orders
+  const showInvoice = !isAutoPayable && (order.status === 'Served' || order.status === 'Paid');
 
   if (deptItems.length === 0 && department !== 'reception') return null;
 
@@ -184,6 +186,20 @@ const ServiceOrderCard = ({ order, department, permissions, onAction, onOpenDeta
             <span className="font-body text-xs text-muted-foreground italic">
               {isRoomCharge ? 'Charged to room' : 'On tab'}
             </span>
+          )}
+          {/* Invoice button for walk-in/dine-in */}
+          {showInvoice && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                generateInvoicePdf(order, resortProfile || null);
+              }}
+              className="font-body text-xs gap-1 min-h-[36px] rounded-lg border-border/60"
+            >
+              <FileText className="w-4 h-4" /> Invoice
+            </Button>
           )}
         </div>
 
