@@ -3,9 +3,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { format } from 'date-fns';
-import { Flame, GlassWater, Truck, CreditCard, Clock, CheckCircle2, Home, Receipt, Info } from 'lucide-react';
+import { Flame, GlassWater, Truck, CreditCard, Clock, CheckCircle2, Home, Receipt, Info, FileText, MessageCircle } from 'lucide-react';
 import { useState } from 'react';
 import { canEdit } from '@/lib/permissions';
+import { generateInvoicePdf, buildInvoiceWhatsAppText } from '@/lib/generateInvoicePdf';
+import type { ResortProfile } from '@/hooks/useResortProfile';
 
 interface ServiceOrderDetailProps {
   order: any | null;
