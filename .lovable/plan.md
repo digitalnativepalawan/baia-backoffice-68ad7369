@@ -1,37 +1,38 @@
 
 
-## Plan: Fix Schedule Delete & Enhance Task/Assignment Scheduling
+## Fix Low Stock Alerts — Smart Consumption-Based Thresholds
 
-### Issues Found
+### Root Cause
 
-1. **Delete button bug**: The trash icon on shift blocks triggers `setDeleteId(s.id)`, but the parent div's `onClick={() => openEdit(s)}` fires simultaneously despite `stopPropagation`. On mobile, the tiny button (3x3 icon) is nearly impossible to tap. The AlertDialog `onOpenChange={() => setDeleteId(null)}` also races with the confirm action.
+Looking at the database, almost every ingredient has `low_stock_threshold: 200` regardless of unit type or actual consumption rate. A bulk ingredient like Sugar (6000g) with threshold 200 is fine, but Chorizo (40g stock, threshold 200) is permanently flagged LOW even though you might only use 80g per week. The thresholds were set uniformly and don't reflect real usage patterns.
 
-2. **Missing scheduling features**: The schedule only manages time shifts. There's no way to assign tasks like housecleaning, reception duty, or track completion from within the schedule view.
+### Solution
+
+Replace the static threshold system with a **consumption-aware** approach that calculates daily burn rate from actual `inventory_logs` data, then shows "days of stock remaining" and auto-suggests thresholds.
 
 ### Changes
 
-**1. Fix Delete Button** (`WeeklyScheduleManager.tsx`)
-- Make `confirmDelete` capture `deleteId` before the dialog closes by saving it in a ref or local variable
-- Increase touch target size for edit/delete buttons on shift blocks
-- Prevent edit modal from opening when clicking edit/delete icons (the `stopPropagation` exists but the parent click handler on the entire timeline area also fires)
+**1. `src/components/admin/InventoryDashboard.tsx` — Smart alerts + auto-threshold**
 
-**2. Add Task/Assignment Creation from Schedule** (`WeeklyScheduleManager.tsx`)
-- Add an "Assign Task" button alongside "Add Shift" 
-- New modal to create a task assignment: select employee, pick type (Housecleaning, Reception, Custom), set date/time, add notes
-- For housecleaning: select a room/unit to clean, auto-creates a `housekeeping_orders` entry assigned to the selected employee
-- For other tasks: creates an `employee_tasks` entry with due date and description
-- Tasks appear as colored pills on the timeline (already partially implemented)
+- Calculate **average daily consumption** per ingredient from `inventory_logs` (order_deduction entries over last 14 days)
+- Show **days of stock remaining** on each ingredient card (e.g., "~12 days left") instead of just raw stock numbers
+- Redesign the low stock alert panel:
+  - Sort by urgency (fewest days remaining first)
+  - Show: ingredient name, current stock, daily burn rate, days remaining
+  - Color code: red (<2 days), amber (<5 days), muted (>5 days)
+- Add **"Auto-set Thresholds"** button that sets each ingredient's `low_stock_threshold` to `avg_daily_consumption × buffer_days` (default 3 days buffer). This batch-updates all ingredients based on real usage so thresholds are meaningful.
+- Show a "Reorder Qty" suggestion = `(buffer_days × daily_rate) - current_stock` when stock is low
+- Keep manual threshold override — the auto-calc is a suggestion, not forced
 
-**3. Show Completion Info on Task Detail** (`WeeklyScheduleManager.tsx`)
-- In the task detail dialog, show who completed the task and when (`completed_at`)
-- For housekeeping pills, show completion status (`cleaning_completed_at`, `completed_by_name`)
-- Make housekeeping pills clickable to show full details (room, status, who inspected/cleaned)
+**2. `src/lib/stockCheck.ts` — No changes needed**
 
-**4. Enhance Task Detail Dialog** (`WeeklyScheduleManager.tsx`)
-- Add edit capability: change title, description, due date, reassign to different employee
-- Add delete capability for tasks
-- Show completion audit trail
+The `getMenuItemStockStatus` function already uses `current_stock < low_stock_threshold` correctly. Once thresholds are fixed in the DB, the menu sold-out/low-stock indicators will also become accurate.
 
-### Files to Edit
-- `src/components/admin/WeeklyScheduleManager.tsx` — all changes in this single file
+### File Summary
+
+```
+EDIT: src/components/admin/InventoryDashboard.tsx — consumption-based alerts, days remaining, auto-threshold tool
+```
+
+No database changes. The existing `inventory_logs` table already has all the consumption data needed.
 
