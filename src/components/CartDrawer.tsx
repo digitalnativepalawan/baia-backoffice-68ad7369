@@ -253,7 +253,28 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
       const hasBar = orderItems.some(i => i.department === 'bar' || i.department === 'both');
 
       const staffName = isGuestOrder ? 'Guest Self-Service' : (localStorage.getItem('emp_name') || '');
-      const roomUnit = selectedOrderType === 'Room' ? units?.find(u => u.unit_name === selectedLocation) : null;
+      // Always try to match location to a unit (works for Room, DineIn to a room, etc.)
+      const roomUnit = units?.find(u => u.unit_name === selectedLocation) || null;
+
+      // Auto-populate guest_name from active booking if placing order against a room
+      let resolvedGuestName = guestName || '';
+      if (roomUnit && !resolvedGuestName) {
+        try {
+          const today = new Date().toISOString().slice(0, 10);
+          const { data: activeBooking } = await supabase
+            .from('resort_ops_bookings')
+            .select('guest_id, resort_ops_guests(full_name)')
+            .eq('unit_id', roomUnit.id)
+            .lte('check_in', today)
+            .gte('check_out', today)
+            .limit(1)
+            .maybeSingle();
+          if (activeBooking && (activeBooking as any).resort_ops_guests?.full_name) {
+            resolvedGuestName = (activeBooking as any).resort_ops_guests.full_name;
+          }
+        } catch { /* ignore lookup failure */ }
+      }
+
       const taxDetails = {
         tax_name: billingConfig?.tax_name || 'VAT',
         tax_rate: vatRate,
