@@ -1,38 +1,37 @@
 
-## The Problem
 
-Line 218 in `ActionRequiredPanel.tsx`:
-```tsx
-{task.status === 'in_progress' ? 'Continue' : 'Start Task'}
-```
+## Plan: Fix Schedule Delete & Enhance Task/Assignment Scheduling
 
-This label is shown to **everyone** regardless of who the task belongs to. Ron (admin) sees David's task and sees "Start Task" — implying Ron should do David's work. That's wrong.
+### Issues Found
 
-The button logic should be:
+1. **Delete button bug**: The trash icon on shift blocks triggers `setDeleteId(s.id)`, but the parent div's `onClick={() => openEdit(s)}` fires simultaneously despite `stopPropagation`. On mobile, the tiny button (3x3 icon) is nearly impossible to tap. The AlertDialog `onOpenChange={() => setDeleteId(null)}` also races with the confirm action.
 
-| Viewer | Task belongs to them | Button |
-|---|---|---|
-| Admin | No | **Manage** |
-| Admin | Yes | **Start Task** / **Continue** |
-| Staff | Yes (always) | **Start Task** / **Continue** |
+2. **Missing scheduling features**: The schedule only manages time shifts. There's no way to assign tasks like housecleaning, reception duty, or track completion from within the schedule view.
 
-The button text for admins viewing **someone else's** task should be **"Manage"** — it navigates to the task board where the admin can comment, reassign, or update status, but it doesn't imply the admin is doing the task themselves.
+### Changes
 
-## Fix — One file, one condition
+**1. Fix Delete Button** (`WeeklyScheduleManager.tsx`)
+- Make `confirmDelete` capture `deleteId` before the dialog closes by saving it in a ref or local variable
+- Increase touch target size for edit/delete buttons on shift blocks
+- Prevent edit modal from opening when clicking edit/delete icons (the `stopPropagation` exists but the parent click handler on the entire timeline area also fires)
 
-**`src/components/staff/ActionRequiredPanel.tsx`**
+**2. Add Task/Assignment Creation from Schedule** (`WeeklyScheduleManager.tsx`)
+- Add an "Assign Task" button alongside "Add Shift" 
+- New modal to create a task assignment: select employee, pick type (Housecleaning, Reception, Custom), set date/time, add notes
+- For housecleaning: select a room/unit to clean, auto-creates a `housekeeping_orders` entry assigned to the selected employee
+- For other tasks: creates an `employee_tasks` entry with due date and description
+- Tasks appear as colored pills on the timeline (already partially implemented)
 
-1. Read `empId` from `localStorage` inside the render loop (it's already fetched in `useEffect`, just needs to be lifted to state or passed down)
-2. Store `isAdmin` and `currentEmpId` in component state after the session read
-3. In the button label logic, check if the task is assigned to the current user:
+**3. Show Completion Info on Task Detail** (`WeeklyScheduleManager.tsx`)
+- In the task detail dialog, show who completed the task and when (`completed_at`)
+- For housekeeping pills, show completion status (`cleaning_completed_at`, `completed_by_name`)
+- Make housekeeping pills clickable to show full details (room, status, who inspected/cleaned)
 
-```tsx
-const isMyTask = task.employee_id === currentEmpId;
-const buttonLabel = isMyTask
-  ? (task.status === 'in_progress' ? 'Continue' : 'Start Task')
-  : 'Manage';
-```
+**4. Enhance Task Detail Dialog** (`WeeklyScheduleManager.tsx`)
+- Add edit capability: change title, description, due date, reassign to different employee
+- Add delete capability for tasks
+- Show completion audit trail
 
-4. Admin's "Manage" button uses `variant="outline"` to visually differentiate it from action buttons (which are solid primary/destructive)
+### Files to Edit
+- `src/components/admin/WeeklyScheduleManager.tsx` — all changes in this single file
 
-No other files need to change. The navigation destination stays `/employee-portal` for all buttons — the admin naturally lands on the full task board where they can comment, reassign, and track all tasks.

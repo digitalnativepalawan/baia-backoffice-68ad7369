@@ -76,6 +76,7 @@ const ActionRequiredPanel = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [employees, setEmployees] = useState<Record<string, Employee>>({});
   const [loading, setLoading] = useState(true);
+  const [currentEmpId, setCurrentEmpId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchTasks = async () => {
@@ -87,6 +88,7 @@ const ActionRequiredPanel = () => {
       } catch {}
 
       const empId = localStorage.getItem('emp_id');
+      setCurrentEmpId(empId);
       const perms: string[] = session?.permissions || [];
       const isAdmin = perms.includes('admin');
 
@@ -209,14 +211,25 @@ const ActionRequiredPanel = () => {
                 </div>
 
                 {/* Action button */}
-                <Button
-                  size="sm"
-                  variant={urgency === 'overdue' ? 'destructive' : 'default'}
-                  className="shrink-0 font-display text-xs tracking-wide h-8 px-3"
-                  onClick={() => navigate('/employee-portal')}
-                >
-                  {task.status === 'in_progress' ? 'Continue' : 'Start Task'}
-                </Button>
+                {(() => {
+                  const isMyTask = task.employee_id === currentEmpId;
+                  const buttonLabel = isMyTask
+                    ? (task.status === 'in_progress' ? 'Continue' : 'Start Task')
+                    : 'Manage';
+                  const buttonVariant = !isMyTask
+                    ? 'outline'
+                    : urgency === 'overdue' ? 'destructive' : 'default';
+                  return (
+                    <Button
+                      size="sm"
+                      variant={buttonVariant}
+                      className="shrink-0 font-display text-xs tracking-wide h-8 px-3"
+                      onClick={() => navigate('/employee-portal')}
+                    >
+                      {buttonLabel}
+                    </Button>
+                  );
+                })()}
               </div>
             </div>
           );
