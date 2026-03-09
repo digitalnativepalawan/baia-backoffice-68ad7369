@@ -320,7 +320,11 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
   const [newPayment, setNewPayment] = useState({ source: '', amount: '', expected_date: '' });
   const [newUnit, setNewUnit] = useState({ name: '', type: '', base_price: '', capacity: '' });
   
-  const [newBooking, setNewBooking] = useState({ guest_id: '', unit_id: '', platform: '', check_in: '', check_out: '', adults: '1', room_rate: '', addons_total: '0', paid_amount: '0', commission_applied: '0' });
+  const [newBooking, setNewBooking] = useState({ guest_id: '', guest_name: '', unit_id: '', platform: '', check_in: '', check_out: '', adults: '1', room_rate: '', addons_total: '0', paid_amount: '0', commission_applied: '0' });
+  const [guestSearch, setGuestSearch] = useState('');
+  const [showGuestDropdown, setShowGuestDropdown] = useState(false);
+  const [editGuestSearch, setEditGuestSearch] = useState('');
+  const [showEditGuestDropdown, setShowEditGuestDropdown] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [expenseReportsOpen, setExpenseReportsOpen] = useState(false);
   const [expenseBulkImportOpen, setExpenseBulkImportOpen] = useState(false);
@@ -439,14 +443,23 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
 
 
   const addBooking = async () => {
-    if (!newBooking.guest_id || !newBooking.unit_id || !newBooking.check_in || !newBooking.check_out) return;
+    let guestId = newBooking.guest_id;
+    // If no guest_id but we have a name, create a new guest
+    if (!guestId && newBooking.guest_name.trim()) {
+      const { data: newGuest, error } = await from('resort_ops_guests').insert({ full_name: newBooking.guest_name.trim() }).select('id').single();
+      if (error || !newGuest) { toast.error('Failed to create guest'); return; }
+      guestId = (newGuest as any).id;
+      qc.invalidateQueries({ queryKey: ['resort-ops-guests'] });
+    }
+    if (!guestId || !newBooking.unit_id || !newBooking.check_in || !newBooking.check_out) { toast.error('Fill in all required fields'); return; }
     await from('resort_ops_bookings').insert({
-      guest_id: newBooking.guest_id, unit_id: newBooking.unit_id, platform: newBooking.platform,
+      guest_id: guestId, unit_id: newBooking.unit_id, platform: newBooking.platform,
       check_in: newBooking.check_in, check_out: newBooking.check_out, adults: parseInt(newBooking.adults) || 1,
       room_rate: parseFloat(newBooking.room_rate) || 0, addons_total: parseFloat(newBooking.addons_total) || 0,
       paid_amount: parseFloat(newBooking.paid_amount) || 0, commission_applied: parseFloat(newBooking.commission_applied) || 0,
     });
-    setNewBooking({ guest_id: '', unit_id: '', platform: '', check_in: '', check_out: '', adults: '1', room_rate: '', addons_total: '0', paid_amount: '0', commission_applied: '0' });
+    setNewBooking({ guest_id: '', guest_name: '', unit_id: '', platform: '', check_in: '', check_out: '', adults: '1', room_rate: '', addons_total: '0', paid_amount: '0', commission_applied: '0' });
+    setGuestSearch('');
     invalidateAll();
     toast.success('Booking added');
   };
@@ -759,10 +772,39 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
                   return (
                     <div key={b.id} className="p-3 rounded border border-primary/50 space-y-2">
                       <div className="grid grid-cols-2 gap-2">
-                        <Select value={editingBooking.guest_id} onValueChange={v => setEditingBooking((p: any) => ({...p, guest_id: v}))}>
-                          <SelectTrigger className={inputCls}><SelectValue placeholder="Guest" /></SelectTrigger>
-                          <SelectContent>{guests.map((g: any) => <SelectItem key={g.id} value={g.id}>{g.full_name}</SelectItem>)}</SelectContent>
-                        </Select>
+                        <div className="relative">
+                          <Input
+                            value={editGuestSearch || (editingBooking.guest_id ? (guestMap.get(editingBooking.guest_id) || '') : '')}
+                            onChange={e => {
+                              const val = e.target.value;
+                              setEditGuestSearch(val);
+                              setEditingBooking((p: any) => ({ ...p, guest_id: '' }));
+                              setShowEditGuestDropdown(val.length >= 1);
+                            }}
+                            onFocus={() => { if ((editGuestSearch || guestMap.get(editingBooking.guest_id) || '').length >= 1) setShowEditGuestDropdown(true); }}
+                            onBlur={() => setTimeout(() => setShowEditGuestDropdown(false), 200)}
+                            placeholder="Guest name *"
+                            className={inputCls}
+                          />
+                          {showEditGuestDropdown && (
+                            <div className="absolute z-50 w-full mt-1 border border-border rounded-lg bg-card shadow-lg max-h-40 overflow-y-auto">
+                              {guests
+                                .filter((g: any) => g.full_name.toLowerCase().includes((editGuestSearch || '').toLowerCase()))
+                                .slice(0, 6)
+                                .map((g: any) => (
+                                  <button key={g.id} type="button" onMouseDown={e => e.preventDefault()}
+                                    onClick={() => {
+                                      setEditingBooking((p: any) => ({ ...p, guest_id: g.id }));
+                                      setEditGuestSearch(g.full_name);
+                                      setShowEditGuestDropdown(false);
+                                    }}
+                                    className="w-full px-3 py-2 text-left hover:bg-secondary transition-colors">
+                                    <p className="font-body text-sm text-foreground">{g.full_name}</p>
+                                  </button>
+                                ))}
+                            </div>
+                          )}
+                        </div>
                         <Select value={editingBooking.unit_id} onValueChange={v => setEditingBooking((p: any) => ({...p, unit_id: v}))}>
                           <SelectTrigger className={inputCls}><SelectValue placeholder="Unit" /></SelectTrigger>
                           <SelectContent>{units.map((u: any) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}</SelectContent>
@@ -810,10 +852,49 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
           {/* Add booking form */}
           <div className="space-y-2 pt-2 border-t border-border">
             <div className="grid grid-cols-2 gap-2">
-              <Select value={newBooking.guest_id} onValueChange={v => setNewBooking(p => ({...p, guest_id: v}))}>
-                <SelectTrigger className={inputCls}><SelectValue placeholder="Guest" /></SelectTrigger>
-                <SelectContent>{guests.map((g: any) => <SelectItem key={g.id} value={g.id}>{g.full_name}</SelectItem>)}</SelectContent>
-              </Select>
+              <div className="relative">
+                <Input
+                  value={guestSearch || (newBooking.guest_id ? (guestMap.get(newBooking.guest_id) || '') : '')}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setGuestSearch(val);
+                    setNewBooking(p => ({ ...p, guest_id: '', guest_name: val }));
+                    setShowGuestDropdown(val.length >= 1);
+                  }}
+                  onFocus={() => { if (guestSearch.length >= 1) setShowGuestDropdown(true); }}
+                  onBlur={() => setTimeout(() => setShowGuestDropdown(false), 200)}
+                  placeholder="Guest name *"
+                  className={inputCls}
+                />
+                {showGuestDropdown && (
+                  <div className="absolute z-50 w-full mt-1 border border-border rounded-lg bg-card shadow-lg max-h-40 overflow-y-auto">
+                    {guests
+                      .filter((g: any) => g.full_name.toLowerCase().includes(guestSearch.toLowerCase()))
+                      .slice(0, 6)
+                      .map((g: any) => (
+                        <button key={g.id} type="button" onMouseDown={e => e.preventDefault()}
+                          onClick={() => {
+                            setNewBooking(p => ({ ...p, guest_id: g.id, guest_name: g.full_name }));
+                            setGuestSearch(g.full_name);
+                            setShowGuestDropdown(false);
+                          }}
+                          className="w-full px-3 py-2 text-left hover:bg-secondary transition-colors">
+                          <p className="font-body text-sm text-foreground">{g.full_name}</p>
+                        </button>
+                      ))}
+                    {guestSearch.trim() && !guests.some((g: any) => g.full_name.toLowerCase() === guestSearch.toLowerCase()) && (
+                      <button type="button" onMouseDown={e => e.preventDefault()}
+                        onClick={() => {
+                          setNewBooking(p => ({ ...p, guest_id: '', guest_name: guestSearch.trim() }));
+                          setShowGuestDropdown(false);
+                        }}
+                        className="w-full px-3 py-2 text-left hover:bg-secondary transition-colors border-t border-border">
+                        <p className="font-body text-xs text-accent">+ Add "{guestSearch.trim()}" as new guest</p>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
               <Select value={newBooking.unit_id} onValueChange={v => setNewBooking(p => ({...p, unit_id: v}))}>
                 <SelectTrigger className={inputCls}><SelectValue placeholder="Unit" /></SelectTrigger>
                 <SelectContent>{units.map((u: any) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}</SelectContent>
