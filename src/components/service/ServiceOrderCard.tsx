@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
 import { Flame, GlassWater, Truck, CreditCard, Clock, CheckCircle2, Home, Receipt, FileText } from 'lucide-react';
 import { useState } from 'react';
-import { canEdit, canManage, canManage } from '@/lib/permissions';
+import { canEdit, canManage } from '@/lib/permissions';
 import { generateInvoicePdf, buildInvoiceWhatsAppText } from '@/lib/generateInvoicePdf';
 import type { ResortProfile } from '@/hooks/useResortProfile';
 

@@ -9,7 +9,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { Home, LogOut } from 'lucide-react';
 import { deductInventoryForOrder } from '@/lib/inventoryDeduction';
-import { canEdit, canManage, canManage } from '@/lib/permissions';
+import { canEdit, canManage } from '@/lib/permissions';
 import { getStaffSession, clearStaffSession } from '@/lib/session';
 
 interface DepartmentOrdersViewProps {
