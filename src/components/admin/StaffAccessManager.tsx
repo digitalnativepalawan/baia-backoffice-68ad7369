@@ -15,9 +15,9 @@ const from = (table: string) => supabase.from(table as any);
 const BUILTIN_ROLE_TEMPLATES: Record<string, string[]> = {
   admin: ['admin'],
   gm: ['admin'],
-  receptionist: ['reception:edit', 'experiences:edit', 'rooms:edit', 'housekeeping:view', 'orders:view', 'documents:view'],
+  receptionist: ['reception:edit', 'experiences:edit', 'rooms:edit', 'housekeeping:view', 'orders:manage', 'documents:view'],
   cook: ['kitchen:edit', 'orders:view', 'inventory:view'],
-  chef: ['kitchen:edit', 'menu:edit', 'orders:edit', 'inventory:edit'],
+  chef: ['kitchen:edit', 'menu:edit', 'orders:manage', 'inventory:edit'],
   bartender: ['bar:edit', 'orders:view', 'inventory:view'],
   tours: ['experiences:edit', 'orders:view'],
   transportation: ['experiences:view', 'tasks:edit'],
