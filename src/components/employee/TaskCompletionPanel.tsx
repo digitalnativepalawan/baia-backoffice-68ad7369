@@ -23,9 +23,10 @@ const TaskCompletionPanel = ({ taskTitle, onConfirm, onCancel }: Props) => {
     if (!file) return;
     setUploading(true);
     try {
-      const ext = file.name.split('.').pop();
+      const compressed = await compressImage(file, 800);
+      const ext = compressed.name.split('.').pop();
       const path = `task-proof/${Date.now()}.${ext}`;
-      const { error } = await supabase.storage.from('receipts').upload(path, file);
+      const { error } = await supabase.storage.from('receipts').upload(path, compressed);
       if (error) throw error;
       const { data: pub } = supabase.storage.from('receipts').getPublicUrl(path);
       setImageUrl(pub.publicUrl);
