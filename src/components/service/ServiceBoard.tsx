@@ -118,28 +118,15 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
         if (deptStatus === 'pending' && (o.status === 'New' || o.status === 'Preparing')) cols.New.push(o);
         else if (deptStatus === 'preparing') cols.Preparing.push(o);
         else if (o.status === 'Served' || o.status === 'Paid') cols.Served.push(o);
-        else if (deptStatus === 'ready') cols.Ready.push(o);
+        else if (deptStatus === 'ready' || o.status === 'Ready') cols.Ready.push(o);
       });
     } else {
+      // Reception: use overall order.status directly
       relevantOrders.forEach(o => {
         if (o.status === 'New') cols.New.push(o);
         else if (o.status === 'Preparing') cols.Preparing.push(o);
-        else if (o.status === 'Served') {
-          const allReady = o.kitchen_status === 'ready' && o.bar_status === 'ready';
-          if (allReady) cols.Ready.push(o);
-          else cols.Preparing.push(o);
-        }
-      });
-      relevantOrders.forEach(o => {
-        if (o.status === 'Preparing' && o.kitchen_status === 'ready' && o.bar_status === 'ready') {
-          cols.Preparing = cols.Preparing.filter(x => x.id !== o.id);
-          cols.Ready.push(o);
-        }
-      });
-      relevantOrders.forEach(o => {
-        if (o.status === 'Served' && !cols.Ready.some(x => x.id === o.id)) {
-          cols.Served.push(o);
-        }
+        else if (o.status === 'Ready') cols.Ready.push(o);
+        else if (o.status === 'Served' || o.status === 'Paid') cols.Served.push(o);
       });
     }
     return cols;
