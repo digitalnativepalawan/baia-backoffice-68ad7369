@@ -1,9 +1,11 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
-import { Flame, GlassWater, Truck, CreditCard, Clock, CheckCircle2, Home, Receipt } from 'lucide-react';
+import { Flame, GlassWater, Truck, CreditCard, Clock, CheckCircle2, Home, Receipt, FileText } from 'lucide-react';
 import { useState } from 'react';
 import { canEdit } from '@/lib/permissions';
+import { generateInvoicePdf, buildInvoiceWhatsAppText } from '@/lib/generateInvoicePdf';
+import type { ResortProfile } from '@/hooks/useResortProfile';
 
 const STATUS_BORDER: Record<string, string> = {
   New: 'border-l-gold',
