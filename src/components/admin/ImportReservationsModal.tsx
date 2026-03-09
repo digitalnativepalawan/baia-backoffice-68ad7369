@@ -146,7 +146,7 @@ const ImportReservationsModal = ({ open, onOpenChange, guests, units, onComplete
           platform: mapPlatform(fields[3] || ''),
           checkIn: checkIn || '',
           checkOut: checkOut || '',
-          totalProjected: fields[6] || '0',
+          pricePerNight: fields[6] || '0',
           paidRealized: fields[7] || '0',
           notes: fields[8] || '',
           errors: [],
