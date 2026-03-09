@@ -313,11 +313,11 @@ const CheckoutModal = ({ open, onOpenChange, unitId, unitName, guestName, bookin
           <Button variant="outline" onClick={() => onOpenChange(false)} className="font-display text-xs tracking-wider">Cancel</Button>
           <Button 
             onClick={handleCheckout} 
-            disabled={submitting || unpaidOrders.length > 0} 
+            disabled={submitting} 
             variant="destructive" 
             className="font-display text-xs tracking-wider"
           >
-            {submitting ? 'Processing...' : unpaidOrders.length > 0 ? 'Settle Orders First' : 'Confirm Checkout'}
+            {submitting ? 'Processing...' : 'Confirm Checkout'}
           </Button>
         </DialogFooter>
       </DialogContent>
