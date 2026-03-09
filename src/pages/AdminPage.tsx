@@ -333,6 +333,17 @@ const AdminPage = () => {
   const [activeStatus, setActiveStatus] = useState('New');
   const [ordersSubView, setOrdersSubView] = useState<'pipeline' | 'tabs'>('pipeline');
   const [selectedTabId, setSelectedTabId] = useState<string | null>(null);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+
+  const deleteAllOrders = async () => {
+    const { error } = await supabase.from('orders').delete().neq('id', '');
+    if (error) { toast.error('Failed to delete orders'); return; }
+    qc.invalidateQueries({ queryKey: ['orders-admin'] });
+    toast.success('All orders deleted');
+    setConfirmDeleteAll(false);
+    const { logAudit } = await import('@/lib/auditLog');
+    logAudit('deleted', 'orders', 'ALL', 'Bulk delete all orders');
+  };
   const filteredOrders = useMemo(() => {
     let filtered = orders;
     const now = new Date();
@@ -535,6 +546,22 @@ const AdminPage = () => {
                       className="text-muted-foreground" title={showClosed ? 'Hide Closed' : 'Show Closed'}>
                       {showClosed ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </Button>
+                    {isAdmin && (
+                      confirmDeleteAll ? (
+                        <Button size="sm" variant="destructive" className="font-body text-xs"
+                          onClick={deleteAllOrders}>
+                          Confirm Delete All?
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="outline" className="font-body text-xs text-destructive border-destructive"
+                          onClick={() => {
+                            setConfirmDeleteAll(true);
+                            setTimeout(() => setConfirmDeleteAll(false), 3000);
+                          }}>
+                          <Trash2 className="w-3 h-3 mr-1" /> Delete All
+                        </Button>
+                      )
+                    )}
                   </div>
 
                   <div className="flex flex-wrap gap-1">
