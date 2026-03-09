@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCart } from '@/lib/cart';
@@ -76,6 +77,9 @@ interface CartDrawerProps {
 
 const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, locationDetail: initialLocation }: CartDrawerProps) => {
   const cart = useCart();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnTo = searchParams.get('returnTo');
   const { data: profile } = useResortProfile();
   const brandName = profile?.resort_name || 'Resort';
   const [paymentType, setPaymentType] = useState('');
@@ -373,8 +377,11 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
               }} className="font-display tracking-wider py-6 w-full">
                 Place Another Order
               </Button>
-              <Button variant="outline" onClick={() => handleClose(false)} className="font-display tracking-wider py-6 w-full">
-                Done
+              <Button variant="outline" onClick={() => {
+                handleClose(false);
+                if (returnTo) navigate(returnTo);
+              }} className="font-display tracking-wider py-6 w-full">
+                {returnTo ? 'Back to Board' : 'Done'}
               </Button>
             </DrawerFooter>
           </>
