@@ -990,15 +990,26 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
 
   // Unpaid F&B orders (not charged to room, status = Served)
   const { data: unpaidOrders = [] } = useQuery({
-    queryKey: ['guest-bill-unpaid-orders', session.room_id],
+    queryKey: ['guest-bill-unpaid-orders', session.room_id, session.room_name],
     queryFn: async () => {
-      const { data } = await supabase
+      // By room_id
+      const { data: byRoom } = await supabase
         .from('orders')
         .select('id, total, guest_name, status, payment_type, created_at')
         .eq('room_id', session.room_id)
         .eq('status', 'Served')
         .neq('payment_type', 'Charge to Room');
-      return data || [];
+      // Fallback: by location_detail where room_id is null
+      const { data: byLocation } = await supabase
+        .from('orders')
+        .select('id, total, guest_name, status, payment_type, created_at')
+        .is('room_id', null)
+        .eq('location_detail', session.room_name)
+        .eq('status', 'Served');
+      // Merge and deduplicate
+      const map = new Map<string, any>();
+      for (const o of [...(byRoom || []), ...(byLocation || [])]) map.set(o.id, o);
+      return Array.from(map.values());
     },
   });
 
@@ -1040,7 +1051,7 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
         event: '*', schema: 'public', table: 'orders',
         filter: `room_id=eq.${session.room_id}`,
       }, () => {
-        qc.invalidateQueries({ queryKey: ['guest-bill-unpaid-orders', session.room_id] });
+        qc.invalidateQueries({ queryKey: ['guest-bill-unpaid-orders', session.room_id, session.room_name] });
       })
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'guest_tours',
