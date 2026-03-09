@@ -1,15 +1,15 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, AlertTriangle, Download, Package, UtensilsCrossed, BarChart3, Calendar, ArrowRightLeft } from 'lucide-react';
+import { Plus, AlertTriangle, Download, Package, UtensilsCrossed, BarChart3, Calendar, ArrowRightLeft, Zap, Clock } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
-import { format, subDays } from 'date-fns';
+import { format, subDays, differenceInDays } from 'date-fns';
 import { Label } from '@/components/ui/label';
 
 const UNITS = ['grams', 'ml', 'pcs', 'kg', 'liters', 'bottles', 'cans', 'slices'];
@@ -22,6 +22,15 @@ const DEPT_LABELS: Record<string, string> = {
   gardens: '🌿 Gardens',
   housekeeping: '🏨 Housekeeping',
 };
+
+const BUFFER_DAYS_DEFAULT = 3;
+
+interface BurnInfo {
+  dailyRate: number;
+  daysRemaining: number | null; // null = no consumption data
+  suggestedThreshold: number;
+  reorderQty: number;
+}
 
 const InventoryDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
   const qc = useQueryClient();
@@ -45,6 +54,20 @@ const InventoryDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
     },
   });
 
+  // Fetch 14 days of consumption for burn rate calculation
+  const { data: burnLogs = [] } = useQuery({
+    queryKey: ['burn-rate-logs'],
+    queryFn: async () => {
+      const since = subDays(new Date(), 14).toISOString();
+      const { data } = await supabase
+        .from('inventory_logs')
+        .select('ingredient_id, change_qty, created_at')
+        .eq('reason', 'order_deduction')
+        .gte('created_at', since);
+      return data || [];
+    },
+  });
+
   const [logDays, setLogDays] = useState(7);
   const { data: consumptionLogs = [] } = useQuery({
     queryKey: ['consumption-logs', logDays],
@@ -59,6 +82,38 @@ const InventoryDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
       return data || [];
     },
   });
+
+  // Calculate burn rates per ingredient from 14-day window
+  const burnMap = useMemo(() => {
+    const map: Record<string, BurnInfo> = {};
+    if (burnLogs.length === 0) return map;
+
+    // Find actual date range of logs
+    const dates = burnLogs.map((l: any) => new Date(l.created_at));
+    const earliest = new Date(Math.min(...dates.map(d => d.getTime())));
+    const now = new Date();
+    const daySpan = Math.max(1, differenceInDays(now, earliest));
+
+    // Aggregate total consumption per ingredient
+    const totals: Record<string, number> = {};
+    burnLogs.forEach((l: any) => {
+      const id = l.ingredient_id;
+      totals[id] = (totals[id] || 0) + Math.abs(l.change_qty);
+    });
+
+    for (const [id, totalUsed] of Object.entries(totals)) {
+      const dailyRate = totalUsed / daySpan;
+      const ing = ingredients.find((i: any) => i.id === id);
+      const currentStock = ing ? (ing as any).current_stock : 0;
+      const daysRemaining = dailyRate > 0 ? currentStock / dailyRate : null;
+      const suggestedThreshold = Math.ceil(dailyRate * BUFFER_DAYS_DEFAULT);
+      const reorderQty = Math.max(0, Math.ceil((BUFFER_DAYS_DEFAULT * dailyRate) - currentStock));
+
+      map[id] = { dailyRate, daysRemaining, suggestedThreshold, reorderQty };
+    }
+
+    return map;
+  }, [burnLogs, ingredients]);
 
   // Build usage map
   const usageMap: Record<string, { dishName: string; quantity: number }[]> = {};
@@ -87,6 +142,9 @@ const InventoryDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
   // Transfer state
   const [showTransfer, setShowTransfer] = useState(false);
   const [transfer, setTransfer] = useState({ fromDept: '' as string, toDept: '' as string, ingredientId: '', quantity: '', reason: '' });
+
+  // Auto-threshold state
+  const [bufferDays, setBufferDays] = useState(BUFFER_DAYS_DEFAULT);
 
   const openNew = () => {
     setEditIng('new');
@@ -142,21 +200,57 @@ const InventoryDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
     toast.success('Ingredient deleted');
   };
 
-  const lowStockItems = deptIngredients.filter((i: any) => i.current_stock < i.low_stock_threshold && i.low_stock_threshold > 0);
+  // Smart low stock: use consumption-based "days remaining" when available, fall back to static threshold
+  const getUrgency = (ing: any): { level: 'critical' | 'warning' | 'ok'; daysLeft: number | null; dailyRate: number } => {
+    const burn = burnMap[ing.id];
+    if (burn && burn.daysRemaining !== null) {
+      if (ing.current_stock <= 0) return { level: 'critical', daysLeft: 0, dailyRate: burn.dailyRate };
+      if (burn.daysRemaining < 2) return { level: 'critical', daysLeft: burn.daysRemaining, dailyRate: burn.dailyRate };
+      if (burn.daysRemaining < 5) return { level: 'warning', daysLeft: burn.daysRemaining, dailyRate: burn.dailyRate };
+      return { level: 'ok', daysLeft: burn.daysRemaining, dailyRate: burn.dailyRate };
+    }
+    // Fallback: static threshold
+    if (ing.current_stock <= 0) return { level: 'critical', daysLeft: null, dailyRate: 0 };
+    if (ing.low_stock_threshold > 0 && ing.current_stock < ing.low_stock_threshold) {
+      return { level: 'warning', daysLeft: null, dailyRate: 0 };
+    }
+    return { level: 'ok', daysLeft: null, dailyRate: 0 };
+  };
+
+  // Build urgency list for alert panel
+  const urgentItems = useMemo(() => {
+    return deptIngredients
+      .map((ing: any) => ({ ing, urgency: getUrgency(ing) }))
+      .filter(({ urgency }) => urgency.level !== 'ok')
+      .sort((a, b) => {
+        // Sort: critical first, then by days remaining (ascending)
+        if (a.urgency.level !== b.urgency.level) return a.urgency.level === 'critical' ? -1 : 1;
+        const aDays = a.urgency.daysLeft ?? 999;
+        const bDays = b.urgency.daysLeft ?? 999;
+        return aDays - bDays;
+      });
+  }, [deptIngredients, burnMap]);
+
+  const lowStockItems = urgentItems;
 
   const filtered = deptIngredients.filter((i: any) => {
     if (search.trim() && !i.name.toLowerCase().includes(search.toLowerCase())) return false;
     if (unitFilter !== 'all' && i.unit !== unitFilter) return false;
-    if (stockFilter === 'low' && !(i.current_stock < i.low_stock_threshold && i.low_stock_threshold > 0)) return false;
+    if (stockFilter === 'low') {
+      const u = getUrgency(i);
+      if (u.level === 'ok') return false;
+    }
     if (stockFilter === 'out' && i.current_stock > 0) return false;
     return true;
   });
 
   const downloadCSV = () => {
-    let csv = 'Name,Department,Unit,Cost Per Unit,Current Stock,Low Stock Threshold,Status\n';
+    let csv = 'Name,Department,Unit,Cost Per Unit,Current Stock,Low Stock Threshold,Daily Burn Rate,Days Remaining,Status\n';
     deptIngredients.forEach((i: any) => {
-      const status = i.current_stock <= i.low_stock_threshold && i.low_stock_threshold > 0 ? 'LOW' : 'OK';
-      csv += `"${i.name}","${i.department || 'kitchen'}","${i.unit}",${i.cost_per_unit},${i.current_stock},${i.low_stock_threshold},${status}\n`;
+      const u = getUrgency(i);
+      const status = u.level === 'critical' ? 'CRITICAL' : u.level === 'warning' ? 'LOW' : 'OK';
+      const daysLeft = u.daysLeft !== null ? u.daysLeft.toFixed(1) : 'N/A';
+      csv += `"${i.name}","${i.department || 'kitchen'}","${i.unit}",${i.cost_per_unit},${i.current_stock},${i.low_stock_threshold},${u.dailyRate.toFixed(2)},${daysLeft},${status}\n`;
     });
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -168,6 +262,32 @@ const InventoryDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
   };
 
   const editIngUsage = editIng && editIng !== 'new' ? (usageMap[editIng.id] || []) : [];
+
+  // Auto-set thresholds based on consumption
+  const autoSetThresholds = async () => {
+    const updates: { id: string; threshold: number }[] = [];
+    for (const ing of deptIngredients as any[]) {
+      const burn = burnMap[ing.id];
+      if (burn && burn.dailyRate > 0) {
+        const newThreshold = Math.ceil(burn.dailyRate * bufferDays);
+        if (newThreshold !== ing.low_stock_threshold) {
+          updates.push({ id: ing.id, threshold: newThreshold });
+        }
+      }
+    }
+
+    if (updates.length === 0) {
+      toast.info('No threshold changes needed — no consumption data for these ingredients');
+      return;
+    }
+
+    for (const u of updates) {
+      await supabase.from('ingredients').update({ low_stock_threshold: u.threshold }).eq('id', u.id);
+    }
+
+    qc.invalidateQueries({ queryKey: ['ingredients'] });
+    toast.success(`Updated thresholds for ${updates.length} ingredients (${bufferDays}-day buffer)`);
+  };
 
   // Filter consumption logs by department
   const filteredLogs = selectedDept === 'all'
@@ -247,6 +367,14 @@ const InventoryDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
     toast.success(`Transferred ${qty} ${(sourceIng as any).unit} of ${(sourceIng as any).name}`);
   };
 
+  // Helper to format days remaining
+  const formatDays = (days: number | null) => {
+    if (days === null) return null;
+    if (days <= 0) return '0d';
+    if (days < 1) return `${Math.round(days * 24)}h`;
+    return `~${Math.round(days)}d`;
+  };
+
   return (
     <div className="space-y-4">
       {/* Department pill selector */}
@@ -302,10 +430,10 @@ const InventoryDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
             </button>
             <button onClick={() => setStockFilter(stockFilter === 'low' ? 'all' : 'low')}
               className={`p-2.5 rounded-lg border text-center transition-colors ${
-                lowStockItems.length > 0 ? 'border-amber-500/40 bg-amber-500/10' : 'border-border bg-secondary/50'
+                urgentItems.length > 0 ? 'border-amber-500/40 bg-amber-500/10' : 'border-border bg-secondary/50'
               }`}>
-              <p className="font-display text-lg text-foreground">{lowStockItems.length}</p>
-              <p className="font-body text-[10px] text-cream-dim">Low Stock</p>
+              <p className="font-display text-lg text-foreground">{urgentItems.length}</p>
+              <p className="font-body text-[10px] text-cream-dim">Needs Attention</p>
             </button>
           </div>
 
@@ -319,20 +447,98 @@ const InventoryDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
             </div>
           )}
 
-          {/* Low stock alerts */}
-          {lowStockItems.length > 0 && stockFilter === 'all' && (
-            <div className="p-3 rounded-lg border border-destructive/40 bg-destructive/10 space-y-1">
-              <div className="flex items-center gap-2 mb-1">
-                <AlertTriangle className="w-4 h-4 text-destructive" />
-                <span className="font-display text-xs tracking-wider text-destructive">
-                  Low Stock Alert{selectedDept !== 'all' ? ` (${DEPT_LABELS[selectedDept]})` : ''}
-                </span>
+          {/* Smart low stock alerts — sorted by urgency */}
+          {urgentItems.length > 0 && stockFilter === 'all' && (
+            <div className="p-3 rounded-lg border border-destructive/40 bg-destructive/5 space-y-2">
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-destructive" />
+                  <span className="font-display text-xs tracking-wider text-destructive">
+                    Reorder Alerts{selectedDept !== 'all' ? ` (${DEPT_LABELS[selectedDept]})` : ''}
+                  </span>
+                </div>
               </div>
-              {lowStockItems.map((i: any) => (
-                <p key={i.id} className="font-body text-xs text-foreground">
-                  {i.name}: {i.current_stock} {i.unit} (threshold: {i.low_stock_threshold})
+              {urgentItems.slice(0, 8).map(({ ing, urgency }) => {
+                const burn = burnMap[ing.id];
+                return (
+                  <div key={ing.id} className={`flex items-center justify-between gap-2 p-2 rounded-md ${
+                    urgency.level === 'critical' ? 'bg-destructive/15' : 'bg-amber-500/10'
+                  }`}>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${
+                          urgency.level === 'critical' ? 'bg-destructive' : 'bg-amber-500'
+                        }`} />
+                        <span className="font-body text-xs text-foreground truncate">{ing.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5 pl-3.5">
+                        <span className="font-body text-[10px] text-cream-dim">
+                          {ing.current_stock} {ing.unit}
+                        </span>
+                        {urgency.dailyRate > 0 && (
+                          <span className="font-body text-[10px] text-cream-dim">
+                            · {urgency.dailyRate.toFixed(1)}/day
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      {urgency.daysLeft !== null ? (
+                        <Badge variant={urgency.level === 'critical' ? 'destructive' : 'outline'}
+                          className={`text-[10px] py-0 ${urgency.level === 'warning' ? 'border-amber-500/50 text-amber-400' : ''}`}>
+                          <Clock className="w-2.5 h-2.5 mr-0.5" />
+                          {formatDays(urgency.daysLeft)} left
+                        </Badge>
+                      ) : (
+                        <Badge variant={urgency.level === 'critical' ? 'destructive' : 'outline'}
+                          className={`text-[10px] py-0 ${urgency.level === 'warning' ? 'border-amber-500/50 text-amber-400' : ''}`}>
+                          {ing.current_stock <= 0 ? 'OUT' : 'LOW'}
+                        </Badge>
+                      )}
+                      {burn && burn.reorderQty > 0 && (
+                        <p className="font-body text-[10px] text-muted-foreground mt-0.5">
+                          Order: {burn.reorderQty} {ing.unit}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              {urgentItems.length > 8 && (
+                <p className="font-body text-[10px] text-cream-dim text-center">
+                  +{urgentItems.length - 8} more — tap "Needs Attention" to see all
                 </p>
-              ))}
+              )}
+            </div>
+          )}
+
+          {/* Auto-threshold tool */}
+          {!readOnly && (
+            <div className="p-3 rounded-lg border border-border bg-secondary/30 space-y-2">
+              <div className="flex items-center gap-2">
+                <Zap className="w-3.5 h-3.5 text-primary" />
+                <span className="font-display text-xs tracking-wider text-foreground">Auto-Set Thresholds</span>
+              </div>
+              <p className="font-body text-[10px] text-cream-dim">
+                Set low-stock thresholds based on actual consumption. Buffer = days of stock to keep.
+              </p>
+              <div className="flex items-center gap-2">
+                <div className="flex gap-1">
+                  {[2, 3, 5, 7].map(d => (
+                    <button key={d} onClick={() => setBufferDays(d)}
+                      className={`px-2.5 py-1.5 rounded-md font-body text-xs border transition-colors ${
+                        bufferDays === d
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-secondary text-foreground border-border hover:bg-accent'
+                      }`}>
+                      {d}d
+                    </button>
+                  ))}
+                </div>
+                <Button size="sm" onClick={autoSetThresholds} variant="outline" className="font-body text-xs ml-auto">
+                  <Zap className="w-3 h-3 mr-1" /> Apply
+                </Button>
+              </div>
             </div>
           )}
 
@@ -372,15 +578,18 @@ const InventoryDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
 
           {/* Ingredients list */}
           {filtered.map((ing: any) => {
-            const isLow = ing.current_stock < ing.low_stock_threshold && ing.low_stock_threshold > 0;
+            const urgency = getUrgency(ing);
             const isOut = ing.current_stock <= 0;
             const noCost = ing.cost_per_unit === 0;
             const dishCount = (usageMap[ing.id] || []).length;
+            const burn = burnMap[ing.id];
+            const daysLabel = formatDays(urgency.daysLeft);
             return (
               <button key={ing.id} onClick={() => openEdit(ing)}
                 className={`w-full text-left p-3 border rounded-lg transition-colors ${
                   isOut ? 'border-destructive/60 bg-destructive/10' :
-                  isLow ? 'border-destructive/40 bg-destructive/5' : 'border-border hover:border-gold/50'
+                  urgency.level === 'critical' ? 'border-destructive/40 bg-destructive/5' :
+                  urgency.level === 'warning' ? 'border-amber-500/30 bg-amber-500/5' : 'border-border hover:border-gold/50'
                 }`}>
                 <div className="flex justify-between items-start">
                   <div>
@@ -388,7 +597,8 @@ const InventoryDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
                       <Package className="w-3.5 h-3.5 text-cream-dim" />
                       <p className="font-display text-sm text-foreground">{ing.name}</p>
                       {isOut && <Badge variant="destructive" className="text-[10px] py-0">OUT</Badge>}
-                      {isLow && !isOut && <Badge variant="destructive" className="text-[10px] py-0">LOW</Badge>}
+                      {urgency.level === 'critical' && !isOut && <Badge variant="destructive" className="text-[10px] py-0">CRITICAL</Badge>}
+                      {urgency.level === 'warning' && <Badge variant="outline" className="text-[10px] py-0 border-amber-500/50 text-amber-400">LOW</Badge>}
                       {noCost && <Badge variant="outline" className="text-[10px] py-0 border-amber-500/50 text-amber-400">No Cost</Badge>}
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
@@ -413,6 +623,14 @@ const InventoryDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
                   <div className="text-right">
                     <p className={`font-display text-sm ${isOut ? 'text-destructive' : 'text-foreground'}`}>{ing.current_stock}</p>
                     <p className="font-body text-[10px] text-cream-dim">{ing.unit}</p>
+                    {daysLabel && (
+                      <p className={`font-body text-[10px] mt-0.5 ${
+                        urgency.level === 'critical' ? 'text-destructive' :
+                        urgency.level === 'warning' ? 'text-amber-400' : 'text-muted-foreground'
+                      }`}>
+                        {daysLabel} left
+                      </p>
+                    )}
                   </div>
                 </div>
               </button>
@@ -521,6 +739,31 @@ const InventoryDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
                   type="number" className="bg-secondary border-border text-foreground font-body mt-1" />
               </div>
             </div>
+
+            {/* Burn rate info in edit dialog */}
+            {editIng && editIng !== 'new' && burnMap[editIng.id] && (
+              <div className="p-2.5 rounded-lg border border-border bg-secondary/30 space-y-1">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="w-3.5 h-3.5 text-primary" />
+                  <span className="font-display text-xs tracking-wider text-foreground">Consumption Stats</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-center">
+                  <div>
+                    <p className="font-display text-sm text-foreground">{burnMap[editIng.id].dailyRate.toFixed(1)}</p>
+                    <p className="font-body text-[10px] text-cream-dim">{editIng.unit}/day</p>
+                  </div>
+                  <div>
+                    <p className="font-display text-sm text-foreground">
+                      {burnMap[editIng.id].daysRemaining !== null ? formatDays(burnMap[editIng.id].daysRemaining) : '—'}
+                    </p>
+                    <p className="font-body text-[10px] text-cream-dim">remaining</p>
+                  </div>
+                </div>
+                <p className="font-body text-[10px] text-cream-dim">
+                  Suggested threshold ({bufferDays}d buffer): <strong className="text-foreground">{burnMap[editIng.id].suggestedThreshold} {editIng.unit}</strong>
+                </p>
+              </div>
+            )}
 
             {/* Used in dishes section */}
             {editIngUsage.length > 0 && (
