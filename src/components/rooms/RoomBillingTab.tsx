@@ -33,18 +33,18 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
   const [showAdjustment, setShowAdjustment] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
 
-  // ── Unpaid F&B orders for this room ──
-  const { data: unpaidOrders = [] } = useQuery({
-    queryKey: ['billing-unpaid-orders', unit?.id, unit?.name, booking?.id],
+  // ── ALL F&B orders for this room (including Paid) ──
+  const { data: roomOrders = [] } = useQuery({
+    queryKey: ['billing-room-orders', unit?.id, unit?.name, booking?.id],
     enabled: !!unit,
     refetchInterval: 10000,
     queryFn: async () => {
       const { data: byRoom } = await supabase.from('orders').select('*')
-        .eq('room_id', unit.id).in('status', ['New', 'Preparing', 'Ready', 'Served'])
+        .eq('room_id', unit.id).in('status', ['New', 'Preparing', 'Ready', 'Served', 'Paid'])
         .order('created_at', { ascending: false });
       const { data: byLocation } = await supabase.from('orders').select('*')
         .is('room_id', null).eq('location_detail', unit.name)
-        .in('status', ['New', 'Preparing', 'Ready', 'Served'])
+        .in('status', ['New', 'Preparing', 'Ready', 'Served', 'Paid'])
         .order('created_at', { ascending: false });
       const map = new Map<string, any>();
       for (const o of [...(byRoom || []), ...(byLocation || [])]) map.set(o.id, o);
@@ -60,6 +60,9 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
       return results;
     },
   });
+
+  const unpaidOrders = roomOrders.filter(o => o.status !== 'Paid');
+  const paidOrders = roomOrders.filter(o => o.status === 'Paid');
 
   // ── Realtime subscription for orders ──
   useEffect(() => {
