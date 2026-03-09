@@ -77,6 +77,9 @@ interface CartDrawerProps {
 
 const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, locationDetail: initialLocation }: CartDrawerProps) => {
   const cart = useCart();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnTo = searchParams.get('returnTo');
   const { data: profile } = useResortProfile();
   const brandName = profile?.resort_name || 'Resort';
   const [paymentType, setPaymentType] = useState('');
