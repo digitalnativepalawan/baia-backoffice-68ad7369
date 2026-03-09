@@ -25,14 +25,12 @@ const EmployeePortal = () => {
     const stored = localStorage.getItem('emp_id');
     if (stored) return stored;
     try {
-      const staffSession = sessionStorage.getItem('staff_home_session');
+      const { getStaffSession } = require('@/lib/session');
+      const staffSession = getStaffSession();
       if (staffSession) {
-        const s = JSON.parse(staffSession);
-        if (s.expiresAt > Date.now()) {
-          localStorage.setItem('emp_id', s.employeeId);
-          localStorage.setItem('emp_name', s.name);
-          return s.employeeId;
-        }
+        localStorage.setItem('emp_id', staffSession.employeeId);
+        localStorage.setItem('emp_name', staffSession.name);
+        return staffSession.employeeId;
       }
     } catch {}
     return null;

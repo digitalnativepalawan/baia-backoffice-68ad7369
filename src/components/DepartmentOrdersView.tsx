@@ -200,9 +200,7 @@ const DepartmentOrdersView = ({ department, embedded = false }: DepartmentOrders
   };
 
   const handleLogout = () => {
-    sessionStorage.removeItem('staff_home_session');
-    localStorage.removeItem('emp_id');
-    localStorage.removeItem('emp_name');
+    clearStaffSession();
     navigate('/');
   };
 

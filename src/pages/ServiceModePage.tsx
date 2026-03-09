@@ -44,11 +44,8 @@ const ServiceModePage = () => {
 
   // Get staff name from session
   const staffName = useMemo(() => {
-    try {
-      const raw = sessionStorage.getItem('staff_home_session');
-      if (raw) return JSON.parse(raw).name || '';
-    } catch {}
-    return '';
+    const s = getStaffSession();
+    return s?.name || '';
   }, []);
 
   // Fetch today's active orders for live counts
