@@ -949,13 +949,22 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
   const qc = useQueryClient();
 
   const { data: transactions = [] } = useQuery({
-    queryKey: ['guest-bill', session.booking_id],
+    queryKey: ['guest-bill', session.booking_id, session.room_id],
     queryFn: async () => {
-      const { data } = await (supabase.from('room_transactions') as any)
+      // Fetch by booking_id OR by unit_id (for transactions missing booking_id)
+      const { data: byBooking } = await (supabase.from('room_transactions') as any)
         .select('*')
         .eq('booking_id', session.booking_id)
         .order('created_at', { ascending: false });
-      return data || [];
+      const { data: byUnit } = await (supabase.from('room_transactions') as any)
+        .select('*')
+        .eq('unit_id', session.room_id)
+        .is('booking_id', null)
+        .order('created_at', { ascending: false });
+      const all = [...(byBooking || []), ...(byUnit || [])];
+      // Deduplicate by id
+      const seen = new Set<string>();
+      return all.filter((t: any) => { if (seen.has(t.id)) return false; seen.add(t.id); return true; });
     },
   });
 
@@ -1005,7 +1014,7 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
         event: '*', schema: 'public', table: 'room_transactions',
         filter: `booking_id=eq.${session.booking_id}`,
       }, () => {
-        qc.invalidateQueries({ queryKey: ['guest-bill', session.booking_id] });
+        qc.invalidateQueries({ queryKey: ['guest-bill', session.booking_id, session.room_id] });
       })
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'orders',
