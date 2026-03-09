@@ -218,7 +218,7 @@ const ImportReservationsModal = ({ open, onOpenChange, guests, units, onComplete
             check_in: row.checkIn,
             check_out: row.checkOut,
             adults: parseInt(row.guestCount) || 1,
-            room_rate: splitRate,
+            room_rate: nightlyRate,
             paid_amount: splitPaid,
           });
           if (bErr) { errors.push(`Row ${row.idx}: ${bErr.message}`); }
