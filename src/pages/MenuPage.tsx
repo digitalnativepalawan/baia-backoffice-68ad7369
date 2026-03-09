@@ -30,6 +30,7 @@ const MenuPage = () => {
   const mode = searchParams.get('mode') || 'guest';
   const orderType = searchParams.get('orderType') || '';
   const location = searchParams.get('location') || '';
+  const initialGuestName = searchParams.get('guestName') || '';
   const isStaff = mode === 'staff';
   const isGuestOrder = mode === 'guest-order';
   const isBrowseOnly = mode === 'guest';

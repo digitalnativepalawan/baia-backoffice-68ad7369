@@ -130,8 +130,8 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
   const vatAmount = Math.round(subtotal * (vatRate / 100));
   const grandTotal = subtotal + serviceCharge + vatAmount;
 
-  // Guest name for room orders
-  const [guestName, setGuestName] = useState('');
+  // Guest name for orders
+  const [guestName, setGuestName] = useState(initialGuestName);
 
   // Fetch order types for guest selection
   const { data: orderTypes = [] } = useQuery({
