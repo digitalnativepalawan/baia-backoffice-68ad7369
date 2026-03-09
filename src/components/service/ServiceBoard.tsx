@@ -22,6 +22,7 @@ interface ServiceBoardProps {
 
 const ServiceBoard = ({ department }: ServiceBoardProps) => {
   const qc = useQueryClient();
+  const { data: resortProfile } = useResortProfile();
   const audioCtxRef = useRef<AudioContext | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [detailOrder, setDetailOrder] = useState<any | null>(null);
