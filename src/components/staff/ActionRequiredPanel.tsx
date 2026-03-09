@@ -88,6 +88,7 @@ const ActionRequiredPanel = () => {
       } catch {}
 
       const empId = localStorage.getItem('emp_id');
+      setCurrentEmpId(empId);
       const perms: string[] = session?.permissions || [];
       const isAdmin = perms.includes('admin');
 
