@@ -765,7 +765,7 @@ const OrdersView = ({ session }: { session: GuestPortalSession }) => {
                 </div>
               </div>
               {/* Department-level status badges */}
-              {(order.status === 'New' || order.status === 'Preparing' || order.status === 'Served') && (
+              {(order.status === 'New' || order.status === 'Preparing' || order.status === 'Ready') && (
                 <div className="flex flex-wrap gap-1.5">
                   {hasKitchenItems && (
                     <span className={`font-body text-[11px] px-2 py-0.5 rounded-full border ${
