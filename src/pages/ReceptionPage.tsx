@@ -18,7 +18,7 @@ import HousekeeperPickerModal from '@/components/rooms/HousekeeperPickerModal';
 import PasswordConfirmModal from '@/components/housekeeping/PasswordConfirmModal';
 import HousekeepingInspection from '@/components/admin/HousekeepingInspection';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { usePaymentMethods } from '@/hooks/usePaymentMethods';
 import { useRoomTransactions } from '@/hooks/useRoomTransactions';
 import { canEdit, canManage, hasAccess } from '@/lib/permissions';
