@@ -113,7 +113,7 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
   const handleCompOrder = async (orderId: string) => {
     await supabase.from('orders').update({ status: 'Paid', payment_type: 'Comp' }).eq('id', orderId);
     await logAudit('updated', 'orders', orderId, `Comped order by ${staffName}`);
-    qc.invalidateQueries({ queryKey: ['billing-unpaid-orders'] });
+    qc.invalidateQueries({ queryKey: ['billing-room-orders'] });
     toast.success('Order comped');
   };
 
