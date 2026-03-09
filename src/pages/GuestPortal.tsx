@@ -711,15 +711,25 @@ const OrdersView = ({ session }: { session: GuestPortalSession }) => {
   const qc = useQueryClient();
 
   const { data: orders = [] } = useQuery({
-    queryKey: ['guest-orders', session.room_id],
+    queryKey: ['guest-orders', session.room_id, session.room_name],
     queryFn: async () => {
-      // Show all orders during the stay, not just today
-      const { data } = await supabase
+      // Primary: orders linked by room_id
+      const { data: byRoom } = await supabase
         .from('orders')
         .select('*')
         .eq('room_id', session.room_id)
         .order('created_at', { ascending: false });
-      return data || [];
+      // Fallback: orders where room_id is null but location_detail matches room name
+      const { data: byLocation } = await supabase
+        .from('orders')
+        .select('*')
+        .is('room_id', null)
+        .eq('location_detail', session.room_name)
+        .order('created_at', { ascending: false });
+      // Merge and deduplicate
+      const map = new Map<string, any>();
+      for (const o of [...(byRoom || []), ...(byLocation || [])]) map.set(o.id, o);
+      return Array.from(map.values()).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     },
   });
 
