@@ -585,12 +585,7 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
     }
   };
 
-  // ── SEND TO CLEAN (with housekeeper picker) ──
-  const handleSendToCleanWithPicker = (unit: any) => {
-    setHkTargetUnit(unit);
-    setHkPickerOpen(true);
-  };
-
+  // ── SEND TO CLEAN (broadcast to all housekeepers) ──
   const handleSendToClean = async (unit: any, assignedTo?: string, assignedName?: string) => {
     setSendingClean(unit.id);
     try {
@@ -615,21 +610,11 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
         }).eq('id', existing.id);
       }
 
-      // Send WhatsApp notification to assigned housekeeper
-      if (assignedTo) {
-        const hkEmp = hkEmployeesForCheckout.find((e: any) => e.id === assignedTo);
-        if (hkEmp?.whatsapp_number) {
-          const { openWhatsApp } = await import('@/lib/messenger');
-          const msg = `🧹 *Room ${unit.name} needs cleaning*\n\nAssigned to you by ${staffName}.\n\nPlease start when ready.`;
-          openWhatsApp(hkEmp.whatsapp_number, msg);
-        }
-      }
-
-      await logAudit('updated', 'units', unit.id, `Sent ${unit.name} to clean${assignedName ? ` (assigned: ${assignedName})` : ''}`);
+      await logAudit('updated', 'units', unit.id, `Sent ${unit.name} to clean${assignedName ? ` (assigned: ${assignedName})` : ' (broadcast)'}`);
       qc.invalidateQueries({ queryKey: ['rooms-units'] });
       qc.invalidateQueries({ queryKey: ['housekeeping-orders'] });
       qc.invalidateQueries({ queryKey: ['housekeeping-orders-all'] });
-      toast.success(`${unit.name} assigned to ${assignedName || 'housekeeping'}`);
+      toast.success(`${unit.name} sent to housekeeping${assignedName ? ` (${assignedName})` : ''}`);
     } catch {
       toast.error('Failed to send to clean');
     } finally {
