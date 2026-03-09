@@ -72,7 +72,7 @@ const CheckoutModal = ({ open, onOpenChange, unitId, unitName, guestName, bookin
   const payments = transactions.filter(t => t.total_amount < 0);
   const totalCharges = charges.reduce((s, t) => s + t.total_amount, 0);
   const totalPayments = Math.abs(payments.reduce((s, t) => s + t.total_amount, 0));
-  const balance = totalCharges - totalPayments;
+  const balance = totalCharges - totalPayments + unpaidTotal;
 
   const nights = booking ? Math.max(1, Math.ceil((new Date(booking.check_out).getTime() - new Date(booking.check_in).getTime()) / 86400000)) : 0;
   const roomRate = booking ? Number(booking.room_rate) : 0;
