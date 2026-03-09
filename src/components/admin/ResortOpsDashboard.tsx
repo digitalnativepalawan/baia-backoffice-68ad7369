@@ -823,10 +823,49 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
           {/* Add booking form */}
           <div className="space-y-2 pt-2 border-t border-border">
             <div className="grid grid-cols-2 gap-2">
-              <Select value={newBooking.guest_id} onValueChange={v => setNewBooking(p => ({...p, guest_id: v}))}>
-                <SelectTrigger className={inputCls}><SelectValue placeholder="Guest" /></SelectTrigger>
-                <SelectContent>{guests.map((g: any) => <SelectItem key={g.id} value={g.id}>{g.full_name}</SelectItem>)}</SelectContent>
-              </Select>
+              <div className="relative">
+                <Input
+                  value={guestSearch || (newBooking.guest_id ? (guestMap.get(newBooking.guest_id) || '') : '')}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setGuestSearch(val);
+                    setNewBooking(p => ({ ...p, guest_id: '', guest_name: val }));
+                    setShowGuestDropdown(val.length >= 1);
+                  }}
+                  onFocus={() => { if (guestSearch.length >= 1) setShowGuestDropdown(true); }}
+                  onBlur={() => setTimeout(() => setShowGuestDropdown(false), 200)}
+                  placeholder="Guest name *"
+                  className={inputCls}
+                />
+                {showGuestDropdown && (
+                  <div className="absolute z-50 w-full mt-1 border border-border rounded-lg bg-card shadow-lg max-h-40 overflow-y-auto">
+                    {guests
+                      .filter((g: any) => g.full_name.toLowerCase().includes(guestSearch.toLowerCase()))
+                      .slice(0, 6)
+                      .map((g: any) => (
+                        <button key={g.id} type="button" onMouseDown={e => e.preventDefault()}
+                          onClick={() => {
+                            setNewBooking(p => ({ ...p, guest_id: g.id, guest_name: g.full_name }));
+                            setGuestSearch(g.full_name);
+                            setShowGuestDropdown(false);
+                          }}
+                          className="w-full px-3 py-2 text-left hover:bg-secondary transition-colors">
+                          <p className="font-body text-sm text-foreground">{g.full_name}</p>
+                        </button>
+                      ))}
+                    {guestSearch.trim() && !guests.some((g: any) => g.full_name.toLowerCase() === guestSearch.toLowerCase()) && (
+                      <button type="button" onMouseDown={e => e.preventDefault()}
+                        onClick={() => {
+                          setNewBooking(p => ({ ...p, guest_id: '', guest_name: guestSearch.trim() }));
+                          setShowGuestDropdown(false);
+                        }}
+                        className="w-full px-3 py-2 text-left hover:bg-secondary transition-colors border-t border-border">
+                        <p className="font-body text-xs text-accent">+ Add "{guestSearch.trim()}" as new guest</p>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
               <Select value={newBooking.unit_id} onValueChange={v => setNewBooking(p => ({...p, unit_id: v}))}>
                 <SelectTrigger className={inputCls}><SelectValue placeholder="Unit" /></SelectTrigger>
                 <SelectContent>{units.map((u: any) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}</SelectContent>
