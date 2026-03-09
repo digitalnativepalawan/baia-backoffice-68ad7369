@@ -25,15 +25,12 @@ const EmployeePortal = () => {
   const [empId, setEmpId] = useState<string | null>(() => {
     const stored = localStorage.getItem('emp_id');
     if (stored) return stored;
-    try {
-      const { getStaffSession } = require('@/lib/session');
-      const staffSession = getStaffSession();
-      if (staffSession) {
-        localStorage.setItem('emp_id', staffSession.employeeId);
-        localStorage.setItem('emp_name', staffSession.name);
-        return staffSession.employeeId;
-      }
-    } catch {}
+    const staffSession = getStaffSession();
+    if (staffSession) {
+      localStorage.setItem('emp_id', staffSession.employeeId);
+      localStorage.setItem('emp_name', staffSession.name);
+      return staffSession.employeeId;
+    }
     return null;
   });
   const [empName, setEmpName] = useState<string>(() => localStorage.getItem('emp_name') || '');
