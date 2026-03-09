@@ -273,7 +273,7 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
         </div>
 
         {/* Mobile: tabbed view */}
-        <MobileTabView columns={columns} department={department} permissions={permissions} onAction={handleAction} onOpenDetail={setDetailOrder} />
+        <MobileTabView columns={columns} department={department} permissions={permissions} onAction={handleAction} onOpenDetail={setDetailOrder} resortProfile={resortProfile} />
       </div>
 
       {/* Detail drawer */}
