@@ -20,7 +20,7 @@ const StaffOrdersView = () => {
   const session = getStaffSession();
   const perms = session?.permissions || [];
   const isAdmin = !!session?.isAdmin;
-  const canPipeline = isAdmin || canManage(perms, 'orders') || canEdit(perms, 'kitchen') || canEdit(perms, 'bar');
+  const canPipeline = isAdmin || canEdit(perms, 'orders');
   const audioCtxRef = useRef<AudioContext | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
