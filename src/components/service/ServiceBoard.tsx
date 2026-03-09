@@ -177,7 +177,7 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
         const d = i.department || 'kitchen';
         return d === 'kitchen' || d === 'both';
       });
-      if (items.length > 0) await deductInventoryForOrder(orderId, items);
+      if (items.length > 0) await deductInventoryForOrder(orderId, items, 'kitchen');
     } else if (action === 'kitchen-ready') {
       updateData.kitchen_status = 'ready';
       const barItems = ((order.items as any[]) || []).some((i: any) => i.department === 'bar' || i.department === 'both');
@@ -191,7 +191,7 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
         const d = i.department || 'kitchen';
         return d === 'bar' || d === 'both';
       });
-      if (items.length > 0) await deductInventoryForOrder(orderId, items);
+      if (items.length > 0) await deductInventoryForOrder(orderId, items, 'bar');
     } else if (action === 'bar-ready') {
       updateData.bar_status = 'ready';
       const kitchenItems = ((order.items as any[]) || []).some((i: any) => {
