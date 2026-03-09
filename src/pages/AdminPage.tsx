@@ -336,13 +336,19 @@ const AdminPage = () => {
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
 
   const deleteAllOrders = async () => {
-    const { error } = await supabase.from('orders').delete().neq('id', '');
-    if (error) { toast.error('Failed to delete orders'); return; }
+    // Delete all orders (use gte on created_at to avoid UUID type mismatch)
+    const { error: ordErr } = await supabase.from('orders').delete().gte('created_at', '1970-01-01');
+    // Delete all tabs
+    const { error: tabErr } = await supabase.from('tabs').delete().gte('created_at', '1970-01-01');
+    if (ordErr && tabErr) { toast.error('Failed to delete orders & tabs'); return; }
+    if (ordErr) { toast.error('Orders failed but tabs deleted'); }
+    if (tabErr) { toast.error('Tabs failed but orders deleted'); }
     qc.invalidateQueries({ queryKey: ['orders-admin'] });
-    toast.success('All orders deleted');
+    qc.invalidateQueries({ queryKey: ['tabs-admin'] });
     setConfirmDeleteAll(false);
+    if (!ordErr && !tabErr) toast.success('All orders & tabs deleted');
     const { logAudit } = await import('@/lib/auditLog');
-    logAudit('deleted', 'orders', 'ALL', 'Bulk delete all orders');
+    logAudit('deleted', 'orders', 'ALL', 'Bulk delete all orders and tabs');
   };
   const filteredOrders = useMemo(() => {
     let filtered = orders;
