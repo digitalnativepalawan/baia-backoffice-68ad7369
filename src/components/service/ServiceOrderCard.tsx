@@ -187,6 +187,20 @@ const ServiceOrderCard = ({ order, department, permissions, onAction, onOpenDeta
               {isRoomCharge ? 'Charged to room' : 'On tab'}
             </span>
           )}
+          {/* Invoice button for walk-in/dine-in */}
+          {showInvoice && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                generateInvoicePdf(order, resortProfile || null);
+              }}
+              className="font-body text-xs gap-1 min-h-[36px] rounded-lg border-border/60"
+            >
+              <FileText className="w-4 h-4" /> Invoice
+            </Button>
+          )}
         </div>
 
         {/* Secondary cross-dept actions */}
