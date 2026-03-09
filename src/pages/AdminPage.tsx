@@ -546,6 +546,22 @@ const AdminPage = () => {
                       className="text-muted-foreground" title={showClosed ? 'Hide Closed' : 'Show Closed'}>
                       {showClosed ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </Button>
+                    {isAdmin && (
+                      confirmDeleteAll ? (
+                        <Button size="sm" variant="destructive" className="font-body text-xs"
+                          onClick={deleteAllOrders}>
+                          Confirm Delete All?
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="outline" className="font-body text-xs text-destructive border-destructive"
+                          onClick={() => {
+                            setConfirmDeleteAll(true);
+                            setTimeout(() => setConfirmDeleteAll(false), 3000);
+                          }}>
+                          <Trash2 className="w-3 h-3 mr-1" /> Delete All
+                        </Button>
+                      )
+                    )}
                   </div>
 
                   <div className="flex flex-wrap gap-1">
