@@ -120,7 +120,7 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
   const handleDeleteOrder = async (orderId: string) => {
     await supabase.from('orders').delete().eq('id', orderId);
     await logAudit('deleted', 'orders', orderId, `Deleted order by ${staffName}`);
-    qc.invalidateQueries({ queryKey: ['billing-unpaid-orders'] });
+    qc.invalidateQueries({ queryKey: ['billing-room-orders'] });
     toast.success('Order deleted');
   };
 
