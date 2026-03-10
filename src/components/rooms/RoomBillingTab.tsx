@@ -256,11 +256,45 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
     }
   };
 
-  if (isLoading) return <p className="font-body text-sm text-muted-foreground text-center py-8">Loading...</p>;
+  // ── Bill disputes ──
+  const { data: disputes = [] } = useQuery({
+    queryKey: ['billing-disputes', booking?.id],
+    enabled: !!booking?.id,
+    queryFn: async () => {
+      const { data } = await from('bill_disputes').select('*')
+        .eq('booking_id', booking.id).order('created_at', { ascending: false });
+      return data || [];
+    },
+  });
+  const [disputeResponse, setDisputeResponse] = useState('');
+  const [respondingDisputeId, setRespondingDisputeId] = useState<string | null>(null);
 
-  return (
-    <div className="space-y-4">
-      {/* ═══ Balance Header ═══ */}
+  const handleResolveDispute = async (disputeId: string, newStatus: 'resolved' | 'dismissed') => {
+    await from('bill_disputes').update({
+      staff_response: disputeResponse.trim(),
+      responded_by: staffName,
+      status: newStatus,
+      resolved_at: new Date().toISOString(),
+    }).eq('id', disputeId);
+    await logAudit('updated', 'bill_disputes', disputeId, `${newStatus} dispute — response: ${disputeResponse.trim()} by ${staffName}`);
+    qc.invalidateQueries({ queryKey: ['billing-disputes', booking?.id] });
+    setRespondingDisputeId(null);
+    setDisputeResponse('');
+    toast.success(`Dispute ${newStatus}`);
+  };
+
+  // Realtime for disputes
+  useEffect(() => {
+    if (!booking?.id) return;
+    const channel = supabase.channel(`billing-disputes-${booking.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bill_disputes', filter: `booking_id=eq.${booking.id}` }, () => {
+        qc.invalidateQueries({ queryKey: ['billing-disputes', booking.id] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [booking?.id]);
+
+  if (isLoading) return <p className="font-body text-sm text-muted-foreground text-center py-8">Loading...</p>;
       <div className="border border-border rounded-lg p-4 bg-secondary space-y-2">
         <div className="flex items-center justify-between">
           <div>

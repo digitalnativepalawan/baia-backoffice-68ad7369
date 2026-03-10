@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { LogOut, UtensilsCrossed, MapPin, Car, Bike, MessageSquare, Star, Receipt, ArrowLeft, ChevronRight, ClipboardList, Calendar, Clock, Users, StickyNote, CheckCircle2, Utensils, Palmtree, Truck, CreditCard, FileText, Loader2, ConciergeBell } from 'lucide-react';
+import { LogOut, UtensilsCrossed, MapPin, Car, Bike, MessageSquare, Star, Receipt, ArrowLeft, ChevronRight, ClipboardList, Calendar, Clock, Users, StickyNote, CheckCircle2, Utensils, Palmtree, Truck, CreditCard, FileText, Loader2, ConciergeBell, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { setGuestSession } from '@/hooks/useGuestSession';
 
