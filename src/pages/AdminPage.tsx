@@ -44,8 +44,18 @@ import { usePermissions } from '@/hooks/usePermissions';
 
 import { formatDistanceToNow } from 'date-fns';
 import { useResortProfile } from '@/hooks/useResortProfile';
+import { useDepartmentAlerts } from '@/hooks/useDepartmentAlerts';
 
 type DateFilter = 'today' | 'yesterday' | 'all';
+
+const ALERT_KEY_MAP: Record<string, string> = {
+  rooms: 'reception',
+  orders: 'orders',
+  'guest-services': 'experiences',
+  kitchen: 'kitchen',
+  bar: 'bar',
+  housekeeping: 'housekeeping',
+};
 
 
 // ── Tab / section definitions ────────────────────────────────────
