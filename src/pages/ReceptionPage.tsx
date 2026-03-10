@@ -119,8 +119,8 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
   const [hkPickerOpen, setHkPickerOpen] = useState(false);
   const [hkTargetUnit, setHkTargetUnit] = useState<any>(null);
 
-  // View Bill state
-  const [billUnitId, setBillUnitId] = useState<string | null>(null);
+  // Expanded order IDs for Recent Room Orders
+  const [expandedOrderIds, setExpandedOrderIds] = useState<Set<string>>(new Set());
 
   // Send to clean loading
   const [sendingClean, setSendingClean] = useState<string | null>(null);
