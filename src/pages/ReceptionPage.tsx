@@ -980,9 +980,37 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
       {readyUnits.length > 0 && (
         <div className="mb-6 space-y-2">
           <div className="flex justify-between items-center">
-            <h2 className="font-display text-xs tracking-wider text-foreground uppercase">Walk-In / Sell Room</h2>
+            <h2 className="font-display text-xs tracking-wider text-foreground uppercase">Walk-In / Sell Room ({trulyAvailableUnits.length} available)</h2>
           </div>
-          {readyUnits.map((unit: any) => {
+
+          {/* Reserved today — protected rooms */}
+          {reservedTodayUnits.map((unit: any) => {
+            const arrivalBooking = getTodayArrivalBooking(unit);
+            const arrGuest = (arrivalBooking as any)?.resort_ops_guests;
+            return (
+              <div key={unit.id} className="border border-amber-500/30 bg-amber-500/5 rounded-lg p-3 flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <BedDouble className="w-4 h-4 text-amber-400" />
+                  <div>
+                    <p className="font-display text-sm text-foreground tracking-wider">{unit.name}</p>
+                    <p className="font-body text-xs text-amber-400">🔒 Reserved for {arrGuest?.full_name || 'Guest'} at 2:00 PM</p>
+                  </div>
+                </div>
+                {canDoManage && (
+                  <Button size="sm" variant="outline" onClick={() => {
+                    setOverrideUnit(unit);
+                    setOverrideReason('');
+                    setOverrideOpen(true);
+                  }} className="font-display text-[10px] tracking-wider min-h-[44px] border-amber-500/40 text-amber-400 hover:bg-amber-500/10">
+                    <AlertTriangle className="w-3 h-3 mr-1" /> Override
+                  </Button>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Truly available rooms */}
+          {trulyAvailableUnits.map((unit: any) => {
             const upcoming = getUpcomingBooking(unit);
             const upGuest = (upcoming as any)?.resort_ops_guests;
             return (
