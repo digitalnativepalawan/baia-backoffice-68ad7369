@@ -11,6 +11,7 @@ const OrderType = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const mode = searchParams.get('mode') || 'guest';
+  const returnTo = searchParams.get('returnTo') || '';
   const isStaff = mode === 'staff';
 
   const [selectedType, setSelectedType] = useState('');
@@ -42,6 +43,46 @@ const OrderType = () => {
     },
   });
 
+  // Query occupied rooms with guest names for quick-select
+  const { data: occupiedGuests = [] } = useQuery({
+    queryKey: ['occupied-guests'],
+    enabled: isStaff,
+    queryFn: async () => {
+      // Get occupied units
+      const occupiedUnits = (units || []).filter(u => u.status === 'occupied');
+      if (occupiedUnits.length === 0) return [];
+
+      // Get resort_ops_units for name-based matching
+      const { data: opsUnits } = await supabase.from('resort_ops_units').select('id, name');
+
+      // Get today's active bookings
+      const today = new Date().toISOString().split('T')[0];
+      const { data: bookings } = await supabase
+        .from('resort_ops_bookings')
+        .select('*, resort_ops_guests(full_name)')
+        .lte('check_in', today)
+        .gt('check_out', today);
+
+      return occupiedUnits.map(unit => {
+        // Find matching ops unit by normalized name
+        const opsUnit = opsUnits?.find(
+          ou => ou.name.toLowerCase().trim() === unit.unit_name.toLowerCase().trim()
+        );
+        // Find booking for this ops unit
+        const booking = opsUnit
+          ? bookings?.find(b => b.unit_id === opsUnit.id)
+          : null;
+        const guestName = booking?.resort_ops_guests?.full_name || '';
+        return {
+          unitId: unit.id,
+          unitName: unit.unit_name,
+          guestName,
+        };
+      });
+    },
+    refetchInterval: 30000, // refresh every 30s for real-time feel
+  });
+
   const activeOrderType = orderTypes.find(ot => ot.type_key === selectedType);
   const isDineIn = selectedType === 'DineIn';
   const canProceed = selectedType && locationDetail && (!isDineIn || tableDetail);
@@ -52,29 +93,68 @@ const OrderType = () => {
     return [];
   };
 
+  const handleGuestCardTap = (guest: { unitName: string; guestName: string }) => {
+    const params = new URLSearchParams({
+      mode,
+      orderType: 'Room',
+      location: guest.unitName,
+      roomName: guest.unitName,
+    });
+    if (guest.guestName) params.set('guestName', guest.guestName);
+    if (returnTo) params.set('returnTo', returnTo);
+    navigate(`/menu?${params.toString()}`);
+  };
+
   const handleProceed = () => {
     if (!canProceed) return;
     const finalLocation = isDineIn ? `${locationDetail} – ${tableDetail}` : locationDetail;
     const params = new URLSearchParams({ mode, orderType: selectedType, location: finalLocation });
     if (guestName.trim()) params.set('guestName', guestName.trim());
-    // Pass raw unit name separately for room linkage (DineIn combines unit + table in location)
     const sourceTable = activeOrderType?.source_table;
     if (sourceTable === 'units' || isDineIn) {
       params.set('roomName', locationDetail);
     }
+    if (returnTo) params.set('returnTo', returnTo);
     navigate(`/menu?${params.toString()}`);
   };
 
   return (
     <div className="min-h-screen bg-navy-texture flex flex-col">
-      {/* Order Type Selection */}
       <div className="flex flex-col items-center justify-center px-6 py-12 relative">
-        <button onClick={() => navigate('/')} className="absolute top-6 left-6 text-cream-dim hover:text-foreground transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center">
+        <button onClick={() => navigate(returnTo || '/')} className="absolute top-6 left-6 text-cream-dim hover:text-foreground transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
         </button>
 
         <h2 className="font-display text-2xl tracking-wider text-foreground mb-2">Order Type</h2>
-        <p className="font-body text-sm text-cream-dim mb-10">Where would you like your order?</p>
+        <p className="font-body text-sm text-cream-dim mb-6">Where would you like your order?</p>
+
+        {/* Current Guests quick-select (staff only) */}
+        {isStaff && occupiedGuests.length > 0 && (
+          <div className="w-full max-w-xs mb-8">
+            <p className="font-display text-xs tracking-widest text-gold uppercase mb-3 text-center">Current Guests</p>
+            <div className="grid grid-cols-1 gap-2">
+              {occupiedGuests.map(guest => (
+                <button
+                  key={guest.unitId}
+                  onClick={() => handleGuestCardTap(guest)}
+                  className="flex items-center gap-3 px-4 py-3 border border-border rounded-md bg-secondary/50 hover:border-gold/60 transition-colors text-left"
+                >
+                  <span className="relative flex h-2.5 w-2.5 shrink-0">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <span className="font-display text-sm text-foreground tracking-wide block truncate">{guest.unitName}</span>
+                    {guest.guestName && (
+                      <span className="font-body text-xs text-cream-dim block truncate">{guest.guestName}</span>
+                    )}
+                  </div>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-cream-dim shrink-0"><path d="m9 18 6-6-6-6"/></svg>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="w-full max-w-xs flex flex-col gap-6">
           {/* Order type buttons */}

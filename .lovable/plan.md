@@ -1,35 +1,37 @@
 
 
-## Add "Currently Occupied" Quick-Select to Order Type Page
+## Plan: Fix Schedule Delete & Enhance Task/Assignment Scheduling
 
-### Problem
-Staff must manually select order types and pick rooms from dropdowns, even though the system already knows which rooms are occupied and by whom. There's no quick way to say "this order is for David Le in Double Room #1" — the occupied guest data exists in the database but isn't surfaced on the ordering screen.
+### Issues Found
 
-### Solution
-Add a **"Current Guests"** section at the top of the Order Type page (staff mode only) showing real-time occupied rooms with guest names. One tap selects the guest and auto-fills everything — room, guest name, order type — then navigates straight to the menu. The existing `roomName` param ensures billing flows through to the guest portal.
+1. **Delete button bug**: The trash icon on shift blocks triggers `setDeleteId(s.id)`, but the parent div's `onClick={() => openEdit(s)}` fires simultaneously despite `stopPropagation`. On mobile, the tiny button (3x3 icon) is nearly impossible to tap. The AlertDialog `onOpenChange={() => setDeleteId(null)}` also races with the confirm action.
+
+2. **Missing scheduling features**: The schedule only manages time shifts. There's no way to assign tasks like housecleaning, reception duty, or track completion from within the schedule view.
 
 ### Changes
 
-**1. `src/pages/OrderType.tsx`** — Add occupied guests section
-- Query `units` where `status = 'occupied'`, join with `resort_ops_bookings` + `resort_ops_guests` to get guest names
-- Cross-reference via `resort_ops_units` (name-based matching as per existing pattern)
-- Render a "Current Guests" card grid above the order type buttons (staff mode only)
-- Each card shows: room name, guest name, a blue "occupied" dot
-- Tapping a guest card sets `orderType=Room`, `location=<unit_name>`, `roomName=<unit_name>`, `guestName=<guest_name>` and navigates directly to `/menu`
-- Cards use the same dark card style as the rest of the UI with blue accent for occupied status
+**1. Fix Delete Button** (`WeeklyScheduleManager.tsx`)
+- Make `confirmDelete` capture `deleteId` before the dialog closes by saving it in a ref or local variable
+- Increase touch target size for edit/delete buttons on shift blocks
+- Prevent edit modal from opening when clicking edit/delete icons (the `stopPropagation` exists but the parent click handler on the entire timeline area also fires)
 
-**2. No database changes needed** — all data already exists in `units.status`, `resort_ops_bookings`, and `resort_ops_guests`
+**2. Add Task/Assignment Creation from Schedule** (`WeeklyScheduleManager.tsx`)
+- Add an "Assign Task" button alongside "Add Shift" 
+- New modal to create a task assignment: select employee, pick type (Housecleaning, Reception, Custom), set date/time, add notes
+- For housecleaning: select a room/unit to clean, auto-creates a `housekeeping_orders` entry assigned to the selected employee
+- For other tasks: creates an `employee_tasks` entry with due date and description
+- Tasks appear as colored pills on the timeline (already partially implemented)
 
-### Flow
-```text
-Staff opens Order Type page
-  → Sees "Current Guests" section at top:
-     [🔵 Double Room #1 — David Le]  [🔵 Suite #2 — Jane Smith]
-  → Taps "David Le" card
-  → Navigates to /menu?mode=staff&orderType=Room&location=Double Room #1&roomName=Double Room #1&guestName=David Le
-  → CartDrawer matches room → sets room_id → auto-defaults "Charge to Room"
-  → Order submitted → room_transaction created → appears on guest portal bill ✓
-```
+**3. Show Completion Info on Task Detail** (`WeeklyScheduleManager.tsx`)
+- In the task detail dialog, show who completed the task and when (`completed_at`)
+- For housekeeping pills, show completion status (`cleaning_completed_at`, `completed_by_name`)
+- Make housekeeping pills clickable to show full details (room, status, who inspected/cleaned)
 
-Staff can still use the traditional order type buttons below for walk-ins, friends & family, etc.
+**4. Enhance Task Detail Dialog** (`WeeklyScheduleManager.tsx`)
+- Add edit capability: change title, description, due date, reassign to different employee
+- Add delete capability for tasks
+- Show completion audit trail
+
+### Files to Edit
+- `src/components/admin/WeeklyScheduleManager.tsx` — all changes in this single file
 
