@@ -199,9 +199,25 @@ const AddReservationModal = ({ open, onClose, rooms, bookings, canManage, editBo
     if (!editBooking) return;
     setDeleting(true);
     try {
+      // If this was an active booking, reset the unit status
+      if (editBooking.unit_id) {
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+        const isActive = editBooking.check_in <= today && editBooking.check_out > today;
+        if (isActive) {
+          const room = rooms.find(r => r.id === editBooking.unit_id);
+          if (room) {
+            const { data: displayUnit } = await supabase.from('units' as any).select('id').ilike('name', room.name.trim()).limit(1);
+            const dUnit = (displayUnit as any)?.[0];
+            if (dUnit) {
+              await supabase.from('units' as any).update({ status: 'to_clean' } as any).eq('id', dUnit.id);
+            }
+          }
+        }
+      }
       await from('resort_ops_bookings').delete().eq('id', editBooking.id);
       toast.success('Reservation deleted');
       qc.invalidateQueries({ queryKey: ['rooms-bookings'] });
+      qc.invalidateQueries({ queryKey: ['rooms-units'] });
       setDeleteOpen(false);
       onClose();
     } catch (e: any) {
