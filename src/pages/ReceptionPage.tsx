@@ -1695,6 +1695,15 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ─── BOOKING CALENDAR ─── */}
+      <Separator className="my-6" />
+      <ReceptionCalendar
+        bookings={bookings as BookingWithGuest[]}
+        rooms={resortUnits as ResortUnit[]}
+        canEdit={canDoEdit}
+        canManage={canDoManage}
+      />
     </div>
   );
 };
