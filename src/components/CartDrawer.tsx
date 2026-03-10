@@ -261,19 +261,23 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
 
       // Auto-populate guest_name from active booking if placing order against a room
       let resolvedGuestName = guestName || '';
-      if (roomUnit && !resolvedGuestName) {
+      let resolvedBookingId: string | null = null;
+      if (roomUnit) {
         try {
           const today = new Date().toISOString().slice(0, 10);
           const { data: activeBooking } = await supabase
             .from('resort_ops_bookings')
-            .select('guest_id, resort_ops_guests(full_name)')
+            .select('id, guest_id, resort_ops_guests(full_name)')
             .eq('unit_id', roomUnit.id)
             .lte('check_in', today)
             .gte('check_out', today)
             .limit(1)
             .maybeSingle();
-          if (activeBooking && (activeBooking as any).resort_ops_guests?.full_name) {
-            resolvedGuestName = (activeBooking as any).resort_ops_guests.full_name;
+          if (activeBooking) {
+            resolvedBookingId = (activeBooking as any).id;
+            if (!resolvedGuestName && (activeBooking as any).resort_ops_guests?.full_name) {
+              resolvedGuestName = (activeBooking as any).resort_ops_guests.full_name;
+            }
           }
         } catch { /* ignore lookup failure */ }
       }
