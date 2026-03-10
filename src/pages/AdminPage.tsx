@@ -500,7 +500,9 @@ const AdminPage = () => {
                 <TabsList className="flex flex-wrap gap-1 mt-1 h-auto bg-transparent p-0">
                   {opsTabs.map(t => (
                     <TabsTrigger key={t.value} value={t.value}
-                      className="font-display text-xs tracking-wider min-h-[44px] px-3 py-1.5 rounded-md border border-border data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary bg-secondary text-muted-foreground">
+                      className={`font-display text-xs tracking-wider min-h-[44px] px-3 py-1.5 rounded-md border border-border data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary bg-secondary text-muted-foreground ${
+                        ALERT_KEY_MAP[t.value] && alerts[ALERT_KEY_MAP[t.value] as keyof typeof alerts] && activeTab !== t.value ? 'tab-pulse' : ''
+                      }`}>
                       {t.label}
                     </TabsTrigger>
                   ))}
