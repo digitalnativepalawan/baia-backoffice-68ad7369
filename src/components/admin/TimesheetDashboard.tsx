@@ -300,19 +300,21 @@ const TimesheetDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
                 <div className="font-body text-xs text-muted-foreground">
                   {hours > 0 ? `${hours.toFixed(1)}h` : '-'} {entry.paid_amount ? `· ₱${entry.paid_amount}` : ''}
                 </div>
-                <div className="flex gap-1 pt-2">
-                  {!entry.clock_out && (
-                    <Button size="sm" variant="outline" className="h-10 w-10 p-0" onClick={() => clockOut(entry.id)}>
-                      <Clock className="h-3.5 w-3.5" />
+                {!readOnly && (
+                  <div className="flex gap-1 pt-2">
+                    {!entry.clock_out && (
+                      <Button size="sm" variant="outline" className="h-10 w-10 p-0" onClick={() => clockOut(entry.id)}>
+                        <Clock className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    <Button size="sm" variant="outline" className="h-10 w-10 p-0" onClick={() => startEdit(entry)}>
+                      <Pencil className="h-3.5 w-3.5" />
                     </Button>
-                  )}
-                  <Button size="sm" variant="outline" className="h-10 w-10 p-0" onClick={() => startEdit(entry)}>
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button size="sm" variant="outline" className="h-10 w-10 p-0 text-destructive" onClick={() => setDeleteId(entry.id)}>
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
+                    <Button size="sm" variant="outline" className="h-10 w-10 p-0 text-destructive" onClick={() => setDeleteId(entry.id)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           );

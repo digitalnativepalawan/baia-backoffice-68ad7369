@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { Plus, Trash2, Copy, Package, ClipboardList, Home, Eye, EyeOff } from 'lucide-react';
 
-const HousekeepingConfig = () => {
+const HousekeepingConfig = ({ readOnly = false }: { readOnly?: boolean }) => {
   const qc = useQueryClient();
   const checklistRef = useRef<HTMLDivElement>(null);
   const packageRef = useRef<HTMLDivElement>(null);
