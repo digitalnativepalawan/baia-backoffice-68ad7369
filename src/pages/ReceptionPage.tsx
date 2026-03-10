@@ -1396,6 +1396,20 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
                     <p className="font-body text-sm text-foreground">{checkInBooking.special_requests}</p>
                   </div>
                 )}
+                {/* Early check-in fee */}
+                {getManilaHour() < 14 && (
+                  <div className="border border-amber-500/30 bg-amber-500/5 rounded-lg p-3 space-y-2">
+                    <p className="font-display text-xs tracking-wider text-amber-400 uppercase">⏰ Early Check-In (before 2:00 PM)</p>
+                    <p className="font-body text-xs text-muted-foreground">Standard check-in is 2:00 PM. Add an optional early check-in fee.</p>
+                    <Input
+                      type="number"
+                      value={earlyCheckInFee}
+                      onChange={e => setEarlyCheckInFee(e.target.value)}
+                      placeholder="₱0 (optional)"
+                      className="bg-secondary border-border text-foreground font-body"
+                    />
+                  </div>
+                )}
               </div>
             );
           })()}
