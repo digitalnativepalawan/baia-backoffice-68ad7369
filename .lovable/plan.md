@@ -1,34 +1,37 @@
 
 
-## Plan: Block Non-Admin Staff from `/admin` Route
+## Plan: Fix Schedule Delete & Enhance Task/Assignment Scheduling
 
-### Problem
-Jessa (housekeeping) can navigate directly to `/admin` and access the full admin dashboard, including editing schedules. The route only checks for a valid session, not admin-level permissions. The red "ADMIN" badge in the navbar confirms she's on the admin page.
+### Issues Found
+
+1. **Delete button bug**: The trash icon on shift blocks triggers `setDeleteId(s.id)`, but the parent div's `onClick={() => openEdit(s)}` fires simultaneously despite `stopPropagation`. On mobile, the tiny button (3x3 icon) is nearly impossible to tap. The AlertDialog `onOpenChange={() => setDeleteId(null)}` also races with the confirm action.
+
+2. **Missing scheduling features**: The schedule only manages time shifts. There's no way to assign tasks like housecleaning, reception duty, or track completion from within the schedule view.
 
 ### Changes
 
-**1. `src/App.tsx`** — Add `adminOnly` to the `/admin` route guard
+**1. Fix Delete Button** (`WeeklyScheduleManager.tsx`)
+- Make `confirmDelete` capture `deleteId` before the dialog closes by saving it in a ref or local variable
+- Increase touch target size for edit/delete buttons on shift blocks
+- Prevent edit modal from opening when clicking edit/delete icons (the `stopPropagation` exists but the parent click handler on the entire timeline area also fires)
 
-Change:
-```tsx
-<Route path="/admin" element={<RequireAuth><AdminPage /></RequireAuth>} />
-```
-To:
-```tsx
-<Route path="/admin" element={<RequireAuth adminOnly><AdminPage /></RequireAuth>} />
-```
+**2. Add Task/Assignment Creation from Schedule** (`WeeklyScheduleManager.tsx`)
+- Add an "Assign Task" button alongside "Add Shift" 
+- New modal to create a task assignment: select employee, pick type (Housecleaning, Reception, Custom), set date/time, add notes
+- For housecleaning: select a room/unit to clean, auto-creates a `housekeeping_orders` entry assigned to the selected employee
+- For other tasks: creates an `employee_tasks` entry with due date and description
+- Tasks appear as colored pills on the timeline (already partially implemented)
 
-This will redirect non-admin users back to `/` with a "Admin access required" toast if they try to navigate to `/admin`.
+**3. Show Completion Info on Task Detail** (`WeeklyScheduleManager.tsx`)
+- In the task detail dialog, show who completed the task and when (`completed_at`)
+- For housekeeping pills, show completion status (`cleaning_completed_at`, `completed_by_name`)
+- Make housekeeping pills clickable to show full details (room, status, who inspected/cleaned)
 
-**2. `src/lib/getHomeRoute.ts`** — Already correct (non-admins route to `/staff`), no change needed.
+**4. Enhance Task Detail Dialog** (`WeeklyScheduleManager.tsx`)
+- Add edit capability: change title, description, due date, reassign to different employee
+- Add delete capability for tasks
+- Show completion audit trail
 
-**3. `src/components/StaffNavBar.tsx`** — Remove the `admin` entry from `DEPT_COLORS` and `DEPT_LABELS`, and remove the route inference for `/admin` (line 55). Non-admin staff should never see an "ADMIN" badge. If an admin is on `/admin`, the department badge is unnecessary since they're in their home dashboard.
-
-### Files
-```
-EDIT  src/App.tsx  (add adminOnly prop)
-EDIT  src/components/StaffNavBar.tsx  (remove admin dept badge logic)
-```
-
-Two lines changed, one block removed. Non-admin staff will be immediately bounced from `/admin` and never see the red badge.
+### Files to Edit
+- `src/components/admin/WeeklyScheduleManager.tsx` — all changes in this single file
 

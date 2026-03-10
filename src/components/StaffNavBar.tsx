@@ -17,7 +17,7 @@ const DEPT_COLORS: Record<string, string> = {
   maintenance:  'bg-[hsl(220,15%,50%)] text-white',
   experiences:  'bg-[hsl(38,60%,55%)] text-white',
   orders:       'bg-[hsl(200,60%,50%)] text-white',
-  admin:        'bg-destructive text-destructive-foreground',
+  
 };
 
 const DEPT_LABELS: Record<string, string> = {
@@ -28,7 +28,7 @@ const DEPT_LABELS: Record<string, string> = {
   maintenance: 'Maintenance',
   experiences: 'Experiences',
   orders: 'Orders',
-  admin: 'Admin',
+  
 };
 
 interface StaffNavBarProps {
@@ -52,8 +52,7 @@ const StaffNavBar = ({ activeDepartment }: StaffNavBarProps) => {
   let currentDept = activeDepartment || '';
   if (!currentDept) {
     // Infer from route when not explicitly passed
-    if (location.pathname === '/admin') currentDept = 'admin';
-    else if (location.pathname === '/kitchen') currentDept = 'kitchen';
+    if (location.pathname === '/kitchen') currentDept = 'kitchen';
     else if (location.pathname === '/bar') currentDept = 'bar';
     else if (location.pathname === '/housekeeper') currentDept = 'housekeeping';
     else if (location.pathname === '/reception') currentDept = 'reception';
