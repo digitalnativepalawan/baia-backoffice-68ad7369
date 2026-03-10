@@ -295,7 +295,7 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
       )}
       {readOnly && (
         <div className="flex flex-wrap gap-2">
-          <PrintBill unitName={unit.name} guestName={guestName} booking={booking} transactions={transactions} />
+          <PrintBill unitName={unit.name} guestName={guestName} booking={booking} transactions={transactions} roomOrders={roomOrders} tours={tours} />
         </div>
       )}
 
