@@ -46,7 +46,7 @@ const App = () => (
           <Route path="/staff" element={<RequireAuth><StaffShell /></RequireAuth>} />
 
           {/* Admin Shell — control tower */}
-          <Route path="/admin" element={<RequireAuth><AdminPage /></RequireAuth>} />
+          <Route path="/admin" element={<RequireAuth adminOnly><AdminPage /></RequireAuth>} />
 
           {/* Shared operational routes (still accessible directly) */}
           <Route path="/order-type" element={<RequireAuth requiredPermission="orders"><OrderType /></RequireAuth>} />
