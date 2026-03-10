@@ -410,11 +410,13 @@ const HousekeepingConfig = ({ readOnly = false }: { readOnly?: boolean }) => {
               );
             })}
 
-            <div className="flex gap-2">
-              <Input value={newPackageName} onChange={e => setNewPackageName(e.target.value)} placeholder="New package name (e.g. Deep Clean)"
-                className="bg-secondary border-border text-foreground font-body" onKeyDown={e => e.key === 'Enter' && addPackage()} />
-              <Button onClick={addPackage} size="icon" variant="outline"><Plus className="w-4 h-4" /></Button>
-            </div>
+            {!readOnly && (
+              <div className="flex gap-2">
+                <Input value={newPackageName} onChange={e => setNewPackageName(e.target.value)} placeholder="New package name (e.g. Deep Clean)"
+                  className="bg-secondary border-border text-foreground font-body" onKeyDown={e => e.key === 'Enter' && addPackage()} />
+                <Button onClick={addPackage} size="icon" variant="outline"><Plus className="w-4 h-4" /></Button>
+              </div>
+            )}
           </>
         )}
       </div>
