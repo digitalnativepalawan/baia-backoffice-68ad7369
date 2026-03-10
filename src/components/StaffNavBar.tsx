@@ -52,8 +52,7 @@ const StaffNavBar = ({ activeDepartment }: StaffNavBarProps) => {
   let currentDept = activeDepartment || '';
   if (!currentDept) {
     // Infer from route when not explicitly passed
-    if (location.pathname === '/admin') currentDept = 'admin';
-    else if (location.pathname === '/kitchen') currentDept = 'kitchen';
+    if (location.pathname === '/kitchen') currentDept = 'kitchen';
     else if (location.pathname === '/bar') currentDept = 'bar';
     else if (location.pathname === '/housekeeper') currentDept = 'housekeeping';
     else if (location.pathname === '/reception') currentDept = 'reception';
