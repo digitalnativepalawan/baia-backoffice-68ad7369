@@ -175,6 +175,29 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
     },
   });
 
+  // Catalog data for tour dropdown
+  const { data: toursConfig = [] } = useQuery({
+    queryKey: ['tours-config-catalog'],
+    queryFn: async () => {
+      const { data } = await supabase.from('tours_config').select('*').eq('active', true).order('sort_order');
+      return (data || []) as any[];
+    },
+  });
+  const { data: rentalRates = [] } = useQuery({
+    queryKey: ['rental-rates-catalog'],
+    queryFn: async () => {
+      const { data } = await supabase.from('rental_rates').select('*').eq('active', true).order('sort_order');
+      return (data || []) as any[];
+    },
+  });
+  const { data: transportRates = [] } = useQuery({
+    queryKey: ['transport-rates-catalog'],
+    queryFn: async () => {
+      const { data } = await supabase.from('transport_rates').select('*').eq('active', true).order('sort_order');
+      return (data || []) as any[];
+    },
+  });
+
   // Get unit status
   const getUnitStatus = (unit: any): 'occupied' | 'to_clean' | 'ready' => {
     return (unit as any).status || 'ready';
