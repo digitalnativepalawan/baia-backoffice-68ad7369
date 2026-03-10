@@ -314,7 +314,7 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
       const { data: orderRow } = await supabase.from('orders').insert(insertData).select('id').single();
 
       // Auto-create room_transaction when "Charge to Room"
-      if ((paymentType === 'Charge to Room' || isGuestOrder) && roomUnit && orderRow) {
+      if ((resolvedPayment === 'Charge to Room' || isGuestOrder) && roomUnit && orderRow) {
         await (supabase.from('room_transactions' as any) as any).insert({
           unit_id: roomUnit.id,
           unit_name: selectedLocation,
