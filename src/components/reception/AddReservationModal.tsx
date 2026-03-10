@@ -206,7 +206,7 @@ const AddReservationModal = ({ open, onClose, rooms, bookings, canManage, editBo
         if (isActive) {
           const room = rooms.find(r => r.id === editBooking.unit_id);
           if (room) {
-            const { data: displayUnit } = await supabase.from('units' as any).select('id').ilike('name', room.name.trim()).limit(1);
+            const { data: displayUnit } = await supabase.from('units' as any).select('id').ilike('unit_name', room.name.trim()).limit(1);
             const dUnit = (displayUnit as any)?.[0];
             if (dUnit) {
               await supabase.from('units' as any).update({ status: 'to_clean' } as any).eq('id', dUnit.id);
