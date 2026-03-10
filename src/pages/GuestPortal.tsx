@@ -968,6 +968,9 @@ const getBillIcon = (notes: string | null, txType: string) => {
 const BillView = ({ session }: { session: GuestPortalSession }) => {
   const qc = useQueryClient();
   const [agreeing, setAgreeing] = useState(false);
+  const [contestOpen, setContestOpen] = useState(false);
+  const [disputeMessage, setDisputeMessage] = useState('');
+  const [submittingDispute, setSubmittingDispute] = useState(false);
 
   // Check if guest already agreed
   const { data: bookingData, refetch: refetchBooking } = useQuery({
