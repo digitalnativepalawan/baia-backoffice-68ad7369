@@ -322,6 +322,7 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
         await (supabase.from('room_transactions' as any) as any).insert({
           unit_id: roomUnit.id,
           unit_name: selectedLocation,
+          booking_id: resolvedBookingId || (guestSession?.booking_id ?? null),
           guest_name: resolvedGuestName || null,
           transaction_type: 'room_charge',
           order_id: orderRow.id,
