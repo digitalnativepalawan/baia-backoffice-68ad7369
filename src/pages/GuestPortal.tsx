@@ -967,6 +967,25 @@ const getBillIcon = (notes: string | null, txType: string) => {
 
 const BillView = ({ session }: { session: GuestPortalSession }) => {
   const qc = useQueryClient();
+  const [agreeing, setAgreeing] = useState(false);
+
+  // Check if guest already agreed
+  const { data: bookingData, refetch: refetchBooking } = useQuery({
+    queryKey: ['guest-bill-agreement', session.booking_id],
+    queryFn: async () => {
+      const { data } = await supabase.from('resort_ops_bookings').select('bill_agreed_at').eq('id', session.booking_id).maybeSingle();
+      return data as any;
+    },
+  });
+  const billAgreedAt = bookingData?.bill_agreed_at;
+
+  const handleAgree = async () => {
+    setAgreeing(true);
+    await (supabase.from('resort_ops_bookings') as any).update({ bill_agreed_at: new Date().toISOString() }).eq('id', session.booking_id);
+    await refetchBooking();
+    setAgreeing(false);
+    toast.success('Bill agreed! Reception has been notified.');
+  };
 
   const { data: transactions = [] } = useQuery({
     queryKey: ['guest-bill', session.booking_id, session.room_id],
