@@ -64,9 +64,6 @@ const StaffNavBar = ({ activeDepartment }: StaffNavBarProps) => {
   const deptLabel = DEPT_LABELS[currentDept] || '';
   const deptColor = DEPT_COLORS[currentDept] || '';
 
-  // Dashboard access: admin or any manager-level permission
-  const MANAGER_SECTIONS = ['orders', 'menu', 'kitchen', 'bar', 'housekeeping', 'reception', 'experiences', 'reports', 'inventory', 'payroll', 'resort_ops', 'rooms', 'schedules', 'setup', 'timesheet'];
-  const hasDashboardAccess = isAdmin || MANAGER_SECTIONS.some(s => hasAccess(perms, s));
 
   const handleLogout = () => {
     clearStaffSession();
