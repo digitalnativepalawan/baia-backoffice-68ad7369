@@ -1,37 +1,29 @@
 
 
-## Plan: Fix Schedule Delete & Enhance Task/Assignment Scheduling
+## Add Catalog Dropdown to "Add Tour" Form & Complete Status-to-Bill Flow
 
-### Issues Found
-
-1. **Delete button bug**: The trash icon on shift blocks triggers `setDeleteId(s.id)`, but the parent div's `onClick={() => openEdit(s)}` fires simultaneously despite `stopPropagation`. On mobile, the tiny button (3x3 icon) is nearly impossible to tap. The AlertDialog `onOpenChange={() => setDeleteId(null)}` also races with the confirm action.
-
-2. **Missing scheduling features**: The schedule only manages time shifts. There's no way to assign tasks like housecleaning, reception duty, or track completion from within the schedule view.
+### Problem
+The "Add Tour" form in the guest card (RoomsDashboard) is entirely manual text input. Staff must type tour names, prices, and providers from memory. There's no connection to the existing catalog tables (`tours_config`, `rental_rates`, `transport_rates`) that are already configured in the admin Guest Portal Config. Additionally, once a tour/experience is completed, there's no clear "Completed" button flow that finalizes it for billing visibility.
 
 ### Changes
 
-**1. Fix Delete Button** (`WeeklyScheduleManager.tsx`)
-- Make `confirmDelete` capture `deleteId` before the dialog closes by saving it in a ref or local variable
-- Increase touch target size for edit/delete buttons on shift blocks
-- Prevent edit modal from opening when clicking edit/delete icons (the `stopPropagation` exists but the parent click handler on the entire timeline area also fires)
+**1. `src/components/admin/RoomsDashboard.tsx`** — Replace manual tour name input with a categorized dropdown
+- Fetch `tours_config`, `rental_rates`, `transport_rates` (all where `active = true`)
+- Replace the plain text `Tour name *` input with a `<Select>` dropdown grouped by category:
+  - **Tours**: from `tours_config` (name + price)
+  - **Rentals**: from `rental_rates` (rate_name + price, grouped by item_type)
+  - **Transport**: from `transport_rates` (type + destination + price)
+  - **Other**: free-text input option for custom entries
+- When a catalog item is selected, auto-fill: name, price, provider (if available), duration
+- Keep all other fields (date, pax, pickup time, notes) as manual inputs
+- Add a "Completed" button on each confirmed tour card (updates `guest_tours.status` to `completed`) — this already exists as `updateTourStatus` but needs a visible button for `confirmed` → `completed` transition
 
-**2. Add Task/Assignment Creation from Schedule** (`WeeklyScheduleManager.tsx`)
-- Add an "Assign Task" button alongside "Add Shift" 
-- New modal to create a task assignment: select employee, pick type (Housecleaning, Reception, Custom), set date/time, add notes
-- For housecleaning: select a room/unit to clean, auto-creates a `housekeeping_orders` entry assigned to the selected employee
-- For other tasks: creates an `employee_tasks` entry with due date and description
-- Tasks appear as colored pills on the timeline (already partially implemented)
-
-**3. Show Completion Info on Task Detail** (`WeeklyScheduleManager.tsx`)
-- In the task detail dialog, show who completed the task and when (`completed_at`)
-- For housekeeping pills, show completion status (`cleaning_completed_at`, `completed_by_name`)
-- Make housekeeping pills clickable to show full details (room, status, who inspected/cleaned)
-
-**4. Enhance Task Detail Dialog** (`WeeklyScheduleManager.tsx`)
-- Add edit capability: change title, description, due date, reassign to different employee
-- Add delete capability for tasks
-- Show completion audit trail
+**2. Guest Portal & Billing flow** — Already working
+- `GuestPortal.tsx` BillView already queries completed tours and shows them
+- `RoomBillingTab.tsx` already shows tours with status badges
+- `CheckoutModal.tsx` already checks for incomplete tours
+- No changes needed here — the missing piece is only the catalog dropdown and the explicit "Complete" action button
 
 ### Files to Edit
-- `src/components/admin/WeeklyScheduleManager.tsx` — all changes in this single file
+1. `src/components/admin/RoomsDashboard.tsx` — Add catalog queries, replace tour name input with categorized Select dropdown, auto-fill price/provider on selection, add "Complete" button on confirmed tours
 
