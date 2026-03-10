@@ -506,6 +506,18 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
 
   const saveBooking = async () => {
     if (!editingBooking) return;
+    // Conflict check on update
+    const conflicting = (bookings as any[]).find((b: any) =>
+      b.unit_id === editingBooking.unit_id &&
+      b.id !== editingBooking.id &&
+      b.check_in < editingBooking.check_out &&
+      b.check_out > editingBooking.check_in
+    );
+    if (conflicting) {
+      const cName = (guests as any[]).find((g) => g.id === conflicting.guest_id)?.full_name || conflicting.platform || 'another guest';
+      toast.error(`Double booking! This room is booked by ${cName} (${conflicting.check_in} to ${conflicting.check_out}).`);
+      return;
+    }
     await from('resort_ops_bookings').update({
       guest_id: editingBooking.guest_id, unit_id: editingBooking.unit_id, platform: editingBooking.platform,
       check_in: editingBooking.check_in, check_out: editingBooking.check_out, adults: parseInt(editingBooking.adults) || 1,
