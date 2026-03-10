@@ -66,7 +66,7 @@ const GuestPortal = () => {
       const { data: opsUnit } = await supabase.from('resort_ops_units').select('id').ilike('name', roomName.trim()).maybeSingle();
       if (!opsUnit) { toast.error('Room not found'); setLoading(false); return; }
 
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
       const { data: booking } = await supabase
         .from('resort_ops_bookings')
         .select('id, check_in, check_out, resort_ops_guests(full_name)')
