@@ -1296,48 +1296,6 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
         </div>
       )}
 
-      {/* ── Quick Room Status ── */}
-      <div className="space-y-2 mb-6">
-        <h2 className="font-display text-xs tracking-wider text-muted-foreground uppercase">Quick Room Status</h2>
-        <div className="grid grid-cols-3 gap-2">
-          {units.map((unit: any) => {
-            const status = getUnitStatus(unit);
-            const booking = getActiveBooking(unit);
-            const guest = (booking as any)?.resort_ops_guests;
-            const borderColor = status === 'occupied' ? 'border-red-500/40' : status === 'to_clean' ? 'border-amber-500/40' : 'border-emerald-500/40';
-            const bgColor = status === 'occupied' ? 'bg-red-500/5' : status === 'to_clean' ? 'bg-amber-500/5' : '';
-            const dotColor = status === 'occupied' ? '🟥' : status === 'to_clean' ? '🟨' : '🟩';
-
-            return (
-              <div key={unit.id} className={`border rounded-lg p-2 text-center ${borderColor} ${bgColor}`}>
-                <p className="font-body text-xs">
-                  {dotColor} {unit.name}
-                </p>
-                {guest && (
-                  <p className="font-body text-[10px] text-muted-foreground truncate">{guest.full_name}</p>
-                )}
-                {status === 'ready' && (() => {
-                  const upcoming = getUpcomingBooking(unit);
-                  if (!upcoming) return null;
-                  const upGuest = (upcoming as any)?.resort_ops_guests;
-                  return (
-                    <p className="font-body text-[10px] text-blue-400 truncate">
-                      {upGuest?.full_name || 'Guest'} · {format(new Date(upcoming.check_in + 'T00:00:00'), 'MMM d')}
-                    </p>
-                  );
-                })()}
-                {status === 'to_clean' && canDoManage && (
-                  <Button size="sm" variant="outline" onClick={() => handleForceReady(unit)}
-                    disabled={forcingReady === unit.id}
-                    className="font-display text-[9px] tracking-wider min-h-[24px] h-6 px-1.5 mt-1 w-full border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10">
-                    <ShieldCheck className="w-3 h-3 mr-0.5" /> {forcingReady === unit.id ? '...' : 'Force Ready'}
-                  </Button>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
 
       {/* ── 🧹 Needs Cleaning — Live Housekeeping Progress ── */}
       {activeHkOrders.length > 0 && (
