@@ -340,17 +340,19 @@ const HousekeepingConfig = ({ readOnly = false }: { readOnly?: boolean }) => {
                     <p className="font-display text-sm text-foreground tracking-wider">
                       {getRoomTypeName(activePackageTypeId)} — {pkg.name}
                     </p>
-                    <div className="flex gap-1">
-                      <Button variant="outline" size="sm" className="h-7 text-xs font-display gap-1" onClick={() => setEditingPackageId(isEditing ? null : pkg.id)}>
-                        <ClipboardList className="w-3 h-3" /> {isEditing ? 'Done' : 'Edit'}
-                      </Button>
-                      <Button variant="outline" size="sm" className="h-7 text-xs font-display gap-1" onClick={() => duplicatePackage(pkg)}>
-                        <Copy className="w-3 h-3" /> Duplicate
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => deletePackage(pkg.id)} className="text-destructive h-7 w-7">
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
+                    {!readOnly && (
+                      <div className="flex gap-1">
+                        <Button variant="outline" size="sm" className="h-7 text-xs font-display gap-1" onClick={() => setEditingPackageId(isEditing ? null : pkg.id)}>
+                          <ClipboardList className="w-3 h-3" /> {isEditing ? 'Done' : 'Edit'}
+                        </Button>
+                        <Button variant="outline" size="sm" className="h-7 text-xs font-display gap-1" onClick={() => duplicatePackage(pkg)}>
+                          <Copy className="w-3 h-3" /> Duplicate
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => deletePackage(pkg.id)} className="text-destructive h-7 w-7">
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
 
                   {items.length > 0 && (
