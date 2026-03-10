@@ -95,19 +95,16 @@ const AdminPage = () => {
   const { data: resortProfile } = useResortProfile();
 
   // ── Permissions ────────────────────────────────────────────────
-  const session = getSession();
-  const perms: string[] = session?.permissions || [];
-  const isAdmin = perms.includes('admin');
+  const { perms, isAdmin, canView, canEdit: canEditModule, readOnly, canViewDocuments: docsAllowedFn } = usePermissions();
 
-  const allowed = (t: TabDef) => isAdmin || (t.perm !== null && hasAccess(perms, t.perm));
+  const allowed = (t: TabDef) => isAdmin || (t.perm !== null && canView(t.perm));
   const opsTabs = OPERATIONS.filter(allowed);
   const peopleTabs = PEOPLE.filter(allowed);
   const cfgTabs = CONFIG.filter(allowed);
   const allTabs = [...opsTabs, ...peopleTabs, ...cfgTabs];
   const defaultTab = allTabs[0]?.value || 'orders';
 
-  const readOnly = (section: string) => !isAdmin && !canEdit(perms, section);
-  const docsAllowed = isAdmin || canViewDocuments(perms);
+  const docsAllowed = docsAllowedFn();
 
   // ── Realtime ───────────────────────────────────────────────────
   useEffect(() => {
