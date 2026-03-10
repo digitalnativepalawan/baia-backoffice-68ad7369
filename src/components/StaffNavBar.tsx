@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, Briefcase, LayoutDashboard, LogOut, Menu, Monitor } from 'lucide-react';
+import { Home, Briefcase, LogOut, Menu, Monitor } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 import { hasAccess } from '@/lib/permissions';
@@ -64,9 +64,6 @@ const StaffNavBar = ({ activeDepartment }: StaffNavBarProps) => {
   const deptLabel = DEPT_LABELS[currentDept] || '';
   const deptColor = DEPT_COLORS[currentDept] || '';
 
-  // Dashboard access: admin or any manager-level permission
-  const MANAGER_SECTIONS = ['orders', 'menu', 'kitchen', 'bar', 'housekeeping', 'reception', 'experiences', 'reports', 'inventory', 'payroll', 'resort_ops', 'rooms', 'schedules', 'setup', 'timesheet'];
-  const hasDashboardAccess = isAdmin || MANAGER_SECTIONS.some(s => hasAccess(perms, s));
 
   const handleLogout = () => {
     clearStaffSession();
@@ -84,10 +81,6 @@ const StaffNavBar = ({ activeDepartment }: StaffNavBarProps) => {
     setMenuOpen(false);
   };
 
-  const goDashboard = () => {
-    navigate('/admin');
-    setMenuOpen(false);
-  };
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -135,17 +128,6 @@ const StaffNavBar = ({ activeDepartment }: StaffNavBarProps) => {
         <Monitor className="w-4 h-4" />
         Service
       </Button>
-      {hasDashboardAccess && (
-        <Button
-          variant={isActive('/admin') ? 'default' : 'ghost'}
-          size="sm"
-          onClick={goDashboard}
-          className={`font-display text-xs tracking-wider gap-1.5 ${mobile ? 'w-full justify-start' : ''}`}
-        >
-          <LayoutDashboard className="w-4 h-4" />
-          Dashboard
-        </Button>
-      )}
     </>
   );
 
