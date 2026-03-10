@@ -36,34 +36,7 @@ const getManilaTimeStr = () => new Date().toLocaleString('en-PH', { timeZone: 'A
 
 const from = (table: string) => supabase.from(table as any);
 
-/** Inline bill summary for a unit */
-const InlineBill = ({ unitId }: { unitId: string }) => {
-  const { data: txns = [], isLoading } = useRoomTransactions(unitId);
-  if (isLoading) return <p className="font-body text-xs text-muted-foreground py-2">Loading...</p>;
-  if (txns.length === 0) return <p className="font-body text-xs text-muted-foreground py-2">No transactions</p>;
-  const charges = txns.filter(t => t.total_amount > 0);
-  const payments = txns.filter(t => t.total_amount < 0);
-  const totalC = charges.reduce((s, t) => s + t.total_amount, 0);
-  const totalP = Math.abs(payments.reduce((s, t) => s + t.total_amount, 0));
-  const bal = totalC - totalP;
-  return (
-    <div className="border border-border rounded-lg p-2 bg-secondary space-y-1 mt-1">
-      {txns.slice(0, 8).map(t => (
-        <div key={t.id} className="flex justify-between font-body text-[10px]">
-          <span className="text-muted-foreground truncate flex-1">{t.notes || t.transaction_type.replace('_', ' ')}</span>
-          <span className={t.total_amount > 0 ? 'text-foreground' : 'text-green-400'}>
-            {t.total_amount > 0 ? '' : '-'}₱{Math.abs(t.total_amount).toLocaleString()}
-          </span>
-        </div>
-      ))}
-      {txns.length > 8 && <p className="font-body text-[10px] text-muted-foreground">+{txns.length - 8} more</p>}
-      <div className="flex justify-between font-display text-xs tracking-wider pt-1 border-t border-border">
-        <span className="text-foreground">Balance</span>
-        <span className={bal > 0 ? 'text-destructive' : 'text-green-400'}>₱{Math.abs(bal).toLocaleString()}</span>
-      </div>
-    </div>
-  );
-};
+/* InlineBill removed – billing is accessible via Details sheet */
 
 /** Compute balance for a unit from transactions */
 const useUnitBalance = (unitId: string | null) => {
