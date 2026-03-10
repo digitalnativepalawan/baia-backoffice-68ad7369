@@ -766,10 +766,42 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
       });
 
       await supabase.from('units').update({ status: 'occupied' } as any).eq('id', walkInUnit.id);
-      await logAudit('created', 'units', walkInUnit.id, `Walk-in check-in: ${walkInForm.guestName.trim()} to ${walkInUnit.name}`);
+
+      // ── Auto-post accommodation charge for walk-in ──
+      const walkInRate = parseFloat(walkInForm.roomRate) || 0;
+      const walkInNights = Math.max(1, Math.ceil((new Date(walkInForm.checkOut).getTime() - new Date(walkInForm.checkIn).getTime()) / 86400000));
+      const { data: newBookings } = await from('resort_ops_bookings')
+        .select('id')
+        .eq('guest_id', gId)
+        .eq('unit_id', resortUnit.id)
+        .eq('check_in', walkInForm.checkIn)
+        .order('created_at', { ascending: false })
+        .limit(1) as any;
+      const newBookingId = newBookings?.[0]?.id || null;
+
+      if (walkInRate > 0 && newBookingId) {
+        const accomTotal = walkInNights * walkInRate;
+        await (from('room_transactions') as any).insert({
+          unit_id: walkInUnit.id,
+          unit_name: walkInUnit.name,
+          guest_name: walkInForm.guestName.trim(),
+          booking_id: newBookingId,
+          transaction_type: 'accommodation',
+          amount: accomTotal,
+          tax_amount: 0,
+          service_charge_amount: 0,
+          total_amount: accomTotal,
+          payment_method: '',
+          staff_name: staffName,
+          notes: `${walkInNights} night${walkInNights !== 1 ? 's' : ''} × ₱${walkInRate.toLocaleString()}/night`,
+        });
+      }
+
+      await logAudit('created', 'units', walkInUnit.id, `Walk-in check-in: ${walkInForm.guestName.trim()} to ${walkInUnit.name}${walkInRate > 0 ? ` — ${walkInNights} nights × ₱${walkInRate.toLocaleString()}` : ''}`);
 
       qc.invalidateQueries({ queryKey: ['rooms-bookings'] });
       qc.invalidateQueries({ queryKey: ['rooms-units'] });
+      qc.invalidateQueries({ queryKey: ['room-transactions', walkInUnit.id] });
       setWalkInOpen(false);
       setWalkInUnit(null);
       setWalkInForm({ guestName: '', checkIn: today, checkOut: '', adults: '2', children: '0', platform: 'Direct', roomRate: '0', notes: '' });
