@@ -85,6 +85,7 @@ const CONFIG: TabDef[] = [
   { value: 'audit', label: 'Audit', perm: null },
   { value: 'archive', label: 'Archive', perm: null },
   { value: 'guest-portal', label: 'Guest Portal', perm: null },
+  ...(import.meta.env.DEV ? [{ value: 'integration', label: 'Integration', perm: null } as TabDef] : []),
 ];
 
 const AdminPage = () => {

@@ -14,11 +14,7 @@ const PROCESS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-w
 const IntegrationReadinessDashboard = () => {
   const qc = useQueryClient();
   const [sending, setSending] = useState(false);
-
-  // Feature flag: only in dev
-  if (!import.meta.env.DEV) {
-    return null;
-  }
+  const isDev = import.meta.env.DEV;
 
   const { data: events = [], isLoading } = useQuery({
     queryKey: ['webhook-events'],
