@@ -131,8 +131,8 @@ const ReceptionCalendar = ({ bookings, rooms, units, canEdit, canManage }: Recep
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-body text-sm truncate">{guestName}</span>
                     <div className="flex items-center gap-1 flex-shrink-0">
-                      {isCI && <Badge variant="outline" className="text-[9px] py-0 border-emerald-500/40 text-emerald-400">IN</Badge>}
-                      {isCO && <Badge variant="outline" className="text-[9px] py-0 border-amber-500/40 text-amber-400">OUT</Badge>}
+                      {isCI && <Badge variant="outline" className="text-[9px] py-0 border-blue-500/40 text-blue-400">IN</Badge>}
+                      {isCO && <Badge variant="outline" className="text-[9px] py-0 border-muted-foreground/40 text-muted-foreground">OUT</Badge>}
                     </div>
                   </div>
                   <p className="font-body text-[11px] opacity-70 mt-0.5">
