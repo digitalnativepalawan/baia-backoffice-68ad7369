@@ -144,6 +144,27 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
     },
   });
 
+  // Realtime subscriptions for guest_requests and tour_bookings
+  useEffect(() => {
+    const ch1 = supabase
+      .channel('experiences-requests-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'guest_requests' }, () => {
+        qc.invalidateQueries({ queryKey: ['all-requests-experiences'] });
+        qc.invalidateQueries({ queryKey: ['recent-requests-history'] });
+      })
+      .subscribe();
+    const ch2 = supabase
+      .channel('experiences-tour-bookings-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tour_bookings' }, () => {
+        qc.invalidateQueries({ queryKey: ['tour-bookings-experiences'] });
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch1);
+      supabase.removeChannel(ch2);
+    };
+  }, [qc]);
+
   const todayTours = tours.filter((t: any) => t.tour_date === todayStr);
   const upcomingTours = tours.filter((t: any) => t.tour_date > todayStr);
 
@@ -151,6 +172,23 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
   const pendingBookings = tourBookings.filter((b: any) => b.status === 'pending');
   const confirmedBookings = tourBookings.filter((b: any) => b.status === 'confirmed');
   const todayBookings = tourBookings.filter((b: any) => b.tour_date === todayStr && b.status !== 'cancelled');
+
+  const pendingRequests = requests.filter((r: any) => r.status === 'pending');
+  const hasPendingItems = pendingBookings.length > 0 || pendingRequests.length > 0;
+
+  // Repeating chime every 5s while there are pending requests/bookings
+  useEffect(() => {
+    if (hasPendingItems) {
+      playChime();
+      intervalRef.current = setInterval(playChime, 5000);
+    } else if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [hasPendingItems, playChime]);
 
   const parsePriceFromDetails = (details: string): number => {
     const match = details.match(/₱([\d,]+)/);
