@@ -1729,6 +1729,7 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
       <ReceptionCalendar
         bookings={bookings as BookingWithGuest[]}
         rooms={resortUnits as ResortUnit[]}
+        units={units as any[]}
         canEdit={canDoEdit}
         canManage={canDoManage}
       />
