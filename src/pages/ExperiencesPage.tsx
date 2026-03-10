@@ -347,7 +347,7 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
       )}
 
       {/* ── Summary ── */}
-      <div className="grid grid-cols-3 gap-2 mb-6">
+      <div className="grid grid-cols-4 gap-2 mb-6">
         <div className="border border-amber-500/30 bg-amber-500/10 rounded-lg p-3 text-center">
           <p className="font-display text-2xl text-amber-400">{pendingBookings.length}</p>
           <p className="font-body text-xs text-amber-400/70">Pending</p>
@@ -355,6 +355,10 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
         <div className="border border-emerald-500/30 bg-emerald-500/10 rounded-lg p-3 text-center">
           <p className="font-display text-2xl text-emerald-400">{confirmedBookings.length}</p>
           <p className="font-body text-xs text-emerald-400/70">Confirmed</p>
+        </div>
+        <div className="border border-border rounded-lg p-3 text-center">
+          <p className="font-display text-2xl text-foreground">{completedToday.length}</p>
+          <p className="font-body text-xs text-muted-foreground">Completed</p>
         </div>
         <div className="border border-border rounded-lg p-3 text-center">
           <p className="font-display text-2xl text-foreground">{requests.filter(r => r.status === 'pending').length}</p>
