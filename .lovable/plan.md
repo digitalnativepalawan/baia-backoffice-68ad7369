@@ -1,57 +1,91 @@
 
 
-## Fresh Launch Data Reset
+## Integration Readiness — Isolated Module
 
-No code or functionality changes. Data-only operation using the database tool to clear all operational/transactional tables while preserving master configuration (rooms, menu, employees, settings).
+All new code lives in separate files/directories. Zero modifications to existing production code.
 
-### Tables to Clear
+### 1. Database Migration
 
-**Reservations & Guest Data:**
-- `resort_ops_bookings` (cascades to guest_notes, guest_tours, room_transactions, guest_requests, guest_reviews, bill_disputes, tour_bookings)
-- `guest_documents`
-- `guest_vibe_records` → `interventions`
+**Add columns to `resort_ops_bookings`** (all nullable with defaults):
+```sql
+ALTER TABLE resort_ops_bookings
+  ADD COLUMN IF NOT EXISTS source text DEFAULT 'walkin',
+  ADD COLUMN IF NOT EXISTS external_reservation_id text NULL,
+  ADD COLUMN IF NOT EXISTS last_synced_at timestamptz NULL,
+  ADD COLUMN IF NOT EXISTS external_data jsonb NULL;
 
-**Food & Beverage:**
-- `orders`
-- `tabs`
-- `inventory_logs`
+CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_external_res_id
+  ON resort_ops_bookings (external_reservation_id) WHERE external_reservation_id IS NOT NULL;
+```
 
-**Housekeeping:**
-- `housekeeping_orders`
+**Create `webhook_events` table:**
+```sql
+CREATE TABLE webhook_events (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id text NOT NULL,
+  event_type text NOT NULL,
+  source text NOT NULL DEFAULT 'unknown',
+  payload jsonb NOT NULL DEFAULT '{}',
+  status text NOT NULL DEFAULT 'pending',
+  retry_count int NOT NULL DEFAULT 0,
+  error_message text NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  processed_at timestamptz NULL
+);
 
-**Staff/Payroll:**
-- `employee_shifts`
-- `employee_tasks`
-- `employee_bonuses`
-- `payroll_payments`
+CREATE INDEX idx_webhook_events_status ON webhook_events (status);
+CREATE UNIQUE INDEX idx_webhook_events_event_id ON webhook_events (event_id);
+```
 
-**Finance:**
-- `expenses` → `expense_history`
+With public RLS policies (read-only for anon, full for service role via edge functions).
 
-**System:**
-- `audit_log`
+### 2. Edge Function: `integration-webhook`
 
-### Post-Cleanup
-- Reset all `units` status to `ready` so every room shows as available on launch day
+New file: `supabase/functions/integration-webhook/index.ts`
 
-### Preserved (untouched)
-Units, room_types, resort_profile, menu_items, menu_categories, ingredients, employees, employee_permissions, billing_config, invoice_settings, payroll_settings, devices, order_types, payment_methods, app_options, cleaning_packages, housekeeping_checklists
+- `POST` → validates payload, stores in `webhook_events` with status `pending`, returns `202 Accepted`
+- `GET` → health check
+- Signature verification placeholder (logs warning if no signature header)
+- `verify_jwt = false` in config.toml
 
-### Execution Order
-1. Delete `interventions` (FK to guest_vibe_records)
-2. Delete `guest_vibe_records`
-3. Delete `guest_documents`
-4. Delete `inventory_logs`
-5. Delete `expense_history` (FK to expenses)
-6. Delete `expenses`
-7. Delete `orders` (room_transactions cascade handled by bookings delete)
-8. Delete `tabs`
-9. Delete `resort_ops_bookings` (cascades: guest_notes, guest_tours, room_transactions, guest_requests, guest_reviews, bill_disputes, tour_bookings)
-10. Delete `housekeeping_orders`
-11. Delete `employee_shifts`, `employee_tasks`, `employee_bonuses`
-12. Delete `payroll_payments`
-13. Delete `audit_log`
-14. Update all `units` → status = `ready`
+### 3. Edge Function: `process-webhook-queue`
 
-Zero code changes. Only data operations.
+New file: `supabase/functions/process-webhook-queue/index.ts`
+
+- Fetches `pending` or `retry` events (max 10 at a time)
+- Processes each event type (new_reservation, date_change, cancellation)
+- On success: marks `processed`, updates `resort_ops_bookings` with `source`, `external_reservation_id`, `last_synced_at`, `external_data`
+- On failure: increments `retry_count`, sets `error` status if retry_count >= 3
+- Called manually from the admin dashboard or could be scheduled later
+
+### 4. Admin Integration Readiness Dashboard
+
+New file: `src/components/integration/IntegrationReadinessDashboard.tsx`
+
+- Feature-flagged: only renders when `import.meta.env.DEV` is true
+- **TEST MODE** banner at the top
+- Sections:
+  - **Webhook Events Log**: read-only table showing `webhook_events` (event_id, type, source, status, retry_count, timestamps)
+  - **Schema Status**: checks if new columns exist on `resort_ops_bookings` and `webhook_events` table exists
+  - **Simulation Tools**: buttons to send test payloads (new reservation, date change, cancellation) to the `integration-webhook` edge function
+  - **Process Queue**: button to trigger `process-webhook-queue`
+
+### 5. Wire into Admin Page (minimal, additive only)
+
+Add a new tab entry to the `CONFIG` array in `AdminPage.tsx`:
+```ts
+{ value: 'integration', label: 'Integration', perm: null }
+```
+And a corresponding `TabsContent` that renders `<IntegrationReadinessDashboard />` — only visible in dev mode. This is a 2-line additive change (array entry + TabsContent), no existing logic modified.
+
+### Files Created/Modified
+
+| File | Action |
+|------|--------|
+| `supabase/migrations/...` | Schema migration (new columns + new table) |
+| `supabase/config.toml` | Add `[functions.integration-webhook]` and `[functions.process-webhook-queue]` entries |
+| `supabase/functions/integration-webhook/index.ts` | New edge function |
+| `supabase/functions/process-webhook-queue/index.ts` | New edge function |
+| `src/components/integration/IntegrationReadinessDashboard.tsx` | New dashboard component |
+| `src/pages/AdminPage.tsx` | Add 1 tab def + 1 TabsContent render (additive only, ~4 lines) |
 
