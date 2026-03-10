@@ -728,6 +728,26 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
         });
       }
 
+      // Late check-out fee
+      const lateFee = parseFloat(lateCheckOutFee) || 0;
+      if (lateFee > 0) {
+        await (from('room_transactions') as any).insert({
+          unit_id: checkOutUnit.id,
+          unit_name: checkOutUnit.name,
+          guest_name: checkOutBooking.resort_ops_guests?.full_name,
+          booking_id: checkOutBooking.id,
+          transaction_type: 'charge',
+          amount: lateFee,
+          tax_amount: 0,
+          service_charge_amount: 0,
+          total_amount: lateFee,
+          payment_method: '',
+          staff_name: staffName,
+          notes: 'Late check-out fee',
+        });
+        await logAudit('created', 'room_transactions', checkOutUnit.id, `Late check-out fee: ₱${lateFee.toLocaleString()} for ${checkOutBooking.resort_ops_guests?.full_name} in ${checkOutUnit.name}`);
+      }
+
       await from('resort_ops_bookings').update({ check_out: today }).eq('id', checkOutBooking.id);
       await supabase.from('units').update({ status: 'to_clean' } as any).eq('id', checkOutUnit.id);
 
