@@ -201,15 +201,16 @@ const AddReservationModal = ({ open, onClose, rooms, bookings, canManage, editBo
     try {
       // If this was an active booking, reset the unit status
       if (editBooking.unit_id) {
-        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
-        const isActive = editBooking.check_in <= today && editBooking.check_out > today;
-        if (isActive) {
-          const room = rooms.find(r => r.id === editBooking.unit_id);
-          if (room) {
-            const { data: displayUnit } = await supabase.from('units' as any).select('id').ilike('unit_name', room.name.trim()).limit(1);
-            const dUnit = (displayUnit as any)?.[0];
-            if (dUnit) {
-              await supabase.from('units' as any).update({ status: 'to_clean' } as any).eq('id', dUnit.id);
+        const room = rooms.find(r => r.id === editBooking.unit_id);
+        if (room) {
+          const { data: displayUnit } = await supabase.from('units' as any).select('id, status').ilike('unit_name', room.name.trim()).limit(1);
+          const dUnit = (displayUnit as any)?.[0];
+          if (dUnit && (dUnit.status === 'occupied' || dUnit.status === 'to_clean')) {
+            // Check if any OTHER active booking exists for this unit
+            const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+            const otherActive = bookings.find(b => b.id !== editBooking.id && b.unit_id === editBooking.unit_id && b.check_in <= today && b.check_out > today);
+            if (!otherActive) {
+              await supabase.from('units' as any).update({ status: 'ready' } as any).eq('id', dUnit.id);
             }
           }
         }

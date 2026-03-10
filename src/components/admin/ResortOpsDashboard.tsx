@@ -402,15 +402,15 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
     if (table === 'resort_ops_bookings') {
       const booking = (bookings as any[]).find((b) => b.id === id);
       if (booking?.unit_id) {
-        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
-        const isActive = booking.check_in <= today && booking.check_out > today;
-        if (isActive) {
-          const resortUnit = (units as any[]).find((u) => u.id === booking.unit_id);
-          if (resortUnit) {
-            const displayUnit = await supabase.from('units' as any).select('id').ilike('unit_name', resortUnit.name.trim()).limit(1);
-            const dUnit = (displayUnit.data as any)?.[0];
-            if (dUnit) {
-              await supabase.from('units' as any).update({ status: 'to_clean' } as any).eq('id', dUnit.id);
+        const resortUnit = (units as any[]).find((u) => u.id === booking.unit_id);
+        if (resortUnit) {
+          const displayUnit = await supabase.from('units' as any).select('id, status').ilike('unit_name', resortUnit.name.trim()).limit(1);
+          const dUnit = (displayUnit.data as any)?.[0];
+          if (dUnit && (dUnit.status === 'occupied' || dUnit.status === 'to_clean')) {
+            // Check if any OTHER active booking exists for this unit
+            const otherActive = (bookings as any[]).find((b: any) => b.id !== id && b.unit_id === booking.unit_id && b.check_in <= new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }) && b.check_out > new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }));
+            if (!otherActive) {
+              await supabase.from('units' as any).update({ status: 'ready' } as any).eq('id', dUnit.id);
             }
           }
         }
