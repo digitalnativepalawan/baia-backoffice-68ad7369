@@ -1,37 +1,60 @@
 
 
-## Plan: Fix Schedule Delete & Enhance Task/Assignment Scheduling
+## Plan: Reception Calendar System
 
-### Issues Found
+### Overview
+Add a full calendar component at the bottom of `ReceptionPage.tsx` that visualizes bookings from `resort_ops_bookings` with multi-view toggle, conflict prevention, and CRUD operations.
 
-1. **Delete button bug**: The trash icon on shift blocks triggers `setDeleteId(s.id)`, but the parent div's `onClick={() => openEdit(s)}` fires simultaneously despite `stopPropagation`. On mobile, the tiny button (3x3 icon) is nearly impossible to tap. The AlertDialog `onOpenChange={() => setDeleteId(null)}` also races with the confirm action.
+### Data Model (existing — no migrations needed)
+- **resort_ops_bookings**: `id`, `unit_id`, `guest_id`, `check_in`, `check_out`, `platform`, `room_rate`, `adults`, `children`, `notes`, `paid_amount`
+- **resort_ops_units**: `id`, `name`, `type`, `base_price`, `capacity`
+- **resort_ops_guests**: `id`, `full_name`, `email`, `phone`
 
-2. **Missing scheduling features**: The schedule only manages time shifts. There's no way to assign tasks like housecleaning, reception duty, or track completion from within the schedule view.
+### New Component: `src/components/reception/ReceptionCalendar.tsx`
 
-### Changes
+**View Toggle** (Week / 2-Week / Month):
+- ToggleGroup at top with date navigation (prev/next arrows)
+- Default: Week view
 
-**1. Fix Delete Button** (`WeeklyScheduleManager.tsx`)
-- Make `confirmDelete` capture `deleteId` before the dialog closes by saving it in a ref or local variable
-- Increase touch target size for edit/delete buttons on shift blocks
-- Prevent edit modal from opening when clicking edit/delete icons (the `stopPropagation` exists but the parent click handler on the entire timeline area also fires)
+**Layout**:
+- **Mobile**: Vertically stacked day cards, each listing bookings for that day
+- **Desktop**: Grid with rooms as rows, dates as columns; booking spans rendered as colored bars
 
-**2. Add Task/Assignment Creation from Schedule** (`WeeklyScheduleManager.tsx`)
-- Add an "Assign Task" button alongside "Add Shift" 
-- New modal to create a task assignment: select employee, pick type (Housecleaning, Reception, Custom), set date/time, add notes
-- For housecleaning: select a room/unit to clean, auto-creates a `housekeeping_orders` entry assigned to the selected employee
-- For other tasks: creates an `employee_tasks` entry with due date and description
-- Tasks appear as colored pills on the timeline (already partially implemented)
+**Booking Display**:
+- Color-coded by status/platform: Green (Confirmed/Direct), Yellow (Pending/partial payment), Red (Maintenance blocks)
+- Check-in arrow (→) and check-out arrow (←) indicators
+- Guest name + room name on each bar/card
+- Click to open edit modal
 
-**3. Show Completion Info on Task Detail** (`WeeklyScheduleManager.tsx`)
-- In the task detail dialog, show who completed the task and when (`completed_at`)
-- For housekeeping pills, show completion status (`cleaning_completed_at`, `completed_by_name`)
-- Make housekeeping pills clickable to show full details (room, status, who inspected/cleaned)
+**Conflict Prevention** (`src/components/reception/ConflictModal.tsx`):
+- Before inserting/updating a booking, query `resort_ops_bookings` for overlapping date ranges on the same `unit_id`
+- If conflict found, show modal with: conflicting booking details, list of alternative available rooms, override button (visible only if `canManage('reception')`)
+- Helper function: `checkAvailability(unitId, checkIn, checkOut, excludeBookingId?)`
 
-**4. Enhance Task Detail Dialog** (`WeeklyScheduleManager.tsx`)
-- Add edit capability: change title, description, due date, reassign to different employee
-- Add delete capability for tasks
-- Show completion audit trail
+**CRUD Modals**:
+- **Add Reservation** (`src/components/reception/AddReservationModal.tsx`): Room picker, guest name, dates, platform, rate — runs conflict check before save. Creates `resort_ops_guests` entry if new guest, then inserts `resort_ops_bookings`.
+- **Edit Reservation**: Reuses same modal in edit mode, pre-filled with existing data. Conflict check on date/room changes.
+- **Delete Reservation**: AlertDialog confirmation, deletes from `resort_ops_bookings`.
+- **Block Room**: Special "Maintenance" booking with no guest, red color coding.
 
-### Files to Edit
-- `src/components/admin/WeeklyScheduleManager.tsx` — all changes in this single file
+**Permissions**:
+- Uses `usePermissions` hook
+- View-only users see calendar but no Add/Edit/Delete buttons
+- Override on conflicts requires `canManage('reception')`
+
+### Integration with ReceptionPage
+- Import `ReceptionCalendar` at bottom of `ReceptionPage.tsx` (after existing content)
+- Pass `bookings`, `resortUnits`, `units`, `canDoEdit`, `canDoManage` as props
+- Shares the existing `rooms-bookings` query key for cache consistency
+
+### Files
+```
+CREATE  src/components/reception/ReceptionCalendar.tsx    (main calendar component)
+CREATE  src/components/reception/AddReservationModal.tsx   (add/edit reservation)
+CREATE  src/components/reception/ConflictModal.tsx         (conflict warning + alternatives)
+CREATE  src/components/reception/calendarUtils.ts          (date helpers, availability check)
+EDIT    src/pages/ReceptionPage.tsx                        (add calendar at bottom)
+```
+
+No database migrations needed — uses existing tables and RLS policies.
 
