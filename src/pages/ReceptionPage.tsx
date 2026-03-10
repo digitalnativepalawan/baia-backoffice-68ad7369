@@ -794,6 +794,7 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
       setCheckOutOpen(false);
       setCheckOutBooking(null);
       setCheckOutUnit(null);
+      setLateCheckOutFee('');
       toast.success('Checkout complete — housekeepers notified');
     } catch {
       toast.error('Checkout failed');
