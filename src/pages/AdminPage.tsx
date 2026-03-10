@@ -397,7 +397,14 @@ const AdminPage = () => {
   };
 
   const deleteOrder = async (orderId: string) => {
-    await supabase.from('orders').delete().eq('id', orderId);
+    // Delete dependent records first to avoid FK constraint errors
+    await supabase.from('room_transactions').delete().eq('order_id', orderId);
+    await supabase.from('inventory_logs').delete().eq('order_id', orderId);
+    const { error } = await supabase.from('orders').delete().eq('id', orderId);
+    if (error) {
+      toast.error(`Delete failed: ${error.message}`);
+      return;
+    }
     qc.invalidateQueries({ queryKey: ['orders-admin'] });
     toast.success('Order deleted');
   };
