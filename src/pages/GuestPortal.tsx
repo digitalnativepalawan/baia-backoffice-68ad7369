@@ -1080,19 +1080,46 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
     },
   });
 
-  // Realtime subscription
+  // Bill disputes
+  const { data: disputes = [] } = useQuery({
+    queryKey: ['guest-bill-disputes', session.booking_id],
+    queryFn: async () => {
+      const { data } = await (supabase.from('bill_disputes') as any)
+        .select('*')
+        .eq('booking_id', session.booking_id)
+        .order('created_at', { ascending: false });
+      return data || [];
+    },
+  });
+
+  const handleContestSubmit = async () => {
+    if (!disputeMessage.trim()) return;
+    setSubmittingDispute(true);
+    await (supabase.from('bill_disputes') as any).insert({
+      booking_id: session.booking_id,
+      room_id: session.room_id,
+      unit_name: session.room_name,
+      guest_name: session.guest_name,
+      guest_message: disputeMessage.trim(),
+    });
+    qc.invalidateQueries({ queryKey: ['guest-bill-disputes', session.booking_id] });
+    setSubmittingDispute(false);
+    setContestOpen(false);
+    setDisputeMessage('');
+    toast.success('Dispute submitted — reception has been notified.');
+  };
+
+  // Realtime subscription — broadened to catch all DELETE events
   useEffect(() => {
     const channel = supabase
       .channel('guest-bill-realtime')
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'room_transactions',
-        filter: `booking_id=eq.${session.booking_id}`,
       }, () => {
         qc.invalidateQueries({ queryKey: ['guest-bill', session.booking_id, session.room_id] });
       })
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'orders',
-        filter: `room_id=eq.${session.room_id}`,
       }, () => {
         qc.invalidateQueries({ queryKey: ['guest-bill-unpaid-orders', session.room_id, session.room_name] });
       })
@@ -1109,6 +1136,12 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
       }, () => {
         qc.invalidateQueries({ queryKey: ['guest-bill-pending-requests', session.booking_id] });
         qc.invalidateQueries({ queryKey: ['guest-bill-completed-requests', session.booking_id] });
+      })
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'bill_disputes',
+        filter: `booking_id=eq.${session.booking_id}`,
+      }, () => {
+        qc.invalidateQueries({ queryKey: ['guest-bill-disputes', session.booking_id] });
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
