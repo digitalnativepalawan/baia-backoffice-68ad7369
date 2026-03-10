@@ -183,18 +183,13 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
     };
   }, [hasPendingItems, playChime]);
 
-  // Repeating chime every 5s while there are pending requests/bookings
+  // Chime only once when pending items first appear
+  const prevHasPendingRef = useRef(false);
   useEffect(() => {
-    if (hasPendingItems) {
+    if (hasPendingItems && !prevHasPendingRef.current) {
       playChime();
-      intervalRef.current = setInterval(playChime, 5000);
-    } else if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
     }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
+    prevHasPendingRef.current = hasPendingItems;
   }, [hasPendingItems, playChime]);
 
   const parsePriceFromDetails = (details: string): number => {

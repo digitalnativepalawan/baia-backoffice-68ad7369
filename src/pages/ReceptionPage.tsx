@@ -396,14 +396,13 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
     };
   }, []);
 
-  // Repeating chime when pending items exist
+  // Chime only once when pending alerts first appear
+  const prevHasPendingRef = useRef(false);
   useEffect(() => {
-    if (!hasPendingAlerts) return;
-    if (audioUnlockedRef.current) playChime();
-    const iv = setInterval(() => {
-      if (audioUnlockedRef.current) playChime();
-    }, 5000);
-    return () => clearInterval(iv);
+    if (hasPendingAlerts && !prevHasPendingRef.current && audioUnlockedRef.current) {
+      playChime();
+    }
+    prevHasPendingRef.current = hasPendingAlerts;
   }, [hasPendingAlerts, playChime]);
 
   // Realtime subscriptions for guest_requests and tour_bookings
