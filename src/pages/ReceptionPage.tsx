@@ -706,6 +706,20 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
       toast.error('Guest name and check-out date required');
       return;
     }
+    // Conflict check: ensure no overlapping booking for this unit
+    const resortUnitForCheck = resolveResortUnit(walkInUnit.name);
+    if (resortUnitForCheck) {
+      const conflicting = (bookings as any[]).find((b: any) =>
+        b.unit_id === resortUnitForCheck.id &&
+        b.check_in < walkInForm.checkOut &&
+        b.check_out > walkInForm.checkIn
+      );
+      if (conflicting) {
+        const conflictGuest = (conflicting as any).resort_ops_guests?.full_name || conflicting.platform || 'another guest';
+        toast.error(`Double booking! ${walkInUnit.name} is already booked by ${conflictGuest} (${conflicting.check_in} to ${conflicting.check_out}). Delete that booking first or pick another room.`);
+        return;
+      }
+    }
     setWalkingIn(true);
     try {
       const { data: existing } = await from('resort_ops_guests')
