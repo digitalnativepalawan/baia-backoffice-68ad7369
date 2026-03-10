@@ -34,6 +34,49 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
   const staffName = session?.name || 'Staff';
 
   const [historyOpen, setHistoryOpen] = useState(false);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Unlock AudioContext on first user interaction (mobile requirement)
+  useEffect(() => {
+    const unlock = () => {
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      if (audioCtxRef.current.state === 'suspended') {
+        audioCtxRef.current.resume();
+      }
+    };
+    document.addEventListener('touchstart', unlock, { once: true });
+    document.addEventListener('click', unlock, { once: true });
+    return () => {
+      document.removeEventListener('touchstart', unlock);
+      document.removeEventListener('click', unlock);
+    };
+  }, []);
+
+  // Play a two-tone chime
+  const playChime = useCallback(() => {
+    const ctx = audioCtxRef.current;
+    if (!ctx || ctx.state !== 'running') return;
+    const now = ctx.currentTime;
+    const gain = ctx.createGain();
+    gain.connect(ctx.destination);
+    gain.gain.setValueAtTime(0.3, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+    const osc1 = ctx.createOscillator();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(880, now);
+    osc1.connect(gain);
+    osc1.start(now);
+    osc1.stop(now + 0.2);
+    const osc2 = ctx.createOscillator();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(1108.73, now + 0.2);
+    osc2.connect(gain);
+    osc2.start(now + 0.2);
+    osc2.stop(now + 0.5);
+  }, []);
 
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
