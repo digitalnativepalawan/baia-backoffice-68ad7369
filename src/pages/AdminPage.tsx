@@ -26,7 +26,7 @@ import ExperiencesPage from '@/pages/ExperiencesPage';
 import InvoiceSettingsForm from '@/components/admin/InvoiceSettingsForm';
 import StaffAccessManager from '@/components/admin/StaffAccessManager';
 import EmployeeContactConfig from '@/components/admin/EmployeeContactConfig';
-import RoomsDashboard from '@/components/admin/RoomsDashboard';
+import ReceptionPage from '@/pages/ReceptionPage';
 import TimesheetDashboard from '@/components/admin/TimesheetDashboard';
 import WeeklyScheduleManager from '@/components/admin/WeeklyScheduleManager';
 import HousekeepingConfig from '@/components/admin/HousekeepingConfig';
