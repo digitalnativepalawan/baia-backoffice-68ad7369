@@ -1,37 +1,66 @@
 
 
-## Plan: Fix Schedule Delete & Enhance Task/Assignment Scheduling
+## Redesign Calendar Status Colors to Reflect Real Occupancy
 
-### Issues Found
+### Problem
+The current calendar color logic is confusing:
+- **"Confirmed"** (green) = booking has a payment or is "Direct" platform -- but this doesn't tell you if the guest is actually checked in
+- **"Pending"** (amber) = no payment yet -- but a checked-in guest with no prepayment shows as "pending"
+- **"Maintenance"** (red) = room blocked for maintenance -- unclear label
 
-1. **Delete button bug**: The trash icon on shift blocks triggers `setDeleteId(s.id)`, but the parent div's `onClick={() => openEdit(s)}` fires simultaneously despite `stopPropagation`. On mobile, the tiny button (3x3 icon) is nearly impossible to tap. The AlertDialog `onOpenChange={() => setDeleteId(null)}` also races with the confirm action.
+A checked-in guest like David Le shows the same color as an upcoming reservation. The statuses should reflect **operational reality**.
 
-2. **Missing scheduling features**: The schedule only manages time shifts. There's no way to assign tasks like housecleaning, reception duty, or track completion from within the schedule view.
+### New Status System
+
+| Status | Color | Meaning |
+|--------|-------|---------|
+| **Occupied** | Blue | Guest is checked in (unit status = `occupied` and booking matches) |
+| **Upcoming** | Amber/Yellow | Reservation exists but guest hasn't checked in yet |
+| **Checked Out** | Gray | Past booking, guest departed |
+| **Blocked** | Red | Room blocked for maintenance/cleaning |
+
+### How It Works
+1. Query the `units` table alongside bookings to know which units are currently `occupied`
+2. Cross-reference: if the booking's unit has `status = 'occupied'` AND today falls within the booking dates → **Occupied**
+3. If the booking's check-in is today or future and unit is not occupied → **Upcoming**
+4. If the booking's check-out is in the past → **Checked Out** (or just dim/gray)
+5. If `platform = 'Maintenance'` → **Blocked**
 
 ### Changes
 
-**1. Fix Delete Button** (`WeeklyScheduleManager.tsx`)
-- Make `confirmDelete` capture `deleteId` before the dialog closes by saving it in a ref or local variable
-- Increase touch target size for edit/delete buttons on shift blocks
-- Prevent edit modal from opening when clicking edit/delete icons (the `stopPropagation` exists but the parent click handler on the entire timeline area also fires)
+**1. `src/components/reception/calendarUtils.ts`**
+- Update `getBookingStatus()` to accept unit status as a parameter
+- New return values: `'occupied' | 'upcoming' | 'checked_out' | 'blocked'`
+- Update `statusColors` map with new color set
+- Update `BookingWithGuest` interface or add optional `unit_status` field
 
-**2. Add Task/Assignment Creation from Schedule** (`WeeklyScheduleManager.tsx`)
-- Add an "Assign Task" button alongside "Add Shift" 
-- New modal to create a task assignment: select employee, pick type (Housecleaning, Reception, Custom), set date/time, add notes
-- For housecleaning: select a room/unit to clean, auto-creates a `housekeeping_orders` entry assigned to the selected employee
-- For other tasks: creates an `employee_tasks` entry with due date and description
-- Tasks appear as colored pills on the timeline (already partially implemented)
+**2. `src/components/reception/ReceptionCalendar.tsx`**
+- Pass unit status data into the status calculation
+- Create a lookup map: `unitId → unit.status`
+- Update legend to show: Occupied (blue), Upcoming (amber), Blocked (red)
+- Update `renderBookingChip` to use new status logic
 
-**3. Show Completion Info on Task Detail** (`WeeklyScheduleManager.tsx`)
-- In the task detail dialog, show who completed the task and when (`completed_at`)
-- For housekeeping pills, show completion status (`cleaning_completed_at`, `completed_by_name`)
-- Make housekeeping pills clickable to show full details (room, status, who inspected/cleaned)
+**3. `src/pages/ReceptionPage.tsx`**
+- Pass the `units` data (which already includes `status`) to the calendar component so it can cross-reference
 
-**4. Enhance Task Detail Dialog** (`WeeklyScheduleManager.tsx`)
-- Add edit capability: change title, description, due date, reassign to different employee
-- Add delete capability for tasks
-- Show completion audit trail
+### Technical Detail
 
-### Files to Edit
-- `src/components/admin/WeeklyScheduleManager.tsx` — all changes in this single file
+Status resolution logic:
+```typescript
+const getBookingStatus = (booking, unitStatus?: string) => {
+  if (booking.platform === 'Maintenance') return 'blocked';
+  const today = new Date().toISOString().split('T')[0];
+  if (booking.check_out <= today) return 'checked_out';
+  if (unitStatus === 'occupied' && booking.check_in <= today) return 'occupied';
+  return 'upcoming';
+};
+```
+
+Color map:
+```typescript
+occupied:    { bg: 'bg-blue-500/20',    text: 'text-blue-400',    border: 'border-blue-500/40' }
+upcoming:    { bg: 'bg-amber-500/20',   text: 'text-amber-400',   border: 'border-amber-500/40' }
+checked_out: { bg: 'bg-muted/30',       text: 'text-muted-foreground', border: 'border-border' }
+blocked:     { bg: 'bg-destructive/20', text: 'text-destructive', border: 'border-destructive/40' }
+```
 
