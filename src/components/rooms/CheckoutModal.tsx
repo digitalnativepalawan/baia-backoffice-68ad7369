@@ -311,7 +311,10 @@ const CheckoutModal = ({ open, onOpenChange, unitId, unitName, guestName, bookin
             <p className="font-display text-sm text-foreground">{guestName || 'Guest'}</p>
             {booking && (
               <p className="font-body text-xs text-muted-foreground">
-                {nights} night{nights !== 1 ? 's' : ''} × ₱{roomRate.toLocaleString()}/night = ₱{(nights * roomRate).toLocaleString()}
+                {nights} night{nights !== 1 ? 's' : ''} · ₱{roomRate.toLocaleString()}/night
+                {charges.some(t => t.transaction_type === 'accommodation') && (
+                  <span className="text-emerald-400 ml-1">✓ Posted to ledger</span>
+                )}
               </p>
             )}
           </div>

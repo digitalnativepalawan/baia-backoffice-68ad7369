@@ -396,18 +396,35 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
           <p className="font-body text-sm text-muted-foreground text-center py-4">No transactions yet</p>
         ) : (
           transactions.map(t => (
-            <div key={t.id} className="border border-border rounded-lg p-3 space-y-1">
+            <div key={t.id} className={`border rounded-lg p-3 space-y-1 ${t.transaction_type === 'accommodation' ? 'border-primary/30 bg-primary/5' : 'border-border'}`}>
               <div className="flex justify-between items-start">
                 <div className="min-w-0 flex-1">
                   <p className="font-body text-xs text-muted-foreground">
                     {format(new Date(t.created_at), 'MMM d h:mma')} · {t.staff_name}
                   </p>
-                  <p className="font-display text-sm text-foreground capitalize">{t.transaction_type.replace('_', ' ')}</p>
+                  <p className="font-display text-sm text-foreground capitalize flex items-center gap-1.5">
+                    {t.transaction_type === 'accommodation' && '🏠 '}
+                    {t.transaction_type.replace('_', ' ')}
+                  </p>
                   {t.notes && <p className="font-body text-xs text-muted-foreground truncate">{t.notes}</p>}
                 </div>
-                <p className={`font-display text-sm shrink-0 ${t.total_amount > 0 ? 'text-foreground' : 'text-green-400'}`}>
-                  {t.total_amount > 0 ? '' : '-'}₱{Math.abs(t.total_amount).toLocaleString()}
-                </p>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <p className={`font-display text-sm ${t.total_amount > 0 ? 'text-foreground' : 'text-green-400'}`}>
+                    {t.total_amount > 0 ? '' : '-'}₱{Math.abs(t.total_amount).toLocaleString()}
+                  </p>
+                  {!readOnly && t.transaction_type === 'accommodation' && (
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                      onClick={async () => {
+                        if (!confirm('Delete this accommodation charge?')) return;
+                        await from('room_transactions').delete().eq('id', t.id);
+                        await logAudit('deleted', 'room_transactions', t.id, `Deleted accommodation charge ₱${Math.abs(t.total_amount).toLocaleString()} for ${unit.name} by ${staffName}`);
+                        qc.invalidateQueries({ queryKey: ['room-transactions', unit.id] });
+                        toast.success('Accommodation charge deleted');
+                      }}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
+                </div>
               </div>
               {(t.tax_amount !== 0 || t.service_charge_amount !== 0) && (
                 <p className="font-body text-[10px] text-muted-foreground">

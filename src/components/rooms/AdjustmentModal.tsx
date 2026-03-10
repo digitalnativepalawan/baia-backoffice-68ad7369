@@ -24,6 +24,7 @@ interface AdjustmentModalProps {
 const ADJUSTMENT_TYPES = ['Discount', 'Void', 'Complimentary', 'Correction'] as const;
 
 const QUICK_CHARGES = [
+  { label: 'Accommodation', emoji: '🏠' },
   { label: 'Room Charge', emoji: '🛏' },
   { label: 'Experience', emoji: '🏄' },
   { label: 'Bar Tab', emoji: '🍹' },
