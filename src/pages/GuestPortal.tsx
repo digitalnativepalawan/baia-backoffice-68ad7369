@@ -1208,6 +1208,28 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
         ))}
         {transactions.length === 0 && !hasPending && unpaidOrders.length === 0 && <p className="font-body text-sm text-muted-foreground text-center">No transactions yet.</p>}
       </div>
+
+      {/* Bill Agreement */}
+      {(transactions.length > 0 || unpaidOrders.length > 0) && (
+        <div className="border border-border rounded-lg p-4 space-y-3">
+          {billAgreedAt ? (
+            <div className="flex items-center gap-2 text-emerald-400">
+              <CheckCircle2 className="w-5 h-5" />
+              <div>
+                <p className="font-display text-sm">Bill Reviewed & Agreed</p>
+                <p className="font-body text-xs text-muted-foreground">{new Date(billAgreedAt).toLocaleString()}</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              <p className="font-body text-xs text-muted-foreground">By tapping below, you confirm that you have reviewed all charges and agree to this bill.</p>
+              <Button onClick={handleAgree} disabled={agreeing} className="w-full font-display tracking-wider h-12">
+                {agreeing ? 'Submitting...' : '✓ I Agree to This Bill'}
+              </Button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 };

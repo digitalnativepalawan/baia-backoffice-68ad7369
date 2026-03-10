@@ -502,6 +502,12 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
                     className="font-display text-xs tracking-wider min-h-[36px]">Cancel</Button>
                 </div>
               )}
+              {canDoEdit && req.status === 'confirmed' && (
+                <Button size="sm" onClick={() => updateRequestStatus(req.id, 'completed')}
+                  className="font-display text-xs tracking-wider min-h-[36px]">
+                  <CheckCircle className="w-3.5 h-3.5 mr-1" /> Complete
+                </Button>
+              )}
             </div>
           ))}
         </div>
