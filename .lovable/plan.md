@@ -1,37 +1,56 @@
 
 
-## Plan: Fix Schedule Delete & Enhance Task/Assignment Scheduling
+## Auto-Post Accommodation Charges to Guest Folio
 
-### Issues Found
+### Problem
+Right now, the `room_rate` is stored on the booking but **never posted as a `room_transaction`**. The guest folio (and guest portal) only shows F&B orders, tours, transport, and manual quick charges — but not the actual accommodation cost. The checkout modal displays `nights × rate` as informational text but doesn't include it in the balance calculation. This means:
+- Guest portal shows no room charges
+- The folio balance is incomplete
+- Reception can't adjust/delete accommodation charges
+- Checkout balance doesn't reflect the full stay cost
 
-1. **Delete button bug**: The trash icon on shift blocks triggers `setDeleteId(s.id)`, but the parent div's `onClick={() => openEdit(s)}` fires simultaneously despite `stopPropagation`. On mobile, the tiny button (3x3 icon) is nearly impossible to tap. The AlertDialog `onOpenChange={() => setDeleteId(null)}` also races with the confirm action.
-
-2. **Missing scheduling features**: The schedule only manages time shifts. There's no way to assign tasks like housecleaning, reception duty, or track completion from within the schedule view.
+### Solution
+**Auto-post nightly accommodation charges at check-in**, then let reception edit/delete them via the existing billing tab.
 
 ### Changes
 
-**1. Fix Delete Button** (`WeeklyScheduleManager.tsx`)
-- Make `confirmDelete` capture `deleteId` before the dialog closes by saving it in a ref or local variable
-- Increase touch target size for edit/delete buttons on shift blocks
-- Prevent edit modal from opening when clicking edit/delete icons (the `stopPropagation` exists but the parent click handler on the entire timeline area also fires)
+**1. `src/pages/ReceptionPage.tsx` — Post accommodation charges at check-in**
+- In `handleReservationCheckIn` and `handleWalkIn`: after setting unit to `occupied`, calculate `nights × room_rate` and insert a single `room_transaction` with `transaction_type: 'accommodation'` and notes like `"3 nights × ₱2,500/night"`
+- For imported reservations (Booking.com, Airbnb, etc.) that already have `paid_amount`, also insert a corresponding payment transaction so the pre-paid amount is reflected
+- This covers all booking sources: direct, walk-in, and bulk imports
 
-**2. Add Task/Assignment Creation from Schedule** (`WeeklyScheduleManager.tsx`)
-- Add an "Assign Task" button alongside "Add Shift" 
-- New modal to create a task assignment: select employee, pick type (Housecleaning, Reception, Custom), set date/time, add notes
-- For housecleaning: select a room/unit to clean, auto-creates a `housekeeping_orders` entry assigned to the selected employee
-- For other tasks: creates an `employee_tasks` entry with due date and description
-- Tasks appear as colored pills on the timeline (already partially implemented)
+**2. `src/components/rooms/RoomBillingTab.tsx` — Show accommodation charges prominently**
+- In the Room Ledger section, accommodation charges will already appear (they're just `room_transactions`)
+- Add an inline edit/delete capability for accommodation transactions so reception can adjust the nightly rate or number of nights after check-in
+- Add a delete button on accommodation charge rows (with confirmation) so reception can remove and re-add if the rate changes
 
-**3. Show Completion Info on Task Detail** (`WeeklyScheduleManager.tsx`)
-- In the task detail dialog, show who completed the task and when (`completed_at`)
-- For housekeeping pills, show completion status (`cleaning_completed_at`, `completed_by_name`)
-- Make housekeeping pills clickable to show full details (room, status, who inspected/cleaned)
+**3. `src/components/rooms/AdjustmentModal.tsx` — Add "Accommodation" to quick charges**
+- Add an "Accommodation" option to the `QUICK_CHARGES` array so reception can manually post room charges if needed (e.g., extending a stay, rate changes)
 
-**4. Enhance Task Detail Dialog** (`WeeklyScheduleManager.tsx`)
-- Add edit capability: change title, description, due date, reassign to different employee
-- Add delete capability for tasks
-- Show completion audit trail
+**4. `src/components/rooms/CheckoutModal.tsx` — Remove duplicate display**
+- The checkout modal currently shows `nights × rate` as info text separate from the ledger. Since accommodation is now in the ledger, the balance will be correct automatically. Keep the info line but remove any separate calculation that would double-count.
+
+### Flow by Booking Source
+
+**Direct / Walk-In:**
+```
+Check-in → auto-inserts room_transaction (accommodation: 3 nights × ₱2,500 = ₱7,500)
+→ appears on guest folio + guest portal immediately
+→ reception can edit/delete if rate negotiated differently
+```
+
+**Imported (Booking.com / Airbnb / Agoda):**
+```
+CSV import creates booking with room_rate + paid_amount
+→ Check-in → auto-inserts accommodation charge (₱7,500)
+→ Also inserts pre-payment transaction (-₱7,500 via Booking.com)
+→ Balance shows ₱0 for accommodation (pre-paid)
+→ Only F&B/tours/extras show as outstanding
+```
 
 ### Files to Edit
-- `src/components/admin/WeeklyScheduleManager.tsx` — all changes in this single file
+1. `src/pages/ReceptionPage.tsx` — Insert accommodation + pre-payment transactions at check-in
+2. `src/components/rooms/RoomBillingTab.tsx` — Add delete button on accommodation rows
+3. `src/components/rooms/AdjustmentModal.tsx` — Add "Accommodation" quick charge
+4. `src/components/rooms/CheckoutModal.tsx` — Remove separate nights×rate display (now in ledger)
 
