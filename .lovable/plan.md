@@ -1,37 +1,39 @@
 
 
-## Plan: Fix Schedule Delete & Enhance Task/Assignment Scheduling
+## Expand Current Guests Section with Full Guest Folio
 
-### Issues Found
+### Problem
+The "Current Guests" cards in the Reception dashboard have limited functionality:
+- **Bill** button only toggles an `InlineBill` showing raw transactions — no orders, tours, or services
+- **Pay** button opens payment modal but there's no way to see what's actually owed
+- No ability to add orders, comp items, delete charges, or manage tours/services inline
+- The full `RoomBillingTab` (with all these features) only lives inside the "Details" sheet → Billing tab, which is buried
 
-1. **Delete button bug**: The trash icon on shift blocks triggers `setDeleteId(s.id)`, but the parent div's `onClick={() => openEdit(s)}` fires simultaneously despite `stopPropagation`. On mobile, the tiny button (3x3 icon) is nearly impossible to tap. The AlertDialog `onOpenChange={() => setDeleteId(null)}` also races with the confirm action.
+Staff must click Details → scroll to Billing tab to do real work. For a reception desk running a resort, this needs to be front and center.
 
-2. **Missing scheduling features**: The schedule only manages time shifts. There's no way to assign tasks like housecleaning, reception duty, or track completion from within the schedule view.
+### Solution
+Replace the simple `InlineBill` toggle with the full `RoomBillingTab` component when the Bill button is clicked. This instantly gives reception staff access to:
+- All F&B orders with status badges (New/Preparing/Ready/Served/Paid)
+- Tours, transport, rentals with cancel/delete actions
+- Room transactions ledger
+- Add Payment, Add Adjustment, Print Bill, Checkout — all inline
+- Real-time updates via existing Supabase subscriptions
+- Comp/delete individual orders
+
+Additionally, add a quick **"Order"** button to each guest card that navigates directly to the menu with pre-filled room/guest params (same flow as the occupied guest cards on OrderType page).
 
 ### Changes
 
-**1. Fix Delete Button** (`WeeklyScheduleManager.tsx`)
-- Make `confirmDelete` capture `deleteId` before the dialog closes by saving it in a ref or local variable
-- Increase touch target size for edit/delete buttons on shift blocks
-- Prevent edit modal from opening when clicking edit/delete icons (the `stopPropagation` exists but the parent click handler on the entire timeline area also fires)
+**1. `src/pages/ReceptionPage.tsx`**
+- Import `RoomBillingTab` component
+- Replace `<InlineBill unitId={unit.id} />` with `<RoomBillingTab unit={unit} booking={booking} guestName={guest?.full_name} />` when `billUnitId === unit.id`
+- Add an **"Order"** button next to Pay/Bill/Clean/Details that navigates to `/menu?mode=staff&orderType=Room&location={unitName}&roomName={unitName}&guestName={guestName}`
+- Remove the standalone Pay button since `RoomBillingTab` already has Add Payment built in (or keep it as a shortcut — both work)
 
-**2. Add Task/Assignment Creation from Schedule** (`WeeklyScheduleManager.tsx`)
-- Add an "Assign Task" button alongside "Add Shift" 
-- New modal to create a task assignment: select employee, pick type (Housecleaning, Reception, Custom), set date/time, add notes
-- For housecleaning: select a room/unit to clean, auto-creates a `housekeeping_orders` entry assigned to the selected employee
-- For other tasks: creates an `employee_tasks` entry with due date and description
-- Tasks appear as colored pills on the timeline (already partially implemented)
-
-**3. Show Completion Info on Task Detail** (`WeeklyScheduleManager.tsx`)
-- In the task detail dialog, show who completed the task and when (`completed_at`)
-- For housekeeping pills, show completion status (`cleaning_completed_at`, `completed_by_name`)
-- Make housekeeping pills clickable to show full details (room, status, who inspected/cleaned)
-
-**4. Enhance Task Detail Dialog** (`WeeklyScheduleManager.tsx`)
-- Add edit capability: change title, description, due date, reassign to different employee
-- Add delete capability for tasks
-- Show completion audit trail
-
-### Files to Edit
-- `src/components/admin/WeeklyScheduleManager.tsx` — all changes in this single file
+### Result
+Each Current Guest card becomes a self-contained operational hub:
+- One tap on **Bill** expands the full folio with orders, tours, services, balance, payments
+- One tap on **Order** goes straight to menu for that guest
+- Pay, Print Bill, Checkout all accessible without navigating to Details
+- Everything syncs in real-time with the Guest Portal
 
