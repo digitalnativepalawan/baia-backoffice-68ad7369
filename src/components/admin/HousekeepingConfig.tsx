@@ -244,6 +244,7 @@ const HousekeepingConfig = ({ readOnly = false }: { readOnly?: boolean }) => {
                     size="sm"
                     className="h-7 text-[10px] font-display px-2 shrink-0"
                     onClick={() => toggleChecklistRequired(item)}
+                    disabled={readOnly}
                   >
                     {item.is_required ? 'Required' : 'Optional'}
                   </Button>
@@ -255,17 +256,22 @@ const HousekeepingConfig = ({ readOnly = false }: { readOnly?: boolean }) => {
                         value={item.count_expected}
                         onChange={e => updateChecklistCount(item.id, parseInt(e.target.value) || null)}
                         className="bg-secondary border-border text-foreground font-body h-7 w-14 text-xs"
+                        disabled={readOnly}
                       />
                     </div>
                   ) : (
-                    <Button variant="ghost" size="sm" className="h-7 text-[10px] font-body text-muted-foreground px-2 shrink-0"
-                      onClick={() => updateChecklistCount(item.id, 1)}>
-                      + Count
+                    !readOnly && (
+                      <Button variant="ghost" size="sm" className="h-7 text-[10px] font-body text-muted-foreground px-2 shrink-0"
+                        onClick={() => updateChecklistCount(item.id, 1)}>
+                        + Count
+                      </Button>
+                    )
+                  )}
+                  {!readOnly && (
+                    <Button variant="ghost" size="icon" onClick={() => deleteChecklistItem(item.id)} className="text-destructive h-7 w-7 shrink-0">
+                      <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   )}
-                  <Button variant="ghost" size="icon" onClick={() => deleteChecklistItem(item.id)} className="text-destructive h-7 w-7 shrink-0">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
                 </div>
               ))}
             </div>
