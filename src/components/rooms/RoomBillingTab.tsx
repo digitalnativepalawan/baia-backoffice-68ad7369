@@ -294,7 +294,69 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
     return () => { supabase.removeChannel(channel); };
   }, [booking?.id]);
 
-  if (isLoading) return <p className="font-body text-sm text-muted-foreground text-center py-8">Loading...</p>;
+  const openDisputes = disputes.filter((d: any) => d.status === 'open');
+
+  return (
+    <div className="space-y-4">
+      {/* ═══ Dispute Alert Banner ═══ */}
+      {openDisputes.length > 0 && (
+        <div className="border border-amber-500/40 bg-amber-500/10 rounded-lg p-3 space-y-3">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-400" />
+            <p className="font-display text-xs tracking-wider text-amber-400 uppercase">Bill Dispute ({openDisputes.length})</p>
+          </div>
+          {openDisputes.map((d: any) => (
+            <div key={d.id} className="bg-card border border-amber-500/30 rounded-lg p-3 space-y-2">
+              <p className="font-body text-xs text-muted-foreground">{d.guest_name} · {new Date(d.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</p>
+              <p className="font-body text-sm text-foreground">{d.guest_message}</p>
+              {respondingDisputeId === d.id ? (
+                <div className="space-y-2">
+                  <Textarea value={disputeResponse} onChange={e => setDisputeResponse(e.target.value)}
+                    placeholder="Explain what was corrected or why the charge is valid..."
+                    className="bg-secondary border-border text-foreground min-h-[80px] text-sm" />
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={() => handleResolveDispute(d.id, 'resolved')} disabled={!disputeResponse.trim()}
+                      className="font-display text-xs tracking-wider gap-1">
+                      <CheckCircle className="w-3 h-3" /> Resolve
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => handleResolveDispute(d.id, 'dismissed')} disabled={!disputeResponse.trim()}
+                      className="font-display text-xs tracking-wider">
+                      Dismiss
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => { setRespondingDisputeId(null); setDisputeResponse(''); }}
+                      className="font-display text-xs tracking-wider text-muted-foreground">
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button size="sm" variant="outline" onClick={() => setRespondingDisputeId(d.id)}
+                  className="font-display text-xs tracking-wider gap-1 border-amber-500/40 text-amber-400 hover:bg-amber-500/10">
+                  <MessageSquare className="w-3 h-3" /> Respond
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Resolved disputes */}
+      {disputes.filter((d: any) => d.status !== 'open').length > 0 && (
+        <div className="space-y-2">
+          <p className="font-display text-[10px] tracking-wider text-muted-foreground uppercase">Past Disputes</p>
+          {disputes.filter((d: any) => d.status !== 'open').map((d: any) => (
+            <div key={d.id} className="border border-border/40 rounded-lg p-2 opacity-60">
+              <div className="flex justify-between items-center">
+                <p className="font-body text-xs text-foreground truncate max-w-[70%]">{d.guest_message}</p>
+                <Badge variant="outline" className="text-[10px]">{d.status}</Badge>
+              </div>
+              {d.staff_response && <p className="font-body text-[10px] text-muted-foreground mt-1">Response: {d.staff_response}</p>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ═══ Balance Header ═══ */}
       <div className="border border-border rounded-lg p-4 bg-secondary space-y-2">
         <div className="flex items-center justify-between">
           <div>
