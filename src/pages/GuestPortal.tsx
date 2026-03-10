@@ -1119,29 +1119,44 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
         </div>
       </div>
 
-      {/* Unpaid F&B orders */}
+      {/* Active F&B orders with itemized breakdown and status */}
       {unpaidOrders.length > 0 && (
         <div className="space-y-2">
           <p className="font-display text-xs tracking-wider text-amber-400 uppercase flex items-center gap-1">
-            ⚠️ Pending Payment
+            ⚠️ Active Orders
           </p>
-          {unpaidOrders.map((o: any) => (
-            <div key={o.id} className="bg-amber-500/10 border border-amber-500/30 p-3 rounded flex justify-between items-start">
-              <div className="flex items-start gap-2">
-                <Utensils className="w-4 h-4 text-amber-400 mt-0.5" />
-                <div>
-                  <p className="font-body text-sm text-foreground">Food & Drink Order</p>
-                  <p className="font-body text-xs text-muted-foreground">
-                    {new Date(o.created_at).toLocaleString()} · {o.payment_type || 'Cash'}
-                  </p>
+          {unpaidOrders.map((o: any) => {
+            const items = Array.isArray(o.items) ? o.items : [];
+            const statusColor = o.status === 'New' ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+              : o.status === 'Preparing' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+              : o.status === 'Ready' ? 'bg-green-500/20 text-green-300 border-green-500/30'
+              : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
+            return (
+              <div key={o.id} className="bg-card border border-border p-3 rounded-lg space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Utensils className="w-4 h-4 text-amber-400" />
+                    <span className="font-body text-xs text-muted-foreground">
+                      {new Date(o.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                    </span>
+                  </div>
+                  <Badge variant="outline" className={`text-[10px] ${statusColor}`}>{o.status}</Badge>
+                </div>
+                {/* Itemized contents */}
+                <div className="space-y-0.5 pl-6">
+                  {items.map((i: any, idx: number) => (
+                    <p key={idx} className="font-body text-sm text-foreground">
+                      {i.qty || 1}× {i.name}
+                    </p>
+                  ))}
+                </div>
+                <div className="flex justify-between items-center pl-6">
+                  <span className="font-body text-sm text-amber-400 font-medium">₱{(o.total || 0).toLocaleString()}</span>
+                  {o.status === 'Served' && <Badge variant="outline" className="text-[10px] border-amber-500/50 text-amber-400">Pay at Counter</Badge>}
                 </div>
               </div>
-              <div className="text-right">
-                <span className="font-body text-sm text-amber-400 font-medium">₱{(o.total || 0).toLocaleString()}</span>
-                <Badge variant="outline" className="ml-2 text-[10px] border-amber-500/50 text-amber-400">Pay at Counter</Badge>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -1157,7 +1172,7 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
                 <Palmtree className="w-4 h-4 text-emerald-400 mt-0.5" />
                 <div>
                   <p className="font-body text-sm text-foreground">{t.tour_name}</p>
-                  <p className="font-body text-xs text-muted-foreground">{t.tour_date} · {t.pax} pax</p>
+                  <p className="font-body text-xs text-muted-foreground">{t.tour_date} · {t.pax} pax{t.pickup_time ? ` · Pickup ${t.pickup_time}` : ''}</p>
                 </div>
               </div>
               <div className="text-right">
@@ -1181,28 +1196,37 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
         </div>
       )}
 
-      {/* Confirmed transactions */}
+      {/* Confirmed transactions — grouped by type */}
       <div className="space-y-2">
         {transactions.length > 0 && (
           <p className="font-display text-xs tracking-wider text-muted-foreground uppercase">Transactions</p>
         )}
-        {transactions.map((t: any) => (
-          <div key={t.id} className="bg-secondary p-3 rounded flex justify-between items-start">
-            <div className="flex items-start gap-2">
-              {getBillIcon(t.notes, t.transaction_type)}
-              <div>
-                <p className="font-body text-sm text-foreground">{t.notes || t.transaction_type}</p>
-                <p className="font-body text-xs text-muted-foreground">
-                  {new Date(t.created_at).toLocaleString()}
-                  {t.staff_name ? ` · ${t.staff_name}` : ''}
-                </p>
+        {transactions.map((t: any) => {
+          const isAccom = t.transaction_type === 'accommodation';
+          const isPayment = t.transaction_type === 'payment';
+          return (
+            <div key={t.id} className={`p-3 rounded-lg flex justify-between items-start ${isAccom ? 'bg-primary/5 border border-primary/20' : 'bg-secondary'}`}>
+              <div className="flex items-start gap-2">
+                {isAccom ? <span className="text-base">🏠</span> : getBillIcon(t.notes, t.transaction_type)}
+                <div>
+                  <p className="font-body text-sm text-foreground">
+                    {isAccom ? 'Accommodation' : (t.notes || t.transaction_type.replace('_', ' '))}
+                  </p>
+                  {isAccom && t.notes && (
+                    <p className="font-body text-xs text-muted-foreground">{t.notes}</p>
+                  )}
+                  <p className="font-body text-xs text-muted-foreground">
+                    {new Date(t.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                    {t.staff_name ? ` · ${t.staff_name}` : ''}
+                  </p>
+                </div>
               </div>
+              <span className={`font-body text-sm font-medium ${isPayment ? 'text-green-400' : 'text-foreground'}`}>
+                {isPayment ? '-' : '+'}₱{Math.abs(t.total_amount || 0).toLocaleString()}
+              </span>
             </div>
-            <span className={`font-body text-sm font-medium ${t.transaction_type === 'payment' ? 'text-green-400' : 'text-foreground'}`}>
-              {t.transaction_type === 'payment' ? '-' : '+'}₱{Math.abs(t.total_amount || 0).toLocaleString()}
-            </span>
-          </div>
-        ))}
+          );
+        })}
         {transactions.length === 0 && !hasPending && unpaidOrders.length === 0 && <p className="font-body text-sm text-muted-foreground text-center">No transactions yet.</p>}
       </div>
 
