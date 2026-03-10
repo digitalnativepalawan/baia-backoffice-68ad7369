@@ -471,6 +471,17 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
       qc.invalidateQueries({ queryKey: ['resort-ops-guests'] });
     }
     if (!guestId || !newBooking.unit_id || !newBooking.check_in || !newBooking.check_out) { toast.error('Fill in all required fields'); return; }
+    // Conflict check
+    const conflicting = (bookings as any[]).find((b: any) =>
+      b.unit_id === newBooking.unit_id &&
+      b.check_in < newBooking.check_out &&
+      b.check_out > newBooking.check_in
+    );
+    if (conflicting) {
+      const cName = guests.find((g: any) => g.id === conflicting.guest_id)?.full_name || conflicting.platform || 'another guest';
+      toast.error(`Double booking! This room is booked by ${cName} (${conflicting.check_in} to ${conflicting.check_out}).`);
+      return;
+    }
     await from('resort_ops_bookings').insert({
       guest_id: guestId, unit_id: newBooking.unit_id, platform: newBooking.platform,
       check_in: newBooking.check_in, check_out: newBooking.check_out, adults: parseInt(newBooking.adults) || 1,
