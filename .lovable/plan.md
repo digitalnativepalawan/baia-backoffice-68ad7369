@@ -1,43 +1,37 @@
 
 
-## Fix Bill Dropdown, Show Service Charges, and Full Status Transparency
+## Plan: Fix Schedule Delete & Enhance Task/Assignment Scheduling
 
-### Problems Identified
+### Issues Found
 
-1. **Bill dropdown shows ₱0** — The balance calculation in `RoomBillingTab` counts `order.total` (which is only the subtotal), but excludes the `service_charge` field stored separately on each order. So the displayed folio balance is wrong.
+1. **Delete button bug**: The trash icon on shift blocks triggers `setDeleteId(s.id)`, but the parent div's `onClick={() => openEdit(s)}` fires simultaneously despite `stopPropagation`. On mobile, the tiny button (3x3 icon) is nearly impossible to tap. The AlertDialog `onOpenChange={() => setDeleteId(null)}` also races with the confirm action.
 
-2. **Service charge (10%) not visible per order** — Neither the billing tab nor the guest portal shows the service charge breakdown for F&B orders. Guests and staff can't see the 10% fee.
-
-3. **Order status changes not reflected in billing** — When kitchen/bar marks an item as "Served" or "Ready", the billing tab and guest portal don't visually emphasize this. The status badge exists but there's no clear indication of what's billable vs still in progress.
-
-4. **Guest portal bill missing service charge lines** — The `BillView` shows order totals but not the service charge or tax breakdown, making it non-transparent for guest approval.
-
-5. **PrintBill only uses room_transactions** — It doesn't include unpaid F&B orders or their service charges in the printed bill, so the print is incomplete.
+2. **Missing scheduling features**: The schedule only manages time shifts. There's no way to assign tasks like housecleaning, reception duty, or track completion from within the schedule view.
 
 ### Changes
 
-**1. `src/components/rooms/RoomBillingTab.tsx`** — Fix balance + show service charge
-- Fix `unpaidOrdersTotal` to include `service_charge`: `Number(o.total || 0) + Number(o.service_charge || 0)`
-- Same fix for `paidOrders` total display
-- Show service charge breakdown under each order: "Subtotal ₱X · SC 10% ₱Y · Total ₱Z"
-- Show tax breakdown if `tax_details` exists on the order
-- In the Summary section, add a "Service Charges" line
-- Include `roomOrders` (all orders including charged-to-room) in the grand total calculation so the folio balance is accurate
+**1. Fix Delete Button** (`WeeklyScheduleManager.tsx`)
+- Make `confirmDelete` capture `deleteId` before the dialog closes by saving it in a ref or local variable
+- Increase touch target size for edit/delete buttons on shift blocks
+- Prevent edit modal from opening when clicking edit/delete icons (the `stopPropagation` exists but the parent click handler on the entire timeline area also fires)
 
-**2. `src/pages/GuestPortal.tsx` (BillView)** — Full transparency
-- Fix `unpaidOrdersTotal` to include service charge: `(o.total || 0) + (o.service_charge || 0)`
-- Show per-order breakdown: subtotal, service charge (10%), and total
-- Show confirmed/completed tours and requests in a "Completed" section (currently only pending ones show)
-- Add completed tours query (status = 'completed') so guests see their finished experiences
-- Show status badge more prominently with color and description text (e.g., "Being prepared by kitchen", "Ready for pickup", "Served ✓")
+**2. Add Task/Assignment Creation from Schedule** (`WeeklyScheduleManager.tsx`)
+- Add an "Assign Task" button alongside "Add Shift" 
+- New modal to create a task assignment: select employee, pick type (Housecleaning, Reception, Custom), set date/time, add notes
+- For housecleaning: select a room/unit to clean, auto-creates a `housekeeping_orders` entry assigned to the selected employee
+- For other tasks: creates an `employee_tasks` entry with due date and description
+- Tasks appear as colored pills on the timeline (already partially implemented)
 
-**3. `src/components/rooms/PrintBill.tsx`** — Include all charges in print
-- Accept `roomOrders` as a prop and include unpaid F&B orders with service charges in the printed bill
-- Show itemized F&B orders with service charge lines
-- Show tours and requests in the printed bill
+**3. Show Completion Info on Task Detail** (`WeeklyScheduleManager.tsx`)
+- In the task detail dialog, show who completed the task and when (`completed_at`)
+- For housekeeping pills, show completion status (`cleaning_completed_at`, `completed_by_name`)
+- Make housekeeping pills clickable to show full details (room, status, who inspected/cleaned)
+
+**4. Enhance Task Detail Dialog** (`WeeklyScheduleManager.tsx`)
+- Add edit capability: change title, description, due date, reassign to different employee
+- Add delete capability for tasks
+- Show completion audit trail
 
 ### Files to Edit
-1. `src/components/rooms/RoomBillingTab.tsx` — Fix balance math, show SC per order
-2. `src/pages/GuestPortal.tsx` — Fix balance math, show SC per order, add completed tours/requests
-3. `src/components/rooms/PrintBill.tsx` — Include F&B orders and service charges in print output
+- `src/components/admin/WeeklyScheduleManager.tsx` — all changes in this single file
 

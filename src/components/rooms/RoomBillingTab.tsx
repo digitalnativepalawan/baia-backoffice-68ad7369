@@ -113,7 +113,11 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
   const totalPayments = Math.abs(payments.reduce((s, t) => s + t.total_amount, 0));
   const unpaidOrdersTotal = unpaidOrders
     .filter(o => o.payment_type !== 'Charge to Room')
-    .reduce((s, o) => s + Number(o.total || 0), 0);
+    .reduce((s, o) => s + Number(o.total || 0) + Number(o.service_charge || 0), 0);
+  const unpaidOrdersSCTotal = unpaidOrders
+    .filter(o => o.payment_type !== 'Charge to Room')
+    .reduce((s, o) => s + Number(o.service_charge || 0), 0);
+  const unpaidOrdersSubtotal = unpaidOrdersTotal - unpaidOrdersSCTotal;
   const balance = totalCharges - totalPayments + unpaidOrdersTotal;
 
   const staffName = localStorage.getItem('emp_display_name') || localStorage.getItem('emp_name') || 'Staff';
@@ -280,7 +284,7 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
             className="font-display text-xs tracking-wider min-h-[44px]">
             Adjustment
           </Button>
-          <PrintBill unitName={unit.name} guestName={guestName} booking={booking} transactions={transactions} />
+          <PrintBill unitName={unit.name} guestName={guestName} booking={booking} transactions={transactions} roomOrders={roomOrders} tours={tours} />
           {booking && (
             <Button size="sm" variant="destructive" onClick={() => setShowCheckout(true)}
               className="font-display text-xs tracking-wider gap-1 min-h-[44px]">
@@ -291,7 +295,7 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
       )}
       {readOnly && (
         <div className="flex flex-wrap gap-2">
-          <PrintBill unitName={unit.name} guestName={guestName} booking={booking} transactions={transactions} />
+          <PrintBill unitName={unit.name} guestName={guestName} booking={booking} transactions={transactions} roomOrders={roomOrders} tours={tours} />
         </div>
       )}
 
@@ -321,6 +325,10 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
                 <p className="font-body text-xs text-foreground">
                   {items.map((i: any) => `${i.qty || 1}× ${i.name}`).join(', ')}
                 </p>
+                {/* Service charge breakdown */}
+                <div className="font-body text-[10px] text-muted-foreground">
+                  Subtotal: ₱{Number(o.total || 0).toLocaleString()} · SC 10%: ₱{Number(o.service_charge || 0).toLocaleString()} · <span className="text-foreground font-medium">Total: ₱{(Number(o.total || 0) + Number(o.service_charge || 0)).toLocaleString()}</span>
+                </div>
                 <div className="flex items-center justify-between">
                   {isEditing ? (
                     <div className="flex items-center gap-1">
@@ -394,7 +402,10 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
                 <p className="font-body text-xs text-foreground">
                   {items.map((i: any) => `${i.qty || 1}× ${i.name}`).join(', ')}
                 </p>
-                <span className="font-display text-sm text-muted-foreground">₱{Number(o.total).toLocaleString()}</span>
+                <div>
+                  <span className="font-display text-sm text-muted-foreground">₱{(Number(o.total || 0) + Number(o.service_charge || 0)).toLocaleString()}</span>
+                  <span className="font-body text-[10px] text-muted-foreground ml-1">(incl SC ₱{Number(o.service_charge || 0).toLocaleString()})</span>
+                </div>
               </div>
             );
           })}
@@ -602,10 +613,16 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
           <span className="text-foreground">₱{totalCharges.toLocaleString()}</span>
         </div>
         {unpaidOrdersTotal > 0 && (
-          <div className="flex justify-between font-body text-sm">
-            <span className="text-muted-foreground">Unpaid F&B</span>
-            <span className="text-amber-400">₱{unpaidOrdersTotal.toLocaleString()}</span>
-          </div>
+          <>
+            <div className="flex justify-between font-body text-sm">
+              <span className="text-muted-foreground">Unpaid F&B (Subtotal)</span>
+              <span className="text-amber-400">₱{unpaidOrdersSubtotal.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between font-body text-sm">
+              <span className="text-muted-foreground">Service Charges (10%)</span>
+              <span className="text-amber-400">₱{unpaidOrdersSCTotal.toLocaleString()}</span>
+            </div>
+          </>
         )}
         <div className="flex justify-between font-body text-sm">
           <span className="text-muted-foreground">Total Payments</span>

@@ -1007,19 +1007,19 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
     },
   });
 
-  // Unpaid F&B orders (not charged to room, status = Served)
+  // Unpaid F&B orders (not charged to room)
   const { data: unpaidOrders = [] } = useQuery({
     queryKey: ['guest-bill-unpaid-orders', session.room_id, session.room_name],
     queryFn: async () => {
       const { data: byRoom } = await supabase
         .from('orders')
-        .select('id, total, guest_name, status, payment_type, created_at, items')
+        .select('id, total, service_charge, guest_name, status, payment_type, created_at, items')
         .eq('room_id', session.room_id)
         .in('status', ['New', 'Preparing', 'Ready', 'Served'])
         .neq('payment_type', 'Charge to Room');
       const { data: byLocation } = await supabase
         .from('orders')
-        .select('id, total, guest_name, status, payment_type, created_at, items')
+        .select('id, total, service_charge, guest_name, status, payment_type, created_at, items')
         .is('room_id', null)
         .eq('location_detail', session.room_name)
         .in('status', ['New', 'Preparing', 'Ready', 'Served']);
@@ -1041,6 +1041,18 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
     },
   });
 
+  // Completed tours
+  const { data: completedTours = [] } = useQuery({
+    queryKey: ['guest-bill-completed-tours', session.booking_id],
+    queryFn: async () => {
+      const { data } = await (supabase.from('guest_tours') as any)
+        .select('*')
+        .eq('booking_id', session.booking_id)
+        .in('status', ['completed', 'confirmed']);
+      return data || [];
+    },
+  });
+
   // Pending requests (transport, rentals)
   const { data: pendingRequests = [] } = useQuery({
     queryKey: ['guest-bill-pending-requests', session.booking_id],
@@ -1049,6 +1061,18 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
         .select('*')
         .eq('booking_id', session.booking_id)
         .eq('status', 'pending');
+      return data || [];
+    },
+  });
+
+  // Completed requests
+  const { data: completedRequests = [] } = useQuery({
+    queryKey: ['guest-bill-completed-requests', session.booking_id],
+    queryFn: async () => {
+      const { data } = await (supabase.from('guest_requests') as any)
+        .select('*')
+        .eq('booking_id', session.booking_id)
+        .eq('status', 'completed');
       return data || [];
     },
   });
@@ -1074,12 +1098,14 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
         filter: `booking_id=eq.${session.booking_id}`,
       }, () => {
         qc.invalidateQueries({ queryKey: ['guest-bill-pending-tours', session.booking_id] });
+        qc.invalidateQueries({ queryKey: ['guest-bill-completed-tours', session.booking_id] });
       })
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'guest_requests',
         filter: `booking_id=eq.${session.booking_id}`,
       }, () => {
         qc.invalidateQueries({ queryKey: ['guest-bill-pending-requests', session.booking_id] });
+        qc.invalidateQueries({ queryKey: ['guest-bill-completed-requests', session.booking_id] });
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -1089,7 +1115,9 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
   const payments = transactions.filter((t: any) => (t.total_amount || 0) < 0);
   const totalCharges = charges.reduce((s: number, t: any) => s + (t.total_amount || 0), 0);
   const totalPayments = Math.abs(payments.reduce((s: number, t: any) => s + (t.total_amount || 0), 0));
-  const unpaidOrdersTotal = unpaidOrders.reduce((s: number, o: any) => s + (o.total || 0), 0);
+  const unpaidOrdersTotal = unpaidOrders.reduce((s: number, o: any) => s + (o.total || 0) + (o.service_charge || 0), 0);
+  const unpaidOrdersSCTotal = unpaidOrders.reduce((s: number, o: any) => s + (o.service_charge || 0), 0);
+  const unpaidOrdersSubtotal = unpaidOrdersTotal - unpaidOrdersSCTotal;
   const balance = totalCharges - totalPayments + unpaidOrdersTotal;
   const hasPending = pendingTours.length > 0 || pendingRequests.length > 0;
 
@@ -1104,10 +1132,16 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
           <span className="font-body text-sm text-foreground">₱{totalCharges.toLocaleString()}</span>
         </div>
         {unpaidOrdersTotal > 0 && (
-          <div className="flex justify-between mb-2">
-            <span className="font-body text-sm text-muted-foreground">Unpaid Orders</span>
-            <span className="font-body text-sm text-amber-400">₱{unpaidOrdersTotal.toLocaleString()}</span>
-          </div>
+          <>
+            <div className="flex justify-between mb-1">
+              <span className="font-body text-sm text-muted-foreground">F&B Subtotal</span>
+              <span className="font-body text-sm text-amber-400">₱{unpaidOrdersSubtotal.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between mb-2">
+              <span className="font-body text-sm text-muted-foreground">Service Charge (10%)</span>
+              <span className="font-body text-sm text-amber-400">₱{unpaidOrdersSCTotal.toLocaleString()}</span>
+            </div>
+          </>
         )}
         <div className="flex justify-between mb-2">
           <span className="font-body text-sm text-muted-foreground">Total Payments</span>
@@ -1131,6 +1165,11 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
               : o.status === 'Preparing' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
               : o.status === 'Ready' ? 'bg-green-500/20 text-green-300 border-green-500/30'
               : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
+            const statusDesc = o.status === 'New' ? 'Order received'
+              : o.status === 'Preparing' ? 'Being prepared by kitchen'
+              : o.status === 'Ready' ? 'Ready for pickup'
+              : 'Served ✓';
+            const orderTotal = Number(o.total || 0) + Number(o.service_charge || 0);
             return (
               <div key={o.id} className="bg-card border border-border p-3 rounded-lg space-y-1.5">
                 <div className="flex items-center justify-between">
@@ -1140,20 +1179,40 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
                       {new Date(o.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                     </span>
                   </div>
-                  <Badge variant="outline" className={`text-[10px] ${statusColor}`}>{o.status}</Badge>
+                  <div className="flex items-center gap-1.5">
+                    <Badge variant="outline" className={`text-[10px] ${statusColor}`}>{o.status}</Badge>
+                  </div>
                 </div>
+                <p className="font-body text-[11px] text-muted-foreground pl-6">{statusDesc}</p>
                 {/* Itemized contents */}
                 <div className="space-y-0.5 pl-6">
                   {items.map((i: any, idx: number) => (
-                    <p key={idx} className="font-body text-sm text-foreground">
-                      {i.qty || 1}× {i.name}
-                    </p>
+                    <div key={idx} className="flex justify-between">
+                      <span className="font-body text-sm text-foreground">{i.qty || 1}× {i.name}</span>
+                      <span className="font-body text-xs text-muted-foreground">₱{((i.price || 0) * (i.qty || 1)).toLocaleString()}</span>
+                    </div>
                   ))}
                 </div>
-                <div className="flex justify-between items-center pl-6">
-                  <span className="font-body text-sm text-amber-400 font-medium">₱{(o.total || 0).toLocaleString()}</span>
-                  {o.status === 'Served' && <Badge variant="outline" className="text-[10px] border-amber-500/50 text-amber-400">Pay at Counter</Badge>}
+                {/* SC breakdown */}
+                <div className="pl-6 border-t border-border/50 pt-1 space-y-0.5">
+                  <div className="flex justify-between">
+                    <span className="font-body text-[11px] text-muted-foreground">Subtotal</span>
+                    <span className="font-body text-[11px] text-muted-foreground">₱{Number(o.total || 0).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-body text-[11px] text-muted-foreground">Service Charge (10%)</span>
+                    <span className="font-body text-[11px] text-muted-foreground">₱{Number(o.service_charge || 0).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-body text-xs text-foreground font-medium">Total</span>
+                    <span className="font-body text-xs text-amber-400 font-medium">₱{orderTotal.toLocaleString()}</span>
+                  </div>
                 </div>
+                {o.status === 'Served' && (
+                  <div className="pl-6">
+                    <Badge variant="outline" className="text-[10px] border-amber-500/50 text-amber-400">Pay at Counter</Badge>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -1191,6 +1250,42 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
                 </div>
               </div>
               <Badge variant="outline" className="text-[10px]">Pending</Badge>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Completed Tours & Experiences */}
+      {(completedTours.length > 0 || completedRequests.length > 0) && (
+        <div className="space-y-2">
+          <p className="font-display text-xs tracking-wider text-emerald-400 uppercase flex items-center gap-1">
+            <CheckCircle2 className="w-3 h-3" /> Completed Experiences
+          </p>
+          {completedTours.map((t: any) => (
+            <div key={t.id} className="bg-card border border-emerald-500/20 p-3 rounded-lg flex justify-between items-start">
+              <div className="flex items-start gap-2">
+                <Palmtree className="w-4 h-4 text-emerald-400 mt-0.5" />
+                <div>
+                  <p className="font-body text-sm text-foreground">{t.tour_name}</p>
+                  <p className="font-body text-xs text-muted-foreground">{t.tour_date} · {t.pax} pax{t.pickup_time ? ` · Pickup ${t.pickup_time}` : ''}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="font-body text-sm text-foreground">₱{(t.price || 0).toLocaleString()}</span>
+                <Badge variant="outline" className="ml-2 text-[10px] bg-emerald-500/20 text-emerald-300 border-emerald-500/30">Done</Badge>
+              </div>
+            </div>
+          ))}
+          {completedRequests.map((r: any) => (
+            <div key={r.id} className="bg-card border border-emerald-500/20 p-3 rounded-lg flex justify-between items-start">
+              <div className="flex items-start gap-2">
+                {r.request_type?.toLowerCase().includes('transport') ? <Truck className="w-4 h-4 text-blue-400 mt-0.5" /> : <Bike className="w-4 h-4 text-purple-400 mt-0.5" />}
+                <div>
+                  <p className="font-body text-sm text-foreground">{r.request_type}</p>
+                  <p className="font-body text-xs text-muted-foreground">{r.details}</p>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-[10px] bg-emerald-500/20 text-emerald-300 border-emerald-500/30">Done</Badge>
             </div>
           ))}
         </div>

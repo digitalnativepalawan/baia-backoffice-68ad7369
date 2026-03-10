@@ -9,9 +9,11 @@ interface PrintBillProps {
   guestName: string | null;
   booking: any;
   transactions: RoomTransaction[];
+  roomOrders?: any[];
+  tours?: any[];
 }
 
-const PrintBill = ({ unitName, guestName, booking, transactions }: PrintBillProps) => {
+const PrintBill = ({ unitName, guestName, booking, transactions, roomOrders = [], tours = [] }: PrintBillProps) => {
   const { data: config } = useBillingConfig();
   const { data: profile } = useResortProfile();
   const { data: invoiceSettings } = useInvoiceSettings();
@@ -21,7 +23,16 @@ const PrintBill = ({ unitName, guestName, booking, transactions }: PrintBillProp
     const payments = transactions.filter(t => t.total_amount < 0);
     const totalCharges = charges.reduce((s, t) => s + t.total_amount, 0);
     const totalPayments = Math.abs(payments.reduce((s, t) => s + t.total_amount, 0));
-    const balance = totalCharges - totalPayments;
+
+    // Unpaid F&B orders (not charged to room)
+    const unpaidFnB = roomOrders.filter((o: any) => o.status !== 'Paid' && o.payment_type !== 'Charge to Room');
+    const fnbTotal = unpaidFnB.reduce((s: number, o: any) => s + Number(o.total || 0) + Number(o.service_charge || 0), 0);
+
+    // Active tours
+    const activeTours = tours.filter((t: any) => t.status !== 'cancelled');
+    const toursTotal = activeTours.reduce((s: number, t: any) => s + Number(t.price || 0), 0);
+
+    const balance = totalCharges - totalPayments + fnbTotal;
 
     const staffNames = [...new Set(transactions.map(t => t.staff_name))].join(', ');
 
@@ -70,7 +81,26 @@ h2, h3 { margin: 4px 0; }
 ${charges.map(t => `<div class="row"><span>${format(new Date(t.created_at), 'M/d h:mma')}</span><span>₱${t.total_amount.toLocaleString()}</span></div>
 ${config?.show_itemized_taxes ? `<div style="font-size:10px;color:#666">&nbsp;&nbsp;Sub:₱${t.amount.toLocaleString()} Tax:₱${t.tax_amount.toLocaleString()} SC:₱${t.service_charge_amount.toLocaleString()}</div>` : ''}`).join('')}
 <div class="line"></div>
-<div class="row bold"><span>Total Charges</span><span>₱${totalCharges.toLocaleString()}</span></div>
+<div class="row bold"><span>Room Charges</span><span>₱${totalCharges.toLocaleString()}</span></div>
+${unpaidFnB.length > 0 ? `
+<div class="line"></div>
+<h3>F&B ORDERS</h3>
+${unpaidFnB.map((o: any) => {
+  const items = Array.isArray(o.items) ? o.items : [];
+  const orderTotal = Number(o.total || 0) + Number(o.service_charge || 0);
+  return `<div style="margin-bottom:4px">
+<div class="row"><span>${items.map((i: any) => (i.qty || 1) + '× ' + i.name).join(', ')}</span></div>
+<div style="font-size:10px;color:#666">&nbsp;&nbsp;Sub:₱${Number(o.total || 0).toLocaleString()} SC:₱${Number(o.service_charge || 0).toLocaleString()}</div>
+<div class="row"><span>${o.status}</span><span>₱${orderTotal.toLocaleString()}</span></div>
+</div>`;
+}).join('')}
+<div class="row bold"><span>F&B Total</span><span>₱${fnbTotal.toLocaleString()}</span></div>` : ''}
+${activeTours.length > 0 ? `
+<div class="line"></div>
+<h3>TOURS & EXPERIENCES</h3>
+${activeTours.map((t: any) => `<div class="row"><span>${t.tour_name} (${t.pax}pax)</span><span>₱${Number(t.price || 0).toLocaleString()}</span></div>
+<div style="font-size:10px;color:#666">&nbsp;&nbsp;${t.tour_date} · ${t.status}</div>`).join('')}
+<div class="row bold"><span>Tours Total</span><span>₱${toursTotal.toLocaleString()}</span></div>` : ''}
 <div class="line"></div>
 <h3>PAYMENTS</h3>
 ${payments.map(t => `<div class="row"><span>${t.payment_method}</span><span>₱${Math.abs(t.total_amount).toLocaleString()}</span></div>`).join('')}
