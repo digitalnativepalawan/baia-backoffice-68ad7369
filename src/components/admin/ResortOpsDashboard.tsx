@@ -407,7 +407,7 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
         if (isActive) {
           const resortUnit = (units as any[]).find((u) => u.id === booking.unit_id);
           if (resortUnit) {
-            const displayUnit = await supabase.from('units' as any).select('id').ilike('name', resortUnit.name.trim()).limit(1);
+            const displayUnit = await supabase.from('units' as any).select('id').ilike('unit_name', resortUnit.name.trim()).limit(1);
             const dUnit = (displayUnit.data as any)?.[0];
             if (dUnit) {
               await supabase.from('units' as any).update({ status: 'to_clean' } as any).eq('id', dUnit.id);
