@@ -78,7 +78,7 @@ const ReceptionCalendar = ({ bookings, rooms, units, canEdit, canManage }: Recep
   };
 
   const renderBookingChip = (b: BookingWithGuest, showRoom = true) => {
-    const status = getBookingStatus(b);
+    const status = getBookingStatus(b, getUnitStatusForBooking(b));
     const colors = statusColors[status];
     const isCheckIn = (date: Date) => isSameDay(date, parseISO(b.check_in));
     const isCheckOut = (date: Date) => isSameDay(date, parseISO(b.check_out));
