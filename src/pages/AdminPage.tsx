@@ -690,8 +690,8 @@ const AdminPage = () => {
 
           {/* ROOMS TAB */}
           {(isAdmin || hasAccess(perms, 'rooms')) && (
-            <TabsContent value="rooms">
-              <RoomsDashboard readOnly={readOnly('rooms')} canViewDocuments={docsAllowed} />
+            <TabsContent value="rooms" className="mt-0">
+              <ReceptionPage embedded />
             </TabsContent>
           )}
 
