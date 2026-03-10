@@ -71,6 +71,48 @@ export type Database = {
         }
         Relationships: []
       }
+      bill_disputes: {
+        Row: {
+          booking_id: string
+          created_at: string
+          guest_message: string
+          guest_name: string
+          id: string
+          resolved_at: string | null
+          responded_by: string
+          room_id: string | null
+          staff_response: string
+          status: string
+          unit_name: string
+        }
+        Insert: {
+          booking_id: string
+          created_at?: string
+          guest_message?: string
+          guest_name?: string
+          id?: string
+          resolved_at?: string | null
+          responded_by?: string
+          room_id?: string | null
+          staff_response?: string
+          status?: string
+          unit_name?: string
+        }
+        Update: {
+          booking_id?: string
+          created_at?: string
+          guest_message?: string
+          guest_name?: string
+          id?: string
+          resolved_at?: string | null
+          responded_by?: string
+          room_id?: string | null
+          staff_response?: string
+          status?: string
+          unit_name?: string
+        }
+        Relationships: []
+      }
       billing_config: {
         Row: {
           allow_room_charging: boolean
