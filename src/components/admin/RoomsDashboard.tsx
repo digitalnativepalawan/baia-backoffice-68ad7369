@@ -465,6 +465,21 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
     if (checkInForm.checkOut <= checkInForm.checkIn) {
       toast.error('Check-out must be after check-in'); return;
     }
+    // Conflict check: ensure no overlapping booking for this unit
+    const resortUnitForCheck = resolveResortUnit(selectedUnit.name);
+    if (resortUnitForCheck) {
+      const conflicting = (bookings as any[]).find((b: any) =>
+        b.unit_id === resortUnitForCheck.id &&
+        b.check_in < checkInForm.checkOut &&
+        b.check_out > checkInForm.checkIn
+      );
+      if (conflicting) {
+        const conflictGuest = conflicting.resort_ops_guests?.full_name || conflicting.platform || 'another guest';
+        toast.error(`Double booking! ${selectedUnit.name} is already booked by ${conflictGuest} (${conflicting.check_in} to ${conflicting.check_out}). Delete that booking first or pick another room.`);
+        setCheckingIn(false);
+        return;
+      }
+    }
     setCheckingIn(true);
     try {
       const { data: existingGuest } = await from('resort_ops_guests')
