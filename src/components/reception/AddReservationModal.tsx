@@ -201,8 +201,6 @@ const AddReservationModal = ({ open, onClose, rooms, bookings, canManage, editBo
     try {
       // If this was an active booking, reset the unit status
       if (editBooking.unit_id) {
-        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
-        const isActive = editBooking.check_in <= today && editBooking.check_out > today;
         const room = rooms.find(r => r.id === editBooking.unit_id);
         if (room) {
           const { data: displayUnit } = await supabase.from('units' as any).select('id, status').ilike('unit_name', room.name.trim()).limit(1);
