@@ -1025,6 +1025,11 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
                     <Badge className={`font-body text-[10px] ${isDepartingToday ? 'bg-amber-500/20 text-amber-400 border-amber-500/40' : 'bg-red-500/20 text-red-400 border-red-500/40'}`}>
                       {isDepartingToday ? 'Departing' : 'Occupied'}
                     </Badge>
+                    {allDisputes.some((d: any) => d.unit_name === unit.name) && (
+                      <Badge className="font-body text-[10px] bg-amber-500/20 text-amber-400 border-amber-500/40 flex items-center gap-0.5">
+                        <AlertTriangle className="w-2.5 h-2.5" /> Dispute
+                      </Badge>
+                    )}
                     {roomOrders.length > 0 && (
                       <span className="font-body text-[10px] text-muted-foreground flex items-center gap-1">
                         <UtensilsCrossed className="w-3 h-3" /> {roomOrders.length} order{roomOrders.length !== 1 ? 's' : ''}
