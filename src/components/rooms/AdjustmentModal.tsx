@@ -35,12 +35,18 @@ const QUICK_CHARGES = [
 
 const AdjustmentModal = ({ open, onOpenChange, unitId, unitName, guestName, bookingId, transactions }: AdjustmentModalProps) => {
   const qc = useQueryClient();
-  const charges = transactions.filter(t => t.transaction_type === 'room_charge');
+  // Show ALL positive transactions (not just room_charge)
+  const allCharges = transactions.filter(t => t.total_amount > 0);
   const [adjType, setAdjType] = useState<string>('Discount');
   const [selectedTxId, setSelectedTxId] = useState('');
   const [reason, setReason] = useState('');
   const [managerName, setManagerName] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Discount mode: percentage or fixed amount
+  const [discountMode, setDiscountMode] = useState<'full' | 'percentage' | 'fixed'>('full');
+  const [discountPct, setDiscountPct] = useState('');
+  const [discountFixed, setDiscountFixed] = useState('');
 
   // Quick charge state
   const [mode, setMode] = useState<'adjustment' | 'charge'>('adjustment');
@@ -48,16 +54,34 @@ const AdjustmentModal = ({ open, onOpenChange, unitId, unitName, guestName, book
   const [chargeAmount, setChargeAmount] = useState('');
   const [chargeNote, setChargeNote] = useState('');
 
-  const selectedTx = charges.find(t => t.id === selectedTxId);
+  const selectedTx = allCharges.find(t => t.id === selectedTxId);
+
+  const computeAdjustmentAmount = (): number => {
+    if (!selectedTx) return 0;
+    if (discountMode === 'full') return -Math.abs(selectedTx.total_amount);
+    if (discountMode === 'percentage') {
+      const pct = parseFloat(discountPct);
+      if (isNaN(pct) || pct <= 0 || pct > 100) return 0;
+      return -Math.abs(selectedTx.total_amount * (pct / 100));
+    }
+    if (discountMode === 'fixed') {
+      const amt = parseFloat(discountFixed);
+      if (isNaN(amt) || amt <= 0) return 0;
+      return -Math.min(amt, Math.abs(selectedTx.total_amount));
+    }
+    return 0;
+  };
 
   const handleSubmitAdjustment = async () => {
     if (!selectedTxId) { toast.error('Select a transaction to adjust'); return; }
     if (!reason.trim()) { toast.error('Reason is required'); return; }
     if (!selectedTx) return;
 
+    const adjustmentAmount = computeAdjustmentAmount();
+    if (adjustmentAmount === 0) { toast.error('Adjustment amount cannot be zero'); return; }
+
     setSubmitting(true);
     try {
-      const adjustmentAmount = -Math.abs(selectedTx.total_amount);
       await (supabase.from('room_transactions' as any) as any).insert({
         unit_id: unitId,
         unit_name: unitName,
@@ -65,19 +89,19 @@ const AdjustmentModal = ({ open, onOpenChange, unitId, unitName, guestName, book
         booking_id: bookingId,
         transaction_type: 'adjustment',
         order_id: selectedTx.order_id,
-        amount: -Math.abs(selectedTx.amount),
-        tax_amount: -Math.abs(selectedTx.tax_amount),
-        service_charge_amount: -Math.abs(selectedTx.service_charge_amount),
+        amount: adjustmentAmount,
+        tax_amount: 0,
+        service_charge_amount: 0,
         total_amount: adjustmentAmount,
         payment_method: adjType,
         staff_name: localStorage.getItem('emp_name') || 'Staff',
-        notes: `${adjType}: ${reason.trim()}${managerName ? ` (Approved by: ${managerName})` : ''}`,
+        notes: `${adjType}${discountMode === 'percentage' ? ` (${discountPct}%)` : discountMode === 'fixed' ? ` (₱${discountFixed})` : ''}: ${reason.trim()}${managerName ? ` (Approved by: ${managerName})` : ''}`,
       });
       await logAudit('created', 'room_transactions', unitId,
         `${adjType} adjustment ₱${Math.abs(adjustmentAmount).toLocaleString()} for ${unitName} — ${reason.trim()}`);
       qc.invalidateQueries({ queryKey: ['room-transactions', unitId] });
       toast.success('Adjustment recorded');
-      setSelectedTxId(''); setReason(''); setManagerName('');
+      setSelectedTxId(''); setReason(''); setManagerName(''); setDiscountPct(''); setDiscountFixed(''); setDiscountMode('full');
       onOpenChange(false);
     } catch {
       toast.error('Failed to record adjustment');
@@ -98,7 +122,7 @@ const AdjustmentModal = ({ open, onOpenChange, unitId, unitName, guestName, book
         unit_name: unitName,
         guest_name: guestName,
         booking_id: bookingId,
-        transaction_type: 'room_charge',
+        transaction_type: chargeCategory === 'Accommodation' ? 'accommodation' : 'room_charge',
         amount: amt,
         tax_amount: 0,
         service_charge_amount: 0,
@@ -119,6 +143,8 @@ const AdjustmentModal = ({ open, onOpenChange, unitId, unitName, guestName, book
       setSubmitting(false);
     }
   };
+
+  const previewAmount = computeAdjustmentAmount();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -194,15 +220,51 @@ const AdjustmentModal = ({ open, onOpenChange, unitId, unitName, guestName, book
                   <SelectValue placeholder="Select a charge" />
                 </SelectTrigger>
                 <SelectContent className="bg-card border-border">
-                  {charges.map(t => (
+                  {allCharges.map(t => (
                     <SelectItem key={t.id} value={t.id} className="text-foreground font-body">
                       {format(new Date(t.created_at), 'MMM d h:mma')} — ₱{t.total_amount.toLocaleString()}
-                      {t.notes ? ` (${t.notes.slice(0, 30)})` : ''}
+                      {' '}({t.transaction_type.replace('_', ' ')})
+                      {t.notes ? ` · ${t.notes.slice(0, 25)}` : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Discount mode selector */}
+            {selectedTx && adjType === 'Discount' && (
+              <div>
+                <label className="font-body text-xs text-muted-foreground">Discount Amount</label>
+                <div className="grid grid-cols-3 gap-2 mt-1">
+                  <button onClick={() => setDiscountMode('full')}
+                    className={`py-2 border rounded font-display text-xs tracking-wider transition-colors ${discountMode === 'full' ? 'border-primary text-primary bg-primary/10' : 'border-border text-muted-foreground'}`}>
+                    Full (100%)
+                  </button>
+                  <button onClick={() => setDiscountMode('percentage')}
+                    className={`py-2 border rounded font-display text-xs tracking-wider transition-colors ${discountMode === 'percentage' ? 'border-primary text-primary bg-primary/10' : 'border-border text-muted-foreground'}`}>
+                    % Off
+                  </button>
+                  <button onClick={() => setDiscountMode('fixed')}
+                    className={`py-2 border rounded font-display text-xs tracking-wider transition-colors ${discountMode === 'fixed' ? 'border-primary text-primary bg-primary/10' : 'border-border text-muted-foreground'}`}>
+                    ₱ Amount
+                  </button>
+                </div>
+                {discountMode === 'percentage' && (
+                  <Input type="number" value={discountPct} onChange={e => setDiscountPct(e.target.value)}
+                    placeholder="e.g. 10" className="bg-secondary border-border text-foreground font-body mt-2" max={100} min={1} />
+                )}
+                {discountMode === 'fixed' && (
+                  <Input type="number" value={discountFixed} onChange={e => setDiscountFixed(e.target.value)}
+                    placeholder="₱ amount" className="bg-secondary border-border text-foreground font-body mt-2" />
+                )}
+                {previewAmount !== 0 && (
+                  <p className="font-body text-xs text-green-400 mt-1">
+                    Adjustment: -₱{Math.abs(previewAmount).toLocaleString()} (from ₱{selectedTx.total_amount.toLocaleString()})
+                  </p>
+                )}
+              </div>
+            )}
+
             <div>
               <label className="font-body text-xs text-muted-foreground">Reason (required)</label>
               <Textarea value={reason} onChange={e => setReason(e.target.value)}

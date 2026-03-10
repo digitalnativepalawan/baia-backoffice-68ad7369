@@ -3,12 +3,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRoomTransactions } from '@/hooks/useRoomTransactions';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import {
   DollarSign, RefreshCw, LogOut, UtensilsCrossed, MapPin, Bike, Truck,
-  Trash2, Gift, FileText, CreditCard, Palmtree, CheckCircle,
+  Trash2, Gift, FileText, CreditCard, Palmtree, CheckCircle, Pencil, Check, X,
 } from 'lucide-react';
 import AddPaymentModal from './AddPaymentModal';
 import AdjustmentModal from './AdjustmentModal';
@@ -32,6 +33,14 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
   const [showPayment, setShowPayment] = useState(false);
   const [showAdjustment, setShowAdjustment] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
+
+  // Inline edit states
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+  const [editOrderAmount, setEditOrderAmount] = useState('');
+  const [editingTourId, setEditingTourId] = useState<string | null>(null);
+  const [editTourAmount, setEditTourAmount] = useState('');
+  const [editingTxId, setEditingTxId] = useState<string | null>(null);
+  const [editTxAmount, setEditTxAmount] = useState('');
 
   // ── ALL F&B orders for this room (including Paid) ──
   const { data: roomOrders = [] } = useQuery({
@@ -117,11 +126,28 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
     toast.success('Order comped');
   };
 
+  const handleMarkPaidOrder = async (orderId: string) => {
+    await supabase.from('orders').update({ status: 'Paid', payment_type: 'Cash', closed_at: new Date().toISOString() }).eq('id', orderId);
+    await logAudit('updated', 'orders', orderId, `Marked order paid by ${staffName}`);
+    qc.invalidateQueries({ queryKey: ['billing-room-orders'] });
+    toast.success('Order marked as paid');
+  };
+
   const handleDeleteOrder = async (orderId: string) => {
     await supabase.from('orders').delete().eq('id', orderId);
     await logAudit('deleted', 'orders', orderId, `Deleted order by ${staffName}`);
     qc.invalidateQueries({ queryKey: ['billing-room-orders'] });
     toast.success('Order deleted');
+  };
+
+  const handleEditOrderSave = async (orderId: string) => {
+    const newTotal = parseFloat(editOrderAmount);
+    if (isNaN(newTotal) || newTotal < 0) { toast.error('Enter a valid amount'); return; }
+    await supabase.from('orders').update({ total: newTotal }).eq('id', orderId);
+    await logAudit('updated', 'orders', orderId, `Edited order total to ₱${newTotal.toLocaleString()} by ${staffName}`);
+    qc.invalidateQueries({ queryKey: ['billing-room-orders'] });
+    setEditingOrderId(null);
+    toast.success('Order total updated');
   };
 
   const handleDeleteTour = async (tourId: string) => {
@@ -131,6 +157,29 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
     toast.success('Tour deleted');
   };
 
+  const handleCancelTour = async (tourId: string) => {
+    await from('guest_tours').update({ status: 'cancelled' }).eq('id', tourId);
+    qc.invalidateQueries({ queryKey: ['billing-tours'] });
+    toast.success('Tour cancelled');
+  };
+
+  const handleCompleteTour = async (tourId: string) => {
+    await from('guest_tours').update({ status: 'completed' }).eq('id', tourId);
+    await logAudit('updated', 'guest_tours', tourId, `Marked tour completed by ${staffName}`);
+    qc.invalidateQueries({ queryKey: ['billing-tours'] });
+    toast.success('Tour marked completed');
+  };
+
+  const handleEditTourSave = async (tourId: string) => {
+    const newPrice = parseFloat(editTourAmount);
+    if (isNaN(newPrice) || newPrice < 0) { toast.error('Enter a valid amount'); return; }
+    await from('guest_tours').update({ price: newPrice }).eq('id', tourId);
+    await logAudit('updated', 'guest_tours', tourId, `Edited tour price to ₱${newPrice.toLocaleString()} by ${staffName}`);
+    qc.invalidateQueries({ queryKey: ['billing-tours'] });
+    setEditingTourId(null);
+    toast.success('Tour price updated');
+  };
+
   const handleDeleteRequest = async (reqId: string) => {
     await from('guest_requests').delete().eq('id', reqId);
     await logAudit('deleted', 'guest_requests', reqId, `Deleted request by ${staffName}`);
@@ -138,16 +187,35 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
     toast.success('Request deleted');
   };
 
-  const handleCancelTour = async (tourId: string) => {
-    await from('guest_tours').update({ status: 'cancelled' }).eq('id', tourId);
-    qc.invalidateQueries({ queryKey: ['billing-tours'] });
-    toast.success('Tour cancelled');
-  };
-
   const handleCancelRequest = async (reqId: string) => {
     await from('guest_requests').update({ status: 'cancelled' }).eq('id', reqId);
     qc.invalidateQueries({ queryKey: ['billing-requests'] });
     toast.success('Request cancelled');
+  };
+
+  const handleCompleteRequest = async (reqId: string) => {
+    await from('guest_requests').update({ status: 'completed' }).eq('id', reqId);
+    await logAudit('updated', 'guest_requests', reqId, `Marked request completed by ${staffName}`);
+    qc.invalidateQueries({ queryKey: ['billing-requests'] });
+    toast.success('Request marked completed');
+  };
+
+  const handleDeleteTx = async (txId: string, txType: string, amount: number) => {
+    if (!confirm(`Delete this ${txType.replace('_', ' ')} entry?`)) return;
+    await from('room_transactions').delete().eq('id', txId);
+    await logAudit('deleted', 'room_transactions', txId, `Deleted ${txType} ₱${Math.abs(amount).toLocaleString()} for ${unit.name} by ${staffName}`);
+    qc.invalidateQueries({ queryKey: ['room-transactions', unit.id] });
+    toast.success('Ledger entry deleted');
+  };
+
+  const handleEditTxSave = async (txId: string) => {
+    const newAmt = parseFloat(editTxAmount);
+    if (isNaN(newAmt)) { toast.error('Enter a valid amount'); return; }
+    await from('room_transactions').update({ amount: newAmt, total_amount: newAmt, tax_amount: 0, service_charge_amount: 0 }).eq('id', txId);
+    await logAudit('updated', 'room_transactions', txId, `Edited ledger amount to ₱${newAmt.toLocaleString()} by ${staffName}`);
+    qc.invalidateQueries({ queryKey: ['room-transactions', unit.id] });
+    setEditingTxId(null);
+    toast.success('Ledger entry updated');
   };
 
   const refreshAll = () => {
@@ -238,6 +306,7 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
           {unpaidOrders.map(o => {
             const items = Array.isArray(o.items) ? o.items : [];
             const isChargedToRoom = o.payment_type === 'Charge to Room';
+            const isEditing = editingOrderId === o.id;
             return (
               <div key={o.id} className="border border-border rounded-lg p-3 space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
@@ -253,13 +322,42 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
                   {items.map((i: any) => `${i.qty || 1}× ${i.name}`).join(', ')}
                 </p>
                 <div className="flex items-center justify-between">
-                  <span className="font-display text-sm text-foreground">₱{Number(o.total).toLocaleString()}</span>
-                  {!readOnly && !isChargedToRoom && (
+                  {isEditing ? (
                     <div className="flex items-center gap-1">
-                      <Button size="sm" variant="ghost" onClick={() => handleCompOrder(o.id)}
-                        className="h-7 px-2 text-xs text-amber-400 hover:text-amber-300">
-                        <Gift className="w-3 h-3 mr-1" /> Comp
+                      <span className="font-body text-xs text-muted-foreground">₱</span>
+                      <Input type="number" value={editOrderAmount} onChange={e => setEditOrderAmount(e.target.value)}
+                        className="h-7 w-24 text-xs bg-secondary border-border" autoFocus />
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-green-400" onClick={() => handleEditOrderSave(o.id)}>
+                        <Check className="w-3.5 h-3.5" />
                       </Button>
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground" onClick={() => setEditingOrderId(null)}>
+                        <X className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <span className="font-display text-sm text-foreground">₱{Number(o.total).toLocaleString()}</span>
+                  )}
+                  {!readOnly && !isEditing && (
+                    <div className="flex items-center gap-1">
+                      {/* Edit price */}
+                      <Button size="sm" variant="ghost" onClick={() => { setEditingOrderId(o.id); setEditOrderAmount(String(o.total)); }}
+                        className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground">
+                        <Pencil className="w-3 h-3" />
+                      </Button>
+                      {/* Mark Paid */}
+                      {o.status === 'Served' && !isChargedToRoom && (
+                        <Button size="sm" variant="ghost" onClick={() => handleMarkPaidOrder(o.id)}
+                          className="h-7 px-2 text-xs text-green-400 hover:text-green-300">
+                          <DollarSign className="w-3 h-3 mr-0.5" /> Paid
+                        </Button>
+                      )}
+                      {/* Comp */}
+                      {!isChargedToRoom && (
+                        <Button size="sm" variant="ghost" onClick={() => handleCompOrder(o.id)}
+                          className="h-7 px-2 text-xs text-amber-400 hover:text-amber-300">
+                          <Gift className="w-3 h-3 mr-1" /> Comp
+                        </Button>
+                      )}
                       <Button size="sm" variant="ghost" onClick={() => handleDeleteOrder(o.id)}
                         className="h-7 w-7 p-0 text-destructive hover:text-destructive">
                         <Trash2 className="w-3.5 h-3.5" />
@@ -309,37 +407,68 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
           <p className="font-display text-xs tracking-wider text-muted-foreground uppercase flex items-center gap-1.5">
             <Palmtree className="w-3.5 h-3.5" /> Tours & Experiences
           </p>
-          {tours.map((t: any) => (
-            <div key={t.id} className="border border-border rounded-lg p-3 space-y-1.5">
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-body text-sm text-foreground font-medium">{t.tour_name}</span>
-                <Badge variant="outline" className={`text-[10px] ${tourStatusColor(t.status)}`}>{t.status}</Badge>
+          {tours.map((t: any) => {
+            const isEditingTour = editingTourId === t.id;
+            return (
+              <div key={t.id} className="border border-border rounded-lg p-3 space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-body text-sm text-foreground font-medium">{t.tour_name}</span>
+                  <Badge variant="outline" className={`text-[10px] ${tourStatusColor(t.status)}`}>{t.status}</Badge>
+                </div>
+                <div className="flex gap-3 font-body text-xs text-muted-foreground">
+                  <span>{t.tour_date}</span>
+                  <span>{t.pax} pax</span>
+                  {t.pickup_time && <span>Pickup: {t.pickup_time}</span>}
+                  {t.provider && <span>{t.provider}</span>}
+                </div>
+                <div className="flex items-center justify-between">
+                  {isEditingTour ? (
+                    <div className="flex items-center gap-1">
+                      <span className="font-body text-xs text-muted-foreground">₱</span>
+                      <Input type="number" value={editTourAmount} onChange={e => setEditTourAmount(e.target.value)}
+                        className="h-7 w-24 text-xs bg-secondary border-border" autoFocus />
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-green-400" onClick={() => handleEditTourSave(t.id)}>
+                        <Check className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground" onClick={() => setEditingTourId(null)}>
+                        <X className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <span className="font-display text-sm text-foreground">
+                      {Number(t.price) > 0 ? `₱${Number(t.price).toLocaleString()}` : 'Free'}
+                    </span>
+                  )}
+                  {!readOnly && !isEditingTour && t.status !== 'cancelled' && (
+                    <div className="flex items-center gap-1">
+                      {/* Edit price */}
+                      <Button size="sm" variant="ghost" onClick={() => { setEditingTourId(t.id); setEditTourAmount(String(t.price)); }}
+                        className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground">
+                        <Pencil className="w-3 h-3" />
+                      </Button>
+                      {/* Complete */}
+                      {t.status !== 'completed' && (
+                        <Button size="sm" variant="ghost" onClick={() => handleCompleteTour(t.id)}
+                          className="h-7 px-2 text-xs text-green-400 hover:text-green-300">
+                          <CheckCircle className="w-3 h-3 mr-0.5" /> Done
+                        </Button>
+                      )}
+                      {t.status !== 'completed' && (
+                        <Button size="sm" variant="ghost" onClick={() => handleCancelTour(t.id)}
+                          className="h-7 px-2 text-xs text-amber-400 hover:text-amber-300">
+                          Cancel
+                        </Button>
+                      )}
+                      <Button size="sm" variant="ghost" onClick={() => handleDeleteTour(t.id)}
+                        className="h-7 w-7 p-0 text-destructive hover:text-destructive">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="flex gap-3 font-body text-xs text-muted-foreground">
-                <span>{t.tour_date}</span>
-                <span>{t.pax} pax</span>
-                {t.pickup_time && <span>Pickup: {t.pickup_time}</span>}
-                {t.provider && <span>{t.provider}</span>}
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="font-display text-sm text-foreground">
-                  {Number(t.price) > 0 ? `₱${Number(t.price).toLocaleString()}` : 'Free'}
-                </span>
-                {!readOnly && t.status !== 'cancelled' && t.status !== 'completed' && (
-                  <div className="flex items-center gap-1">
-                    <Button size="sm" variant="ghost" onClick={() => handleCancelTour(t.id)}
-                      className="h-7 px-2 text-xs text-amber-400 hover:text-amber-300">
-                      Cancel
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => handleDeleteTour(t.id)}
-                      className="h-7 w-7 p-0 text-destructive hover:text-destructive">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -366,12 +495,21 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
                   <span className="font-body text-[11px] text-muted-foreground">
                     {format(new Date(r.created_at), 'MMM d h:mma')}
                   </span>
-                  {!readOnly && r.status !== 'cancelled' && r.status !== 'completed' && (
+                  {!readOnly && r.status !== 'cancelled' && (
                     <div className="flex items-center gap-1">
-                      <Button size="sm" variant="ghost" onClick={() => handleCancelRequest(r.id)}
-                        className="h-7 px-2 text-xs text-amber-400 hover:text-amber-300">
-                        Cancel
-                      </Button>
+                      {/* Complete */}
+                      {r.status !== 'completed' && (
+                        <Button size="sm" variant="ghost" onClick={() => handleCompleteRequest(r.id)}
+                          className="h-7 px-2 text-xs text-green-400 hover:text-green-300">
+                          <CheckCircle className="w-3 h-3 mr-0.5" /> Done
+                        </Button>
+                      )}
+                      {r.status !== 'completed' && (
+                        <Button size="sm" variant="ghost" onClick={() => handleCancelRequest(r.id)}
+                          className="h-7 px-2 text-xs text-amber-400 hover:text-amber-300">
+                          Cancel
+                        </Button>
+                      )}
                       <Button size="sm" variant="ghost" onClick={() => handleDeleteRequest(r.id)}
                         className="h-7 w-7 p-0 text-destructive hover:text-destructive">
                         <Trash2 className="w-3.5 h-3.5" />
@@ -395,44 +533,63 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
         {transactions.length === 0 ? (
           <p className="font-body text-sm text-muted-foreground text-center py-4">No transactions yet</p>
         ) : (
-          transactions.map(t => (
-            <div key={t.id} className={`border rounded-lg p-3 space-y-1 ${t.transaction_type === 'accommodation' ? 'border-primary/30 bg-primary/5' : 'border-border'}`}>
-              <div className="flex justify-between items-start">
-                <div className="min-w-0 flex-1">
-                  <p className="font-body text-xs text-muted-foreground">
-                    {format(new Date(t.created_at), 'MMM d h:mma')} · {t.staff_name}
-                  </p>
-                  <p className="font-display text-sm text-foreground capitalize flex items-center gap-1.5">
-                    {t.transaction_type === 'accommodation' && '🏠 '}
-                    {t.transaction_type.replace('_', ' ')}
-                  </p>
-                  {t.notes && <p className="font-body text-xs text-muted-foreground truncate">{t.notes}</p>}
+          transactions.map(t => {
+            const isEditingThisTx = editingTxId === t.id;
+            return (
+              <div key={t.id} className={`border rounded-lg p-3 space-y-1 ${t.transaction_type === 'accommodation' ? 'border-primary/30 bg-primary/5' : 'border-border'}`}>
+                <div className="flex justify-between items-start">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-body text-xs text-muted-foreground">
+                      {format(new Date(t.created_at), 'MMM d h:mma')} · {t.staff_name}
+                    </p>
+                    <p className="font-display text-sm text-foreground capitalize flex items-center gap-1.5">
+                      {t.transaction_type === 'accommodation' && '🏠 '}
+                      {t.transaction_type.replace('_', ' ')}
+                    </p>
+                    {t.notes && <p className="font-body text-xs text-muted-foreground truncate">{t.notes}</p>}
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {isEditingThisTx ? (
+                      <div className="flex items-center gap-1">
+                        <span className="font-body text-xs text-muted-foreground">₱</span>
+                        <Input type="number" value={editTxAmount} onChange={e => setEditTxAmount(e.target.value)}
+                          className="h-7 w-24 text-xs bg-secondary border-border" autoFocus />
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-green-400" onClick={() => handleEditTxSave(t.id)}>
+                          <Check className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground" onClick={() => setEditingTxId(null)}>
+                          <X className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <p className={`font-display text-sm ${t.total_amount > 0 ? 'text-foreground' : 'text-green-400'}`}>
+                          {t.total_amount > 0 ? '' : '-'}₱{Math.abs(t.total_amount).toLocaleString()}
+                        </p>
+                        {!readOnly && (
+                          <>
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                              onClick={() => { setEditingTxId(t.id); setEditTxAmount(String(t.total_amount)); }}>
+                              <Pencil className="w-3 h-3" />
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                              onClick={() => handleDeleteTx(t.id, t.transaction_type, t.total_amount)}>
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <p className={`font-display text-sm ${t.total_amount > 0 ? 'text-foreground' : 'text-green-400'}`}>
-                    {t.total_amount > 0 ? '' : '-'}₱{Math.abs(t.total_amount).toLocaleString()}
+                {!isEditingThisTx && (t.tax_amount !== 0 || t.service_charge_amount !== 0) && (
+                  <p className="font-body text-[10px] text-muted-foreground">
+                    Sub: ₱{Math.abs(t.amount).toLocaleString()} · Tax: ₱{Math.abs(t.tax_amount).toLocaleString()} · SC: ₱{Math.abs(t.service_charge_amount).toLocaleString()}
                   </p>
-                  {!readOnly && t.transaction_type === 'accommodation' && (
-                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                      onClick={async () => {
-                        if (!confirm('Delete this accommodation charge?')) return;
-                        await from('room_transactions').delete().eq('id', t.id);
-                        await logAudit('deleted', 'room_transactions', t.id, `Deleted accommodation charge ₱${Math.abs(t.total_amount).toLocaleString()} for ${unit.name} by ${staffName}`);
-                        qc.invalidateQueries({ queryKey: ['room-transactions', unit.id] });
-                        toast.success('Accommodation charge deleted');
-                      }}>
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  )}
-                </div>
+                )}
               </div>
-              {(t.tax_amount !== 0 || t.service_charge_amount !== 0) && (
-                <p className="font-body text-[10px] text-muted-foreground">
-                  Sub: ₱{Math.abs(t.amount).toLocaleString()} · Tax: ₱{Math.abs(t.tax_amount).toLocaleString()} · SC: ₱{Math.abs(t.service_charge_amount).toLocaleString()}
-                </p>
-              )}
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
