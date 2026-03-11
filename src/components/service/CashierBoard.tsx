@@ -670,7 +670,7 @@ const DailySummary = ({ completed }: { completed: any[] }) => {
               <span className="font-display text-xs tracking-wider text-muted-foreground">CASH TRANSACTIONS ({cashEntry.count})</span>
               <ChevronDown className="w-4 h-4 text-muted-foreground" />
             </CollapsibleTrigger>
-            <CollapsibleContent className="pt-2 space-y-1 max-h-[30vh] overflow-y-auto">
+            <CollapsibleContent className="pt-2 space-y-1">
               {completed.filter(o => o.payment_type === 'Cash').map(o => (
                 <div key={o.id} className="flex items-center justify-between rounded-lg bg-card/80 border border-border/50 px-3 py-2">
                   <div className="min-w-0">
