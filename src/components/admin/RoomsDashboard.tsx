@@ -585,13 +585,16 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
 
   // ── HOUSEKEEPING INSPECTION VIEW ──
   if (viewingHousekeepingOrder) {
+    const hkMode = viewingHousekeepingOrder.status === 'pre_inspection' ? 'pre_inspection' : 'cleaning';
     return (
       <HousekeepingInspection
         order={viewingHousekeepingOrder}
+        mode={hkMode}
         onClose={() => {
           setViewingHousekeepingOrder(null);
           qc.invalidateQueries({ queryKey: ['housekeeping-orders'] });
           qc.invalidateQueries({ queryKey: ['rooms-units'] });
+          qc.invalidateQueries({ queryKey: ['checkout-hk-clearance'] });
         }}
       />
     );
