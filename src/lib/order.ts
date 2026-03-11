@@ -1,7 +1,7 @@
 import { CartItem } from './cart';
 
 export interface OrderInfo {
-  orderType: 'Room' | 'DineIn' | 'Beach' | 'WalkIn';
+  orderType: 'Room' | 'RoomDelivery' | 'Beach' | 'WalkIn' | 'Friends&Familywalkin';
   locationDetail: string;
   isStaff: boolean;
   paymentType?: string;
