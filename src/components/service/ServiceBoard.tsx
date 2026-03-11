@@ -113,7 +113,7 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
 
   // Bucket into columns
   const columns = useMemo(() => {
-    const cols: Record<string, any[]> = { New: [], Preparing: [], Ready: [], Completed: [] };
+    const cols: Record<string, any[]> = { New: [], Preparing: [], Ready: [], 'Bill Out': [], Completed: [] };
 
     // Walk-in/dine-in served orders stay visible until marked paid
     const isAutoPayable = (o: any) => o.payment_type === 'Charge to Room' || !!o.tab_id;
@@ -130,14 +130,14 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
         else if (deptStatus === 'ready' || o.status === 'Ready') cols.Ready.push(o);
       });
     } else {
-      // Reception: use overall order.status directly
+      // Reception: use overall order.status directly — Served walk-ins go to Bill Out
       relevantOrders.forEach(o => {
         if (o.status === 'New') cols.New.push(o);
         else if (o.status === 'Preparing') cols.Preparing.push(o);
         else if (o.status === 'Ready') cols.Ready.push(o);
         else if (o.status === 'Paid') cols.Completed.push(o);
         else if (o.status === 'Served' && isAutoPayable(o)) cols.Completed.push(o);
-        else if (o.status === 'Served') cols.Ready.push(o); // Walk-in stays visible
+        else if (o.status === 'Served') cols['Bill Out'].push(o); // Walk-in awaiting payment
       });
     }
     return cols;
