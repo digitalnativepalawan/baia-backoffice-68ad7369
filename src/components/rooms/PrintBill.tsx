@@ -51,7 +51,8 @@ const PrintBill = ({ unitName, guestName, booking, transactions, roomOrders = []
     const tinNumber = invoiceSettings?.tin_number || '';
 
     const html = `<!DOCTYPE html>
-<html><head><style>
+<html><head><title>Guest Bill</title><style>
+@page { margin: 0; size: auto; }
 body { font-family: 'Courier New', monospace; max-width: 300px; margin: 0 auto; padding: 10px; font-size: 12px; }
 .center { text-align: center; }
 .right { text-align: right; }

@@ -71,7 +71,8 @@ const CashierReceipt = ({ order, onDone }: CashierReceiptProps) => {
     const footerText = invoiceSettings?.footer_text || '';
 
     const html = `<!DOCTYPE html>
-<html><head><style>
+<html><head><title>Receipt</title><style>
+@page { margin: 0; size: auto; }
 body { font-family: 'Courier New', monospace; max-width: 300px; margin: 0 auto; padding: 10px; font-size: 12px; }
 .center { text-align: center; }
 .line { border-top: 1px dashed #000; margin: 8px 0; }
