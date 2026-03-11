@@ -125,7 +125,7 @@ const ServiceModePage = () => {
             Select a department to open its live board
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {departments.map(dept => {
+            {visibleDepartments.map(dept => {
               const count = counts[dept.key as keyof typeof counts] || 0;
               return (
                 <button
