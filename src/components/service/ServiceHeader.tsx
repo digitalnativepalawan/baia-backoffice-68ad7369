@@ -20,9 +20,14 @@ const ServiceHeader = ({ department }: ServiceHeaderProps) => {
   const navigate = useNavigate();
   const config = DEPT_CONFIG[department];
 
-  const staffName = useMemo(() => {
+  const { staffName, canOrder } = useMemo(() => {
     const s = getStaffSession();
-    return s?.name || '';
+    const perms: string[] = s?.permissions || [];
+    const isAdmin = perms.includes('admin');
+    return {
+      staffName: s?.name || '',
+      canOrder: isAdmin || canEdit(perms, 'orders'),
+    };
   }, []);
 
   const handleBack = () => navigate('/service');
