@@ -337,6 +337,29 @@ const CheckoutModal = ({ open, onOpenChange, unitId, unitName, guestName, bookin
             </div>
           </div>
 
+          {/* Settled F&B Orders */}
+          {paidOrders.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="font-display text-xs tracking-wider text-muted-foreground uppercase">
+                ✅ Settled F&B — ₱{paidFnbTotal.toLocaleString()}
+              </p>
+              {paidOrders.map((o: any) => {
+                const items = Array.isArray(o.items) ? o.items : [];
+                return (
+                  <div key={o.id} className="flex justify-between items-center bg-secondary/50 rounded p-2">
+                    <div>
+                      <p className="font-body text-xs text-foreground">
+                        {items.map((i: any) => `${i.qty || 1}× ${i.name}`).join(', ') || 'F&B Order'}
+                      </p>
+                      <p className="font-body text-[10px] text-muted-foreground">{new Date(o.created_at).toLocaleString()}</p>
+                    </div>
+                    <span className="font-display text-xs text-emerald-400">₱{(o.total || 0).toLocaleString()}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {unpaidTotal > 0 && (
             <>
               <Separator />
