@@ -38,6 +38,16 @@ const departments = [
     route: '/service/reception',
     statusField: null,
   },
+  {
+    key: 'cashier',
+    label: 'Cashier',
+    subtitle: 'Fast checkout & payment',
+    icon: <Banknote className="w-7 h-7" />,
+    gradient: 'from-[hsl(45,90%,50%)] to-[hsl(35,85%,42%)]',
+    glow: 'shadow-[0_0_30px_-5px_hsl(45,90%,50%,0.3)]',
+    route: '/service/cashier',
+    statusField: null,
+  },
 ];
 
 const ServiceModePage = () => {
