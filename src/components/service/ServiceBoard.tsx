@@ -10,12 +10,14 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import ServiceOrderCard from './ServiceOrderCard';
 import ServiceOrderDetail from './ServiceOrderDetail';
 
-const KANBAN_COLS = ['New', 'Preparing', 'Ready'] as const;
+const KANBAN_COLS_DEFAULT = ['New', 'Preparing', 'Ready'] as const;
+const KANBAN_COLS_RECEPTION = ['New', 'Preparing', 'Ready', 'Bill Out'] as const;
 
 const COL_COLORS: Record<string, string> = {
   New: 'border-t-gold',
   Preparing: 'border-t-orange-400',
   Ready: 'border-t-emerald-400',
+  'Bill Out': 'border-t-amber-400',
 };
 
 interface ServiceBoardProps {
@@ -111,7 +113,7 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
 
   // Bucket into columns
   const columns = useMemo(() => {
-    const cols: Record<string, any[]> = { New: [], Preparing: [], Ready: [], Completed: [] };
+    const cols: Record<string, any[]> = { New: [], Preparing: [], Ready: [], 'Bill Out': [], Completed: [] };
 
     // Walk-in/dine-in served orders stay visible until marked paid
     const isAutoPayable = (o: any) => o.payment_type === 'Charge to Room' || !!o.tab_id;
@@ -128,14 +130,14 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
         else if (deptStatus === 'ready' || o.status === 'Ready') cols.Ready.push(o);
       });
     } else {
-      // Reception: use overall order.status directly
+      // Reception: use overall order.status directly — Served walk-ins go to Bill Out
       relevantOrders.forEach(o => {
         if (o.status === 'New') cols.New.push(o);
         else if (o.status === 'Preparing') cols.Preparing.push(o);
         else if (o.status === 'Ready') cols.Ready.push(o);
         else if (o.status === 'Paid') cols.Completed.push(o);
         else if (o.status === 'Served' && isAutoPayable(o)) cols.Completed.push(o);
-        else if (o.status === 'Served') cols.Ready.push(o); // Walk-in stays visible
+        else if (o.status === 'Served') cols['Bill Out'].push(o); // Walk-in awaiting payment
       });
     }
     return cols;
@@ -206,7 +208,8 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
     toast.success('Order updated');
   };
 
-  const totalActive = columns.New.length + columns.Preparing.length + columns.Ready.length;
+  const totalActive = columns.New.length + columns.Preparing.length + columns.Ready.length + columns['Bill Out'].length;
+  const KANBAN_COLS = department === 'reception' ? KANBAN_COLS_RECEPTION : KANBAN_COLS_DEFAULT;
 
   return (
     <div className="h-full flex flex-col">
@@ -225,12 +228,17 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
             {columns.Ready.length} READY
           </span>
         )}
+        {columns['Bill Out'].length > 0 && (
+          <span className="font-body text-xs text-amber-400 font-bold">
+            {columns['Bill Out'].length} BILL OUT
+          </span>
+        )}
       </div>
 
       {/* Kanban columns — horizontal on tablet, vertical on phone */}
       <div className="flex-1 overflow-auto">
         {/* Tablet/Desktop: horizontal kanban */}
-        <div className="hidden md:grid md:grid-cols-3 gap-3 p-4">
+        <div className={`hidden md:grid gap-3 p-4 ${department === 'reception' ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
           {KANBAN_COLS.map(col => (
             <div key={col} className={`flex flex-col border-t-4 ${COL_COLORS[col]} rounded-t-lg bg-secondary/30`}>
               <div className="px-3 py-2 flex items-center justify-between">
@@ -271,7 +279,7 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
                 {completedOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
               </CollapsibleTrigger>
               <CollapsibleContent className="pt-3">
-                <div className="grid grid-cols-3 gap-3 max-h-[40vh] overflow-y-auto">
+                <div className={`grid gap-3 max-h-[40vh] overflow-y-auto ${department === 'reception' ? 'grid-cols-4' : 'grid-cols-3'}`}>
                   {columns.Completed.map(order => (
                     <ServiceOrderCard
                       key={order.id}
@@ -319,7 +327,9 @@ const MobileTabView = ({ columns, department, permissions, onAction, onOpenDetai
   const [tab, setTab] = useState<string>('New');
   const [completedOpen, setCompletedOpen] = useState(false);
 
-  const MOBILE_TABS = ['New', 'Preparing', 'Ready'] as const;
+  const MOBILE_TABS = department === 'reception'
+    ? ['New', 'Preparing', 'Ready', 'Bill Out'] as const
+    : ['New', 'Preparing', 'Ready'] as const;
 
   return (
     <div className="md:hidden flex flex-col h-full">
