@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Flame, GlassWater, BellRing, Banknote, ArrowLeft, LayoutGrid } from 'lucide-react';
+import { Flame, GlassWater, BellRing, Banknote, ArrowLeft, LayoutGrid, UtensilsCrossed } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -144,6 +144,20 @@ const ServiceModePage = () => {
               );
             })}
           </div>
+
+          {/* Menu button */}
+          <button
+            onClick={() => navigate('/order-type?mode=staff&returnTo=/service')}
+            className="w-full rounded-2xl border border-border/60 bg-card/80 backdrop-blur-sm p-5 flex items-center gap-4 group transition-all duration-200 hover:scale-[1.01] active:scale-[0.98] hover:border-accent/40 shadow-[0_0_30px_-5px_hsl(150,60%,45%,0.2)]"
+          >
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[hsl(150,60%,45%)] to-[hsl(160,55%,35%)] flex items-center justify-center text-white group-hover:scale-110 transition-transform duration-200">
+              <UtensilsCrossed className="w-7 h-7" />
+            </div>
+            <div className="text-left">
+              <p className="font-display text-xl text-foreground tracking-wider">Menu</p>
+              <p className="font-body text-xs text-muted-foreground mt-0.5">Place a new order</p>
+            </div>
+          </button>
         </div>
       </div>
     </div>
