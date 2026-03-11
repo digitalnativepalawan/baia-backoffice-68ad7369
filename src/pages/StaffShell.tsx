@@ -35,7 +35,11 @@ const StaffShell = () => {
 
   const availableRoles = useMemo(() => {
     if (isAdmin) return ROLES;
-    return ROLES.filter(r => hasAccess(perms, r.perm));
+    return ROLES.filter(r => {
+      // Orders tab requires edit (placing orders), not just view
+      if (r.key === 'orders') return canEdit(perms, r.perm);
+      return hasAccess(perms, r.perm);
+    });
   }, [perms, isAdmin]);
 
   const [activeRole, setActiveRole] = useState(() => availableRoles[0]?.key || 'reception');
