@@ -327,7 +327,9 @@ const MobileTabView = ({ columns, department, permissions, onAction, onOpenDetai
   const [tab, setTab] = useState<string>('New');
   const [completedOpen, setCompletedOpen] = useState(false);
 
-  const MOBILE_TABS = ['New', 'Preparing', 'Ready'] as const;
+  const MOBILE_TABS = department === 'reception'
+    ? ['New', 'Preparing', 'Ready', 'Bill Out'] as const
+    : ['New', 'Preparing', 'Ready'] as const;
 
   return (
     <div className="md:hidden flex flex-col h-full">
