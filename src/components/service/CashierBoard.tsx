@@ -512,4 +512,109 @@ const BillOutPanel = ({
   );
 };
 
+/** Daily cash reconciliation summary */
+const DailySummary = ({ completed }: { completed: any[] }) => {
+  const summary = useMemo(() => {
+    const methods: Record<string, { count: number; total: number }> = {};
+    let totalRevenue = 0;
+
+    completed.forEach(o => {
+      const method = o.payment_type || 'Unknown';
+      if (!methods[method]) methods[method] = { count: 0, total: 0 };
+      methods[method].count += 1;
+      methods[method].total += Number(o.total) || 0;
+      totalRevenue += Number(o.total) || 0;
+    });
+
+    return { methods, totalRevenue, orderCount: completed.length };
+  }, [completed]);
+
+  const sortedMethods = useMemo(() => {
+    return Object.entries(summary.methods).sort((a, b) => b[1].total - a[1].total);
+  }, [summary.methods]);
+
+  const cashEntry = summary.methods['Cash'];
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="px-4 py-3 border-b border-border">
+        <p className="font-display text-xs tracking-wider text-muted-foreground">
+          DAILY SUMMARY — {format(new Date(), 'MMM d, yyyy')}
+        </p>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
+        {/* Total revenue */}
+        <div className="text-center space-y-1">
+          <p className="font-body text-xs text-muted-foreground uppercase tracking-wider">Total Revenue Today</p>
+          <p className="font-display text-3xl text-gold tabular-nums">₱{summary.totalRevenue.toLocaleString()}</p>
+          <p className="font-body text-xs text-muted-foreground">{summary.orderCount} paid order{summary.orderCount !== 1 ? 's' : ''}</p>
+        </div>
+
+        {/* Cash highlight */}
+        {cashEntry && (
+          <div className="rounded-xl border-2 border-gold/40 bg-gold/5 p-4 space-y-1">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-gold" />
+                <span className="font-display text-sm tracking-wider text-gold">CASH</span>
+              </div>
+              <Badge className="bg-gold/20 text-gold border-gold/30 font-body text-xs">{cashEntry.count} orders</Badge>
+            </div>
+            <p className="font-display text-2xl text-gold tabular-nums">₱{cashEntry.total.toLocaleString()}</p>
+            <p className="font-body text-[11px] text-muted-foreground">Amount to reconcile with cash drawer</p>
+          </div>
+        )}
+
+        {/* Breakdown by method */}
+        {sortedMethods.length > 0 && (
+          <div className="space-y-2">
+            <p className="font-display text-xs tracking-wider text-muted-foreground">BREAKDOWN BY METHOD</p>
+            <div className="space-y-1">
+              {sortedMethods.map(([method, data]) => (
+                <div key={method} className={`flex items-center justify-between rounded-lg px-3 py-2 ${method === 'Cash' ? 'bg-gold/5' : 'bg-secondary/50'}`}>
+                  <div className="flex items-center gap-2">
+                    <span className={`font-body text-sm ${method === 'Cash' ? 'text-gold font-semibold' : 'text-foreground'}`}>{method}</span>
+                    <span className="font-body text-xs text-muted-foreground">({data.count})</span>
+                  </div>
+                  <span className={`font-display text-sm tabular-nums ${method === 'Cash' ? 'text-gold' : 'text-foreground'}`}>₱{data.total.toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Cash transactions list */}
+        {cashEntry && cashEntry.count > 0 && (
+          <Collapsible>
+            <CollapsibleTrigger className="w-full flex items-center justify-between bg-secondary/50 border border-border rounded-lg px-4 py-3 hover:bg-secondary transition-colors">
+              <span className="font-display text-xs tracking-wider text-muted-foreground">CASH TRANSACTIONS ({cashEntry.count})</span>
+              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-2 space-y-1 max-h-[30vh] overflow-y-auto">
+              {completed.filter(o => o.payment_type === 'Cash').map(o => (
+                <div key={o.id} className="flex items-center justify-between rounded-lg bg-card/80 border border-border/50 px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="font-body text-xs text-foreground truncate">{o.location_detail || o.order_type}</p>
+                    <p className="font-body text-[10px] text-muted-foreground">{o.closed_at ? format(new Date(o.closed_at), 'h:mm a') : '—'}</p>
+                  </div>
+                  <span className="font-display text-sm text-gold tabular-nums">₱{Number(o.total).toLocaleString()}</span>
+                </div>
+              ))}
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+
+        {summary.orderCount === 0 && (
+          <p className="font-body text-sm text-muted-foreground text-center py-8">No paid orders yet today</p>
+        )}
+      </div>
+
+      <div className="px-4 py-3 border-t border-border text-center">
+        <p className="font-body text-[10px] text-muted-foreground">Tap an order to open bill & payment</p>
+      </div>
+    </div>
+  );
+};
+
 export default CashierBoard;
