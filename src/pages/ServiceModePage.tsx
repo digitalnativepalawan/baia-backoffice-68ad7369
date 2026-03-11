@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useMemo } from 'react';
 import { getStaffSession } from '@/lib/session';
 import { getHomeRoute } from '@/lib/getHomeRoute';
-import { hasAccess } from '@/lib/permissions';
+import { hasAccess, canEdit } from '@/lib/permissions';
 
 const departments = [
   {
