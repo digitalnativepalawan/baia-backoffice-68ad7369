@@ -522,16 +522,26 @@ const DailySummary = ({ completed }: { completed: any[] }) => {
   const summary = useMemo(() => {
     const methods: Record<string, { count: number; total: number }> = {};
     let totalRevenue = 0;
+    let registerRevenue = 0;
+    let roomChargeTotal = 0;
+    let roomChargeCount = 0;
 
     completed.forEach(o => {
-      const method = o.payment_type || 'Unknown';
+      const method = o.payment_type || 'Pending';
+      const amount = Number(o.total) || 0;
       if (!methods[method]) methods[method] = { count: 0, total: 0 };
       methods[method].count += 1;
-      methods[method].total += Number(o.total) || 0;
-      totalRevenue += Number(o.total) || 0;
+      methods[method].total += amount;
+      totalRevenue += amount;
+      if (method === 'Charge to Room') {
+        roomChargeTotal += amount;
+        roomChargeCount += 1;
+      } else {
+        registerRevenue += amount;
+      }
     });
 
-    return { methods, totalRevenue, orderCount: completed.length };
+    return { methods, totalRevenue, registerRevenue, roomChargeTotal, roomChargeCount, orderCount: completed.length };
   }, [completed]);
 
   const sortedMethods = useMemo(() => {
