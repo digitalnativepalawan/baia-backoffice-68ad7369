@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Flame, GlassWater, BellRing, ArrowLeft, LayoutGrid } from 'lucide-react';
+import { Flame, GlassWater, BellRing, Banknote, ArrowLeft, LayoutGrid } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
