@@ -106,11 +106,10 @@ const OrderType = () => {
 
   const handleProceed = () => {
     if (!canProceed) return;
-    const finalLocation = isDineIn ? `${locationDetail} – ${tableDetail}` : locationDetail;
-    const params = new URLSearchParams({ mode, orderType: selectedType, location: finalLocation });
+    const params = new URLSearchParams({ mode, orderType: selectedType, location: locationDetail });
     if (guestName.trim()) params.set('guestName', guestName.trim());
     const sourceTable = activeOrderType?.source_table;
-    if (sourceTable === 'units' || isDineIn) {
+    if (sourceTable === 'units') {
       params.set('roomName', locationDetail);
     }
     if (returnTo) params.set('returnTo', returnTo);
