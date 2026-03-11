@@ -43,6 +43,7 @@ const CashierBoard = () => {
       .channel('cashier-board')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
         qc.invalidateQueries({ queryKey: ['cashier-orders'] });
+        qc.invalidateQueries({ queryKey: ['cashier-completed'] });
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
