@@ -35,20 +35,22 @@ const CheckoutModal = ({ open, onOpenChange, unitId, unitName, guestName, bookin
   const [selectedHousekeeper, setSelectedHousekeeper] = useState('');
   const [overrideChecklist, setOverrideChecklist] = useState(false);
 
-  // Fetch all non-paid orders for this room
-  const { data: unpaidOrders = [] } = useQuery({
-    queryKey: ['checkout-unpaid-orders', unitId],
+  // Fetch ALL orders for this room (paid and unpaid)
+  const { data: allRoomOrders = [] } = useQuery({
+    queryKey: ['checkout-all-room-orders', unitId],
     enabled: open && !!unitId,
     queryFn: async () => {
       const { data } = await supabase
         .from('orders')
         .select('id, total, guest_name, status, payment_type, created_at, items')
         .eq('room_id', unitId)
-        .in('status', ['New', 'Preparing', 'Ready', 'Served'])
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: true });
       return data || [];
     },
   });
+
+  const unpaidOrders = allRoomOrders.filter((o: any) => ['New', 'Preparing', 'Ready', 'Served'].includes(o.status));
+  const paidOrders = allRoomOrders.filter((o: any) => o.status === 'Paid');
 
   // Check for unserved orders (not yet "Served")
   const { data: unservedOrders = [] } = useQuery({
@@ -116,7 +118,6 @@ const CheckoutModal = ({ open, onOpenChange, unitId, unitName, guestName, bookin
     },
   });
 
-  const unpaidTotal = unpaidOrders.reduce((s, o: any) => s + (o.total || 0), 0);
 
   // Fetch housekeeping employees
   const { data: hkEmployees = [] } = useQuery({
@@ -140,6 +141,8 @@ const CheckoutModal = ({ open, onOpenChange, unitId, unitName, guestName, bookin
   const payments = transactions.filter(t => t.total_amount < 0);
   const totalCharges = charges.reduce((s, t) => s + t.total_amount, 0);
   const totalPayments = Math.abs(payments.reduce((s, t) => s + t.total_amount, 0));
+  const paidFnbTotal = paidOrders.reduce((s, o: any) => s + (o.total || 0), 0);
+  const unpaidTotal = unpaidOrders.reduce((s, o: any) => s + (o.total || 0), 0);
   const balance = totalCharges - totalPayments + unpaidTotal;
 
   const nights = booking ? Math.max(1, Math.ceil((new Date(booking.check_out).getTime() - new Date(booking.check_in).getTime()) / 86400000)) : 0;
@@ -333,6 +336,29 @@ const CheckoutModal = ({ open, onOpenChange, unitId, unitName, guestName, bookin
               <span className="text-foreground">₱{totalCharges.toLocaleString()}</span>
             </div>
           </div>
+
+          {/* Settled F&B Orders */}
+          {paidOrders.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="font-display text-xs tracking-wider text-muted-foreground uppercase">
+                ✅ Settled F&B — ₱{paidFnbTotal.toLocaleString()}
+              </p>
+              {paidOrders.map((o: any) => {
+                const items = Array.isArray(o.items) ? o.items : [];
+                return (
+                  <div key={o.id} className="flex justify-between items-center bg-secondary/50 rounded p-2">
+                    <div>
+                      <p className="font-body text-xs text-foreground">
+                        {items.map((i: any) => `${i.qty || 1}× ${i.name}`).join(', ') || 'F&B Order'}
+                      </p>
+                      <p className="font-body text-[10px] text-muted-foreground">{new Date(o.created_at).toLocaleString()}</p>
+                    </div>
+                    <span className="font-display text-xs text-emerald-400">₱{(o.total || 0).toLocaleString()}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {unpaidTotal > 0 && (
             <>
