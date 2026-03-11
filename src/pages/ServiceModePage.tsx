@@ -58,11 +58,16 @@ const departments = [
 const ServiceModePage = () => {
   const navigate = useNavigate();
 
-  // Get staff name from session
-  const staffName = useMemo(() => {
-    const s = getStaffSession();
-    return s?.name || '';
-  }, []);
+  const session = useMemo(() => getStaffSession(), []);
+  const staffName = session?.name || '';
+  const perms: string[] = session?.permissions || [];
+  const isAdmin = perms.includes('admin');
+
+  // Filter departments by permission
+  const visibleDepartments = useMemo(() => {
+    if (isAdmin) return departments;
+    return departments.filter(dept => dept.permKeys.some(k => hasAccess(perms, k)));
+  }, [perms, isAdmin]);
 
   // Fetch today's active orders for live counts
   const { data: orders = [] } = useQuery({
