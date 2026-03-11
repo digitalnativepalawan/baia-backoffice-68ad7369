@@ -54,13 +54,18 @@ const CashierBoard = () => {
     queryFn: async () => {
       const start = new Date();
       start.setHours(0, 0, 0, 0);
-      const { data } = await supabase
+      console.log('[CashierBoard] Fetching active orders since:', start.toISOString());
+      const { data, error } = await supabase
         .from('orders')
         .select('*')
         .in('status', ['New', 'Preparing', 'Ready', 'Served'])
         .gte('created_at', start.toISOString())
         .order('created_at', { ascending: true })
         .limit(300);
+      console.log('[CashierBoard] Active orders fetched:', data?.length, 'error:', error?.message);
+      if (data?.length) {
+        console.log('[CashierBoard] Order statuses:', data.map(o => `${o.order_type}:${o.status}`).join(', '));
+      }
       return data || [];
     },
     refetchInterval: 5000,
