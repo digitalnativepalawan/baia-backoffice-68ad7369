@@ -211,9 +211,14 @@ const HousekeeperPage = ({ embedded = false }: { embedded?: boolean }) => {
                         </Badge>
                       )}
                     </div>
-                    <Badge className={priorityColor(order.priority || 'normal')} variant="secondary">
-                      {order.priority || 'normal'}
-                    </Badge>
+                    <div className="flex items-center gap-1">
+                      {order.status === 'pre_inspection' && (
+                        <Badge className="bg-blue-600 text-white font-body text-[10px]">🔍 Pre-Checkout</Badge>
+                      )}
+                      <Badge className={priorityColor(order.priority || 'normal')} variant="secondary">
+                        {order.priority || 'normal'}
+                      </Badge>
+                    </div>
                   </div>
                   <p className="font-body text-xs text-muted-foreground mb-3">
                     Created: {format(new Date(order.created_at), 'h:mm a')}
