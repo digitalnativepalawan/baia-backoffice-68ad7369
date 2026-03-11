@@ -305,7 +305,7 @@ const CashierBoard = () => {
       </div>
 
       {/* Right: Bill Out / Payment Panel */}
-      <div className="w-full md:w-[400px] lg:w-[440px] flex-shrink-0 bg-card/50 flex flex-col overflow-y-auto">
+      <div className="w-full md:w-[400px] lg:w-[440px] flex-shrink-0 bg-card/50 flex flex-col md:overflow-y-auto">
         {selectedOrder ? (
           <BillOutPanel
             order={selectedOrder}
