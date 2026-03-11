@@ -33,6 +33,7 @@ const BUILTIN_ROLE_LABELS: Record<string, string> = {
   cook: 'Cook',
   chef: 'Chef',
   bartender: 'Bartender / Barista',
+  cashier: 'Cashier',
   tours: 'Tours',
   transportation: 'Transportation',
   maintenance: 'Maintenance',
