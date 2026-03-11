@@ -607,7 +607,7 @@ const DailySummary = ({ completed }: { completed: any[] }) => {
         </p>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
+      <div className="flex-1 px-4 py-4 space-y-5">
         {/* Register revenue (excluding room charges) */}
         <div className="text-center space-y-1">
           <p className="font-body text-xs text-muted-foreground uppercase tracking-wider">Register Revenue Today</p>
