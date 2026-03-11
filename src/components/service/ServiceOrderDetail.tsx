@@ -40,7 +40,10 @@ const ServiceOrderDetail = ({ order, open, onOpenChange, permissions, onAction, 
   const handleAction = async (action: string) => {
     if (busy) return;
     setBusy(action);
-    try { await onAction(order.id, action); } finally { setBusy(null); }
+    try {
+      await onAction(order.id, action);
+      onOpenChange(false);
+    } finally { setBusy(null); }
   };
 
   const canServe = canEdit(permissions, 'reception') || canEdit(permissions, 'kitchen') || canEdit(permissions, 'bar');
