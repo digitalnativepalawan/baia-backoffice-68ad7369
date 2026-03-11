@@ -22,6 +22,7 @@ import ServiceModePage from "./pages/ServiceModePage";
 import ServiceKitchenPage from "./pages/ServiceKitchenPage";
 import ServiceBarPage from "./pages/ServiceBarPage";
 import ServiceReceptionPage from "./pages/ServiceReceptionPage";
+import ServiceCashierPage from "./pages/ServiceCashierPage";
 
 const queryClient = new QueryClient();
 
