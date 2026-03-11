@@ -35,20 +35,22 @@ const CheckoutModal = ({ open, onOpenChange, unitId, unitName, guestName, bookin
   const [selectedHousekeeper, setSelectedHousekeeper] = useState('');
   const [overrideChecklist, setOverrideChecklist] = useState(false);
 
-  // Fetch all non-paid orders for this room
-  const { data: unpaidOrders = [] } = useQuery({
-    queryKey: ['checkout-unpaid-orders', unitId],
+  // Fetch ALL orders for this room (paid and unpaid)
+  const { data: allRoomOrders = [] } = useQuery({
+    queryKey: ['checkout-all-room-orders', unitId],
     enabled: open && !!unitId,
     queryFn: async () => {
       const { data } = await supabase
         .from('orders')
         .select('id, total, guest_name, status, payment_type, created_at, items')
         .eq('room_id', unitId)
-        .in('status', ['New', 'Preparing', 'Ready', 'Served'])
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: true });
       return data || [];
     },
   });
+
+  const unpaidOrders = allRoomOrders.filter((o: any) => ['New', 'Preparing', 'Ready', 'Served'].includes(o.status));
+  const paidOrders = allRoomOrders.filter((o: any) => o.status === 'Paid');
 
   // Check for unserved orders (not yet "Served")
   const { data: unservedOrders = [] } = useQuery({
