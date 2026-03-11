@@ -195,7 +195,7 @@ const CashierBoard = () => {
   };
 
   return (
-    <div className="h-full flex flex-col md:flex-row overflow-hidden">
+    <div className="h-full flex flex-col md:flex-row overflow-hidden max-w-full">
       {/* Left: Order list */}
       <div className="flex-1 flex flex-col overflow-hidden border-r border-border/50">
         {/* Summary */}
