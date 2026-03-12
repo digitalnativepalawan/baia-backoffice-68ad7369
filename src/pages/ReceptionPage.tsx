@@ -279,13 +279,25 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
   const resolveResortUnit = (roomName: string) =>
     resortUnits.find((ru: any) => ru.name.toLowerCase().trim() === roomName.toLowerCase().trim());
 
-  const getUnitStatus = (unit: any): 'occupied' | 'to_clean' | 'ready' => (unit as any).status || 'ready';
+  const getUnitStatus = (unit: any): 'occupied' | 'to_clean' | 'ready' => {
+    const raw = (unit as any).status || 'ready';
+    if (raw === 'occupied') return 'occupied';
+    if (raw === 'to_clean') return 'to_clean';
+    // Fallback: check if there's an active booking for this unit
+    const resortUnit = resolveResortUnit(unit.name);
+    if (resortUnit) {
+      const hasActiveBooking = bookings.some((b: any) =>
+        b.unit_id === resortUnit.id && b.check_in <= today && b.check_out > today
+      );
+      if (hasActiveBooking) return 'occupied';
+    }
+    return 'ready';
+  };
 
   const getActiveBooking = (unit: any) => {
-    if (getUnitStatus(unit) !== 'occupied') return null;
     const resortUnit = resolveResortUnit(unit.name);
     if (!resortUnit) return null;
-    return bookings.find((b: any) => b.unit_id === resortUnit.id && b.check_in <= today && b.check_out >= today) || null;
+    return bookings.find((b: any) => b.unit_id === resortUnit.id && b.check_in <= today && b.check_out > today) || null;
   };
 
   // Today's arrivals

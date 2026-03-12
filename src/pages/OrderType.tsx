@@ -47,10 +47,6 @@ const OrderType = () => {
     queryKey: ['occupied-guests'],
     enabled: isStaff,
     queryFn: async () => {
-      // Get occupied units
-      const occupiedUnits = (units || []).filter(u => u.status === 'occupied');
-      if (occupiedUnits.length === 0) return [];
-
       // Get resort_ops_units for name-based matching
       const { data: opsUnits } = await supabase.from('resort_ops_units').select('id, name');
 
@@ -62,12 +58,20 @@ const OrderType = () => {
         .lte('check_in', today)
         .gt('check_out', today);
 
+      // Use hybrid detection: units.status OR active booking
+      const occupiedUnits = (units || []).filter(u => {
+        if (u.status === 'occupied') return true;
+        const opsUnit = opsUnits?.find(
+          ou => ou.name.toLowerCase().trim() === u.unit_name.toLowerCase().trim()
+        );
+        return opsUnit && bookings?.some(b => b.unit_id === opsUnit.id);
+      });
+      if (occupiedUnits.length === 0) return [];
+
       return occupiedUnits.map(unit => {
-        // Find matching ops unit by normalized name
         const opsUnit = opsUnits?.find(
           ou => ou.name.toLowerCase().trim() === unit.unit_name.toLowerCase().trim()
         );
-        // Find booking for this ops unit
         const booking = opsUnit
           ? bookings?.find(b => b.unit_id === opsUnit.id)
           : null;
