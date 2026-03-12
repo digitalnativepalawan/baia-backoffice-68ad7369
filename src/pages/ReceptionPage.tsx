@@ -417,6 +417,20 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
     prevHasPendingRef.current = hasPendingAlerts;
   }, [hasPendingAlerts, playChime]);
 
+  // Auto-heal: sync units.status when booking says occupied but status is ready
+  useEffect(() => {
+    units.forEach((unit: any) => {
+      if (unit.status === 'ready') {
+        const ru = resolveResortUnit(unit.name);
+        if (ru && bookings.some((b: any) => b.unit_id === ru.id && b.check_in <= today && b.check_out > today)) {
+          from('units').update({ status: 'occupied' }).eq('id', unit.id).then(() => {
+            qc.invalidateQueries({ queryKey: ['rooms-units'] });
+          });
+        }
+      }
+    });
+  }, [units, bookings, resortUnits]);
+
   // Realtime subscriptions for guest_requests and tour_bookings
   useEffect(() => {
     const channel = supabase
