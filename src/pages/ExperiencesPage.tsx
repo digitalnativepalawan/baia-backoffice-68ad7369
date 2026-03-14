@@ -407,16 +407,29 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
             {todayTours.map((tour: any) => (
               <div key={tour.id} className="border border-border rounded-lg p-3 space-y-2">
                 <div className="flex justify-between items-start">
-                  <div>
+                  <div className="flex-1 min-w-0 cursor-pointer" onClick={() => canDoEdit && setEditTour(tour)}>
                     <div className="flex items-center gap-2">
                       <MapPin className="w-3.5 h-3.5 text-primary" />
                       <p className="font-display text-sm text-foreground tracking-wider">{tour.tour_name}</p>
+                      {canDoEdit && <Pencil className="w-3 h-3 text-muted-foreground" />}
                     </div>
                     <p className="font-body text-xs text-muted-foreground mt-1">
                       {tour.pickup_time && `${tour.pickup_time} · `}{tour.unit_name} · {tour.pax} pax
                     </p>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <CalendarDays className="w-3 h-3 text-muted-foreground" />
+                      <p className="font-body text-xs text-muted-foreground">
+                        {format(new Date(tour.tour_date + 'T00:00:00'), 'EEE, MMM d, yyyy')}
+                      </p>
+                    </div>
                     {tour.provider && <p className="font-body text-xs text-muted-foreground">Provider: {tour.provider}</p>}
                     {Number(tour.price) > 0 && <p className="font-body text-xs text-foreground">₱{Number(tour.price).toLocaleString()}</p>}
+                    {tour.notes && (
+                      <div className="flex items-start gap-1 mt-1">
+                        <StickyNote className="w-3 h-3 text-amber-400 mt-0.5 flex-shrink-0" />
+                        <p className="font-body text-[11px] text-amber-400/80 italic">{tour.notes}</p>
+                      </div>
+                    )}
                   </div>
                   <Badge className={`font-body text-xs ${statusColor(tour.status)}`}>{tour.status}</Badge>
                 </div>
