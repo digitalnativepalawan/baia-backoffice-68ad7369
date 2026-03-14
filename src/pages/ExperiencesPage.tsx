@@ -373,11 +373,12 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
           {pendingBookings.map((b: any) => (
             <div key={b.id} className="border border-amber-500/30 bg-amber-500/5 rounded-lg p-3 space-y-2 new-order-card">
               <div className="flex justify-between items-start">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <Palmtree className="w-3.5 h-3.5 text-amber-400" />
-                    <p className="font-display text-sm text-foreground tracking-wider">{b.tour_name}</p>
-                  </div>
+                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => { if (canDoEdit) { setEditTourSource('tour_bookings'); setEditTour(b); } }}>
+                    <div className="flex items-center gap-2">
+                     <Palmtree className="w-3.5 h-3.5 text-amber-400" />
+                     <p className="font-display text-sm text-foreground tracking-wider">{b.tour_name}</p>
+                     {canDoEdit && <Pencil className="w-3 h-3 text-muted-foreground" />}
+                   </div>
                    <p className="font-body text-xs text-muted-foreground mt-1">
                      <span className="inline-flex items-center gap-1"><CalendarDays className="w-3 h-3" />{b.tour_date && format(new Date(b.tour_date + 'T00:00:00'), 'EEE, MMM d, yyyy')}</span>
                      {' · '}{b.pickup_time || ''} · {b.pax} pax
