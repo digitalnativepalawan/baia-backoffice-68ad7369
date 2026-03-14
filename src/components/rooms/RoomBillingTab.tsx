@@ -479,19 +479,77 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
       {/* ═══ SECTION: Active F&B Orders ═══ */}
       {unpaidOrders.length > 0 && (
         <div className="space-y-2">
-          <p className="font-display text-xs tracking-wider text-muted-foreground uppercase flex items-center gap-1.5">
-            <UtensilsCrossed className="w-3.5 h-3.5" /> Active F&B Orders
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="font-display text-xs tracking-wider text-muted-foreground uppercase flex items-center gap-1.5">
+              <UtensilsCrossed className="w-3.5 h-3.5" /> Active F&B Orders
+            </p>
+            {!readOnly && unpaidOrders.filter(o => o.payment_type !== 'Charge to Room').length > 0 && (
+              <Button size="sm" variant="ghost" onClick={selectAllUnpaid}
+                className="font-body text-[10px] text-muted-foreground h-6 px-2">
+                {selectedOrderIds.size === unpaidOrders.filter(o => o.payment_type !== 'Charge to Room').length ? 'Deselect All' : 'Select All'}
+              </Button>
+            )}
+          </div>
+
+          {/* Pay Selected bar */}
+          {!readOnly && selectedOrderIds.size > 0 && (
+            <div className="border border-primary/40 bg-primary/5 rounded-lg p-3 space-y-2">
+              {!showPaySelected ? (
+                <Button size="sm" onClick={() => setShowPaySelected(true)}
+                  className="w-full font-display text-xs tracking-wider gap-1.5 min-h-[44px]">
+                  <ShoppingCart className="w-3.5 h-3.5" />
+                  Pay Selected ({selectedOrderIds.size} orders — ₱{selectedTotal.toLocaleString()})
+                </Button>
+              ) : (
+                <div className="space-y-2">
+                  <p className="font-display text-xs tracking-wider text-foreground">
+                    Pay {selectedOrderIds.size} order(s) — ₱{selectedTotal.toLocaleString()}
+                  </p>
+                  <Select onValueChange={setPaySelectedMethod} value={paySelectedMethod}>
+                    <SelectTrigger className="bg-secondary border-border text-foreground font-body text-sm">
+                      <SelectValue placeholder="Select payment method" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-border">
+                      {activePayMethods.map(m => (
+                        <SelectItem key={m.id} value={m.name} className="text-foreground font-body">{m.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={handlePaySelected} disabled={!paySelectedMethod || paySelectedBusy}
+                      className="flex-1 font-display text-xs tracking-wider gap-1 min-h-[40px]">
+                      <Check className="w-3.5 h-3.5" /> {paySelectedBusy ? 'Processing...' : 'Confirm Payment'}
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => { setShowPaySelected(false); setPaySelectedMethod(''); }}
+                      className="font-display text-xs tracking-wider min-h-[40px]">
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {unpaidOrders.map(o => {
             const items = Array.isArray(o.items) ? o.items : [];
             const isChargedToRoom = o.payment_type === 'Charge to Room';
             const isEditing = editingOrderId === o.id;
+            const isSelectable = !isChargedToRoom && !readOnly;
             return (
               <div key={o.id} className="border border-border rounded-lg p-3 space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-body text-xs text-muted-foreground">
-                    {format(new Date(o.created_at), 'MMM d h:mma')} · {o.staff_name || '—'}
-                  </span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    {isSelectable && (
+                      <Checkbox
+                        checked={selectedOrderIds.has(o.id)}
+                        onCheckedChange={() => toggleOrderSelection(o.id)}
+                        className="shrink-0"
+                      />
+                    )}
+                    <span className="font-body text-xs text-muted-foreground truncate">
+                      {format(new Date(o.created_at), 'MMM d h:mma')} · {o.staff_name || '—'}
+                    </span>
+                  </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <Badge variant="outline" className={`text-[10px] ${orderStatusColor(o.status)}`}>{o.status}</Badge>
                     {isChargedToRoom && <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/30">Room</Badge>}
@@ -522,19 +580,16 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
                   )}
                   {!readOnly && !isEditing && (
                     <div className="flex items-center gap-1">
-                      {/* Edit price */}
                       <Button size="sm" variant="ghost" onClick={() => { setEditingOrderId(o.id); setEditOrderAmount(String(o.total)); }}
                         className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground">
                         <Pencil className="w-3 h-3" />
                       </Button>
-                      {/* Mark Paid */}
                       {o.status === 'Served' && !isChargedToRoom && (
                         <Button size="sm" variant="ghost" onClick={() => handleMarkPaidOrder(o.id)}
                           className="h-7 px-2 text-xs text-green-400 hover:text-green-300">
                           <DollarSign className="w-3 h-3 mr-0.5" /> Paid
                         </Button>
                       )}
-                      {/* Comp */}
                       {!isChargedToRoom && (
                         <Button size="sm" variant="ghost" onClick={() => handleCompOrder(o.id)}
                           className="h-7 px-2 text-xs text-amber-400 hover:text-amber-300">
