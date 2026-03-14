@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { useMemo } from 'react';
 import { getStaffSession, clearStaffSession } from '@/lib/session';
 import { canEdit } from '@/lib/permissions';
+import ThemeToggle from '@/components/ThemeToggle';
 
 const DEPT_CONFIG: Record<string, { label: string; icon: React.ReactNode; gradient: string }> = {
   kitchen: { label: 'Kitchen', icon: <Flame className="w-4 h-4" />, gradient: 'from-[hsl(25,85%,55%)] to-[hsl(15,80%,45%)]' },
