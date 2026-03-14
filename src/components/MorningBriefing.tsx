@@ -1,7 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
-import { Sun, BedDouble, LogIn, LogOut, Sparkles, UtensilsCrossed, ClipboardList, Zap } from 'lucide-react';
+import {
+  Sun, BedDouble, LogIn, LogOut, Sparkles, UtensilsCrossed,
+  ClipboardList, Zap, MapPin, Bell, Car,
+} from 'lucide-react';
 
 const from = (table: string) => supabase.from(table as any);
 
@@ -16,6 +19,12 @@ const getManilaTimeStr = () =>
     hour12: true,
   });
 
+interface OpsTask {
+  label: string;
+  icon: 'arrival' | 'departure' | 'kitchen' | 'tour' | 'request' | 'clean';
+  urgent?: boolean;
+}
+
 interface BriefingData {
   occupiedRooms: number;
   totalRooms: number;
@@ -24,7 +33,7 @@ interface BriefingData {
   roomsToClean: number;
   pendingKitchenOrders: number;
   adminTasks: { title: string; assignee: string }[];
-  opsTasks: string[];
+  opsTasks: OpsTask[];
 }
 
 function useMorningBriefing() {
@@ -33,7 +42,10 @@ function useMorningBriefing() {
   return useQuery<BriefingData>({
     queryKey: ['morning-briefing', today],
     queryFn: async () => {
-      const [unitsRes, bookingsRes, ordersRes, tasksRes, employeesRes, opsUnitsRes] = await Promise.all([
+      const [
+        unitsRes, bookingsRes, ordersRes, tasksRes, employeesRes, opsUnitsRes,
+        toursRes, requestsRes,
+      ] = await Promise.all([
         from('units').select('id, status'),
         from('resort_ops_bookings').select('id, check_in, check_out, unit_id, resort_ops_guests(full_name), resort_ops_units:unit_id(name)'),
         from('orders')
@@ -46,6 +58,15 @@ function useMorningBriefing() {
           .is('archived_at', null),
         from('employees').select('id, display_name, name'),
         from('resort_ops_units').select('id, name'),
+        // Today's tours
+        from('guest_tours')
+          .select('tour_name, unit_name, pax, status, tour_date, pickup_time')
+          .eq('tour_date', today)
+          .in('status', ['booked', 'confirmed']),
+        // Pending guest requests
+        from('guest_requests')
+          .select('request_type, details, guest_name, status')
+          .eq('status', 'pending'),
       ]);
 
       const units = (unitsRes.data as any[]) || [];
@@ -54,8 +75,12 @@ function useMorningBriefing() {
       const employees = (employeesRes.data as any[]) || [];
       const opsUnits = (opsUnitsRes.data as any[]) || [];
       const pendingKitchenCount = ordersRes.count || 0;
+      const tours = (toursRes.data as any[]) || [];
+      const requests = (requestsRes.data as any[]) || [];
 
       // --- Stats ---
+      const unitStatusMap = new Map(units.map((u: any) => [u.id, u.status]));
+
       const occupiedRooms = units.filter((u) => {
         if (u.status === 'occupied') return true;
         return bookings.some(
@@ -77,31 +102,81 @@ function useMorningBriefing() {
         assignee: empMap.get(t.employee_id) || 'Unassigned',
       }));
 
-      // --- Auto ops tasks ---
-      const opsTasks: string[] = [];
+      // --- Real-time Ops Tasks ---
+      const opsTasks: OpsTask[] = [];
 
-      // Helper to resolve unit name from booking
       const getUnitName = (b: any) => {
-        // Try joined data first
         if (b.resort_ops_units?.name) return b.resort_ops_units.name;
-        // Fallback: lookup from opsUnits
         const u = opsUnits.find((ou: any) => ou.id === b.unit_id);
         return u?.name || 'Room';
       };
       const getGuestName = (b: any) => b.resort_ops_guests?.full_name || 'Guest';
 
+      // Arrivals — only show if unit is NOT already occupied (guest hasn't checked in yet)
       todayArrivals.forEach((b: any) => {
-        opsTasks.push(`Prepare ${getUnitName(b)} for arrival — guest ${getGuestName(b)}`);
+        const unitStatus = unitStatusMap.get(b.unit_id);
+        if (unitStatus === 'occupied') return; // Already checked in, skip
+        opsTasks.push({
+          label: `Prepare ${getUnitName(b)} for arrival — ${getGuestName(b)}`,
+          icon: 'arrival',
+          urgent: true,
+        });
       });
 
+      // Departures — only show if unit is still occupied (guest hasn't checked out yet)
       todayDepartures.forEach((b: any) => {
-        opsTasks.push(`Clean ${getUnitName(b)} after checkout — guest ${getGuestName(b)}`);
+        const unitStatus = unitStatusMap.get(b.unit_id);
+        if (unitStatus !== 'occupied') return; // Already checked out, skip
+        opsTasks.push({
+          label: `Checkout pending: ${getUnitName(b)} — ${getGuestName(b)}`,
+          icon: 'departure',
+        });
       });
 
+      // Rooms to clean
+      if (roomsToClean > 0) {
+        const dirtyNames = units
+          .filter((u) => u.status === 'dirty' || u.status === 'cleaning' || u.status === 'to_clean')
+          .map((u) => {
+            const ou = opsUnits.find((o: any) => o.id === u.id);
+            return ou?.name || 'Room';
+          });
+        opsTasks.push({
+          label: `Clean ${dirtyNames.length} room${dirtyNames.length > 1 ? 's' : ''}: ${dirtyNames.join(', ')}`,
+          icon: 'clean',
+          urgent: true,
+        });
+      }
+
+      // Tours today
+      tours.forEach((t: any) => {
+        opsTasks.push({
+          label: `Tour: ${t.tour_name} — ${t.unit_name}, ${t.pax} pax${t.pickup_time ? ` @ ${t.pickup_time}` : ''}`,
+          icon: 'tour',
+        });
+      });
+
+      // Pending guest requests
+      requests.forEach((r: any) => {
+        const type = (r.request_type || 'request').replace(/_/g, ' ');
+        opsTasks.push({
+          label: `${type}: ${r.details || 'No details'} — ${r.guest_name || 'Guest'}`,
+          icon: 'request',
+          urgent: true,
+        });
+      });
+
+      // Pending kitchen orders
       if (pendingKitchenCount > 0) {
-        opsTasks.push(`Prepare ${pendingKitchenCount} kitchen order${pendingKitchenCount > 1 ? 's' : ''}`);
-      } else {
-        opsTasks.push('Kitchen prep: none');
+        opsTasks.push({
+          label: `${pendingKitchenCount} pending kitchen order${pendingKitchenCount > 1 ? 's' : ''}`,
+          icon: 'kitchen',
+        });
+      }
+
+      // If nothing, show all-clear
+      if (opsTasks.length === 0) {
+        opsTasks.push({ label: 'All clear — no pending operations', icon: 'kitchen' });
       }
 
       return {
@@ -115,8 +190,8 @@ function useMorningBriefing() {
         opsTasks,
       };
     },
-    refetchInterval: 30_000,
-    staleTime: 10_000,
+    refetchInterval: 15_000, // More frequent for real-time ops
+    staleTime: 5_000,
   });
 }
 
@@ -127,6 +202,15 @@ const statsDef = [
   { key: 'cleaning', icon: Sparkles, label: 'Rooms to clean' },
   { key: 'kitchen', icon: UtensilsCrossed, label: 'Pending kitchen' },
 ] as const;
+
+const opsIconMap: Record<string, typeof LogIn> = {
+  arrival: LogIn,
+  departure: LogOut,
+  kitchen: UtensilsCrossed,
+  tour: MapPin,
+  request: Bell,
+  clean: Sparkles,
+};
 
 const MorningBriefing = () => {
   const { data: rawData, isLoading } = useMorningBriefing();
@@ -192,26 +276,31 @@ const MorningBriefing = () => {
                   {data.adminTasks.map((t, i) => (
                     <li key={i} className="text-xs text-foreground leading-relaxed">
                       <span className="text-muted-foreground mr-1">•</span>
-                      {t.title} <span className="text-muted-foreground">— assigned to {t.assignee}</span>
+                      {t.title} <span className="text-muted-foreground">— {t.assignee}</span>
                     </li>
                   ))}
                 </ul>
               )}
             </div>
 
-            {/* Operations Tasks */}
+            {/* Operations Tasks — Real-time */}
             <div className="rounded-md bg-background/60 border border-border/50 p-3">
               <div className="flex items-center gap-1.5 mb-2">
                 <Zap className="h-4 w-4 text-muted-foreground" />
-                <h3 className="text-xs font-semibold text-foreground tracking-wide">Operations Tasks</h3>
+                <h3 className="text-xs font-semibold text-foreground tracking-wide">Live Operations</h3>
               </div>
-              <ul className="space-y-1">
-                {data.opsTasks.map((t, i) => (
-                  <li key={i} className="text-xs text-foreground leading-relaxed">
-                    <span className="text-muted-foreground mr-1">•</span>
-                    {t}
-                  </li>
-                ))}
+              <ul className="space-y-1.5">
+                {data.opsTasks.map((t, i) => {
+                  const Icon = opsIconMap[t.icon] || Zap;
+                  return (
+                    <li key={i} className="flex items-start gap-1.5 text-xs leading-relaxed">
+                      <Icon className={`h-3.5 w-3.5 shrink-0 mt-0.5 ${t.urgent ? 'text-amber-400' : 'text-muted-foreground'}`} />
+                      <span className={t.urgent ? 'text-foreground font-medium' : 'text-foreground'}>
+                        {t.label}
+                      </span>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           </div>
