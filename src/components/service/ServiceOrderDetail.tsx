@@ -14,6 +14,7 @@ interface ServiceOrderDetailProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   permissions: string[];
+  department: 'kitchen' | 'bar' | 'reception' | 'cashier';
   onAction: (orderId: string, action: string) => Promise<void>;
   resortProfile?: ResortProfile | null;
 }
@@ -24,7 +25,7 @@ const STATUS_DOT: Record<string, string> = {
   ready: 'bg-emerald-400',
 };
 
-const ServiceOrderDetail = ({ order, open, onOpenChange, permissions, onAction, resortProfile }: ServiceOrderDetailProps) => {
+const ServiceOrderDetail = ({ order, open, onOpenChange, permissions, department, onAction, resortProfile }: ServiceOrderDetailProps) => {
   const [busy, setBusy] = useState<string | null>(null);
 
   if (!order) return null;
