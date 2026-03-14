@@ -452,6 +452,25 @@ const HousekeepingInspection = ({ order, onClose, mode }: HousekeepingInspection
         </div>
       ) : (
         <div className="space-y-4">
+          {/* Cleaning Checklist */}
+          {checklistItems.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="font-display text-xs tracking-wider text-muted-foreground uppercase">Cleaning Checklist</h4>
+              {checklistItems.map((item: any) => (
+                <div key={item.id} className="flex items-center gap-3 border border-border rounded p-3 min-h-[44px]">
+                  <Checkbox
+                    checked={!!cleaningChecked[item.id]}
+                    onCheckedChange={v => setCleaningChecked(prev => ({ ...prev, [item.id]: !!v }))}
+                  />
+                  <span className={`font-body text-sm flex-1 ${cleaningChecked[item.id] ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                    {item.item_label}
+                    {item.is_required && <span className="text-amber-400 text-xs ml-1">*</span>}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Package selector */}
           {packages.length > 0 && (
             <div>
