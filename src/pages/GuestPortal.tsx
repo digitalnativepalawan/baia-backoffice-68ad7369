@@ -978,11 +978,17 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
   const { data: bookingData, refetch: refetchBooking } = useQuery({
     queryKey: ['guest-bill-agreement', session.booking_id],
     queryFn: async () => {
-      const { data } = await supabase.from('resort_ops_bookings').select('bill_agreed_at').eq('id', session.booking_id).maybeSingle();
+      const { data } = await supabase.from('resort_ops_bookings').select('bill_agreed_at, room_rate, check_in, check_out').eq('id', session.booking_id).maybeSingle();
       return data as any;
     },
   });
   const billAgreedAt = bookingData?.bill_agreed_at;
+  const bookingRoomRate = bookingData?.room_rate || 0;
+  const bookingCheckIn = bookingData?.check_in;
+  const bookingCheckOut = bookingData?.check_out;
+  const bookingNights = bookingCheckIn && bookingCheckOut
+    ? Math.max(1, Math.round((new Date(bookingCheckOut).getTime() - new Date(bookingCheckIn).getTime()) / 86400000))
+    : 0;
 
   const handleAgree = async () => {
     setAgreeing(true);
