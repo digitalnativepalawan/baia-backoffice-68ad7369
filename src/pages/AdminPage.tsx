@@ -187,6 +187,7 @@ const AdminPage = () => {
       const { data } = await supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(200);
       return data || [];
     },
+    refetchInterval: 5000,
   });
 
   const { data: tabs = [] } = useQuery({
