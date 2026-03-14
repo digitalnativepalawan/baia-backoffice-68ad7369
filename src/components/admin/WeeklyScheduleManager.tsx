@@ -1068,12 +1068,14 @@ const WeeklyScheduleManager = ({ readOnly = false }: { readOnly?: boolean }) => 
 // Shift Add/Edit Modal
 const ShiftModal = ({ shiftModal, shiftForm, setShiftForm, employees, weekDates, saveShift, addBrokenShift, onClose, onDelete, onDuplicate }: {
   shiftModal: any; shiftForm: any; setShiftForm: any; employees: Employee[]; weekDates: Date[];
-  saveShift: () => void; addBrokenShift: () => void; onClose: () => void; onDelete?: () => void; onDuplicate?: () => void;
+  saveShift: (keepOpen?: boolean) => void; addBrokenShift: () => void; onClose: () => void; onDelete?: () => void; onDuplicate?: () => void;
 }) => {
   const isAdd = shiftModal?.mode === 'add';
   const allDays = weekDates.map(d => format(d, 'yyyy-MM-dd'));
   const selectedDays: string[] = shiftForm.selected_days || [];
-  const allChecked = allDays.every(d => selectedDays.includes(d));
+  const selectedEmps: string[] = shiftForm.selected_employees || [];
+  const allDaysChecked = allDays.every(d => selectedDays.includes(d));
+  const allEmpsChecked = employees.length > 0 && employees.every(e => selectedEmps.includes(e.id));
 
   const toggleDay = (dateStr: string) => {
     setShiftForm((p: any) => {
@@ -1082,32 +1084,86 @@ const ShiftModal = ({ shiftModal, shiftForm, setShiftForm, employees, weekDates,
     });
   };
 
-  const toggleAll = () => {
-    setShiftForm((p: any) => ({ ...p, selected_days: allChecked ? [] : [...allDays] }));
+  const toggleAllDays = () => {
+    setShiftForm((p: any) => ({ ...p, selected_days: allDaysChecked ? [] : [...allDays] }));
   };
+
+  const toggleEmp = (empId: string) => {
+    setShiftForm((p: any) => {
+      const emps = p.selected_employees || [];
+      const next = emps.includes(empId) ? emps.filter((id: string) => id !== empId) : [...emps, empId];
+      return { ...p, selected_employees: next, employee_id: next[0] || '' };
+    });
+  };
+
+  const toggleAllEmps = () => {
+    if (allEmpsChecked) {
+      setShiftForm((p: any) => ({ ...p, selected_employees: [], employee_id: '' }));
+    } else {
+      const all = employees.map(e => e.id);
+      setShiftForm((p: any) => ({ ...p, selected_employees: all, employee_id: all[0] || '' }));
+    }
+  };
+
+  const totalShifts = isAdd ? (selectedEmps.length || (shiftForm.employee_id ? 1 : 0)) * (selectedDays.length || 1) : 1;
 
   return (
     <Dialog open={!!shiftModal} onOpenChange={() => onClose()}>
-      <DialogContent className="bg-card border-border max-w-sm">
+      <DialogContent className="bg-card border-border max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-display text-foreground">{isAdd ? 'Add Shift' : 'Edit Shift'}</DialogTitle>
+          <DialogTitle className="font-display text-foreground">{isAdd ? 'Add Shifts' : 'Edit Shift'}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
-          <div>
-            <Label className="font-body text-xs text-muted-foreground">Employee</Label>
-            <Select value={shiftForm.employee_id} onValueChange={v => setShiftForm((p: any) => ({ ...p, employee_id: v }))}>
-              <SelectTrigger className="bg-secondary border-border text-foreground font-body"><SelectValue /></SelectTrigger>
-              <SelectContent className="bg-card border-border">
-                {employees.map(e => <SelectItem key={e.id} value={e.id} className="font-body text-foreground">{e.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
+          {isAdd ? (
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <Label className="font-body text-xs text-muted-foreground">Employees</Label>
+                <button onClick={toggleAllEmps} className="font-body text-[10px] text-accent hover:underline">
+                  {allEmpsChecked ? 'Clear All' : 'Select All'}
+                </button>
+              </div>
+              <div className="grid grid-cols-3 gap-1 max-h-[120px] overflow-y-auto">
+                {employees.map(e => {
+                  const checked = selectedEmps.includes(e.id);
+                  return (
+                    <button
+                      key={e.id}
+                      onClick={() => toggleEmp(e.id)}
+                      className={`flex items-center gap-1.5 py-1.5 px-2 rounded text-xs font-body transition-colors border truncate
+                        ${checked
+                          ? 'bg-primary/20 border-primary/50 text-primary'
+                          : 'bg-secondary border-border text-muted-foreground hover:bg-secondary/80'
+                        }`}
+                    >
+                      <div className={`w-3 h-3 rounded-sm border flex items-center justify-center shrink-0 ${checked ? 'bg-primary border-primary' : 'border-muted-foreground/40'}`}>
+                        {checked && <Check className="h-2 w-2 text-primary-foreground" />}
+                      </div>
+                      <span className="truncate">{e.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {selectedEmps.length > 0 && (
+                <p className="font-body text-[10px] text-muted-foreground mt-1">{selectedEmps.length} employee(s) selected</p>
+              )}
+            </div>
+          ) : (
+            <div>
+              <Label className="font-body text-xs text-muted-foreground">Employee</Label>
+              <Select value={shiftForm.employee_id} onValueChange={v => setShiftForm((p: any) => ({ ...p, employee_id: v }))}>
+                <SelectTrigger className="bg-secondary border-border text-foreground font-body"><SelectValue /></SelectTrigger>
+                <SelectContent className="bg-card border-border">
+                  {employees.map(e => <SelectItem key={e.id} value={e.id} className="font-body text-foreground">{e.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           {isAdd ? (
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <Label className="font-body text-xs text-muted-foreground">Days</Label>
-                <button onClick={toggleAll} className="font-body text-[10px] text-accent hover:underline">
-                  {allChecked ? 'Clear All' : 'All Week'}
+                <button onClick={toggleAllDays} className="font-body text-[10px] text-accent hover:underline">
+                  {allDaysChecked ? 'Clear All' : 'All Week'}
                 </button>
               </div>
               <div className="grid grid-cols-7 gap-1">
@@ -1168,7 +1224,7 @@ const ShiftModal = ({ shiftModal, shiftForm, setShiftForm, employees, weekDates,
           </Button>
         )}
         <div className="flex gap-2 pt-2">
-          <Button variant="outline" className="flex-1 font-display text-xs" onClick={onClose}>Cancel</Button>
+          <Button variant="outline" className="font-display text-xs" onClick={onClose}>Cancel</Button>
           <Button variant="outline" className="font-display text-xs" onClick={addBrokenShift}>
             <Clock className="h-3.5 w-3.5 mr-1" /> Broken
           </Button>
@@ -1177,8 +1233,13 @@ const ShiftModal = ({ shiftModal, shiftForm, setShiftForm, employees, weekDates,
               <Copy className="h-3.5 w-3.5 mr-1" /> Dup
             </Button>
           )}
-          <Button className="flex-1 font-display text-xs" onClick={saveShift}>
-            {isAdd && selectedDays.length > 1 ? `Save (${selectedDays.length})` : 'Save'}
+          {isAdd && (
+            <Button variant="outline" className="flex-1 font-display text-xs" onClick={() => saveShift(true)}>
+              Save & Add More
+            </Button>
+          )}
+          <Button className="flex-1 font-display text-xs" onClick={() => saveShift(false)}>
+            {isAdd && totalShifts > 1 ? `Save (${totalShifts})` : 'Save'}
           </Button>
         </div>
       </DialogContent>
