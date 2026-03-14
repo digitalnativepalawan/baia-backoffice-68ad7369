@@ -56,6 +56,7 @@ const fmtTime = (t: string) => {
 const PRESETS = [
   { label: 'Morning', time_in: '07:00', time_out: '16:00' },
   { label: 'Evening', time_in: '12:00', time_out: '21:00' },
+  { label: 'Night', time_in: '21:00', time_out: '09:00' },
   { label: 'Maintenance', time_in: '08:00', time_out: '17:00' },
 ];
 
