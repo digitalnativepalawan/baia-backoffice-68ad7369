@@ -667,7 +667,7 @@ const WeeklyScheduleManager = ({ readOnly = false }: { readOnly?: boolean }) => 
               <div key={h} className="absolute top-0 bottom-0 border-r border-border/30"
                 style={{ left: `${((h - TIMELINE_START) / TIMELINE_HOURS) * 100}%` }} />
             ))}
-            {shifts.map(s => <ShiftBlock key={s.id} s={s} compact={compact} />)}
+            {shifts.map(s => <ShiftBlock key={s.render_id} s={s} compact={compact} />)}
             <TooltipProvider delayDuration={200}>
               {tasks.map(task => {
                 const pos = getTaskPosition(task);
