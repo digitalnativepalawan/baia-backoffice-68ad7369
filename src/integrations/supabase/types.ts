@@ -367,6 +367,35 @@ export type Database = {
           },
         ]
       }
+      employee_roles: {
+        Row: {
+          created_at: string
+          employee_id: string
+          id: string
+          role_key: string
+        }
+        Insert: {
+          created_at?: string
+          employee_id: string
+          id?: string
+          role_key: string
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string
+          id?: string
+          role_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_roles_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_shifts: {
         Row: {
           clock_in: string
