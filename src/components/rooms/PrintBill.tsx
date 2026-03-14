@@ -85,6 +85,7 @@ h2, h3 { margin: 4px 0; }
   <p><strong>Room:</strong> ${unitName}</p>
   <p><strong>Guest:</strong> ${guestName || '—'}</p>
   ${booking ? `<p>${format(new Date(booking.check_in + 'T00:00:00'), 'MMM d')} — ${format(new Date(booking.check_out + 'T00:00:00'), 'MMM d, yyyy')}</p>` : ''}
+  ${booking?.room_rate ? `<p>Rate: ₱${Number(booking.room_rate).toLocaleString()}/night · ${Math.max(1, Math.round((new Date(booking.check_out).getTime() - new Date(booking.check_in).getTime()) / 86400000))} night(s)</p>` : ''}
   <p>${format(new Date(), 'MMM d, yyyy h:mm a')}</p>
 </div>
 <div class="line"></div>
