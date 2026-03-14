@@ -188,7 +188,11 @@ const StaffNavBar = ({ activeDepartment }: StaffNavBarProps) => {
               {deptLabel && <div className="mb-3"><DeptBadge /></div>}
               <div className="flex flex-col gap-2">
                 <NavItems mobile />
-                <div className="border-t border-border my-2" />
+              <div className="flex items-center gap-2 py-1">
+                <ThemeToggle />
+                <span className="font-body text-xs text-muted-foreground">Theme</span>
+              </div>
+              <div className="border-t border-border my-2" />
                 <Button
                   variant="ghost"
                   size="sm"

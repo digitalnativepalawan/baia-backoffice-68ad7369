@@ -78,7 +78,10 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-navy-texture flex flex-col items-center justify-center px-6">
+    <div className="min-h-screen bg-navy-texture flex flex-col items-center justify-center px-6 relative">
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
       {profile?.logo_url && (
         <div className="mb-6" style={{ width: logoSize, height: logoSize }}>
           <img
