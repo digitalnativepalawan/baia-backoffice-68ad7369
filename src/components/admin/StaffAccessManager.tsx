@@ -235,14 +235,13 @@ const StaffAccessManager = () => {
   /* ── Write combined permissions from roles to employee_permissions ── */
   const syncPermissionsFromRoles = async (empId: string, roleKeys: string[]) => {
     const combined = combineRolePermissions(roleKeys, customRoles);
-    // Delete existing
-    const empPerms = permissions.filter(p => p.employee_id === empId);
-    for (const p of empPerms) {
-      await from('employee_permissions').delete().eq('id', p.id);
-    }
+    // Delete ALL existing permissions for this employee in one query (avoids stale cache issues)
+    await from('employee_permissions').delete().eq('employee_id', empId);
     // Insert combined
-    for (const perm of combined) {
-      await from('employee_permissions').insert({ employee_id: empId, permission: perm });
+    if (combined.length > 0) {
+      await from('employee_permissions').insert(
+        combined.map(perm => ({ employee_id: empId, permission: perm }))
+      );
     }
     qc.invalidateQueries({ queryKey: ['employee-permissions'] });
   };
