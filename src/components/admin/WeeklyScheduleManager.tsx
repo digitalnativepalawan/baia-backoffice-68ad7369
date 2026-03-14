@@ -244,12 +244,12 @@ const WeeklyScheduleManager = ({ readOnly = false }: { readOnly?: boolean }) => 
 
   const openAdd = (date?: string, empId?: string) => {
     const d = date || format(weekDates[selectedDayIdx], 'yyyy-MM-dd');
-    setShiftForm({ employee_id: empId || employees[0]?.id || '', schedule_date: d, time_in: '07:00', time_out: '16:00', selected_days: [d] });
+    setShiftForm({ employee_id: empId || '', schedule_date: d, time_in: '07:00', time_out: '16:00', selected_days: [d], selected_employees: empId ? [empId] : [] });
     setShiftModal({ mode: 'add', date, empId });
   };
 
   const openEdit = (s: Schedule) => {
-    setShiftForm({ employee_id: s.employee_id, schedule_date: s.schedule_date, time_in: s.time_in.slice(0, 5), time_out: s.time_out.slice(0, 5), selected_days: [s.schedule_date] });
+    setShiftForm({ employee_id: s.employee_id, schedule_date: s.schedule_date, time_in: s.time_in.slice(0, 5), time_out: s.time_out.slice(0, 5), selected_days: [s.schedule_date], selected_employees: [s.employee_id] });
     setShiftModal({ mode: 'edit', schedule: s });
   };
 
