@@ -1,37 +1,51 @@
 
 
-## Plan: Fix Schedule Delete & Enhance Task/Assignment Scheduling
+## Plan: Room Orders Billing Separation & Partial Payment
 
-### Issues Found
-
-1. **Delete button bug**: The trash icon on shift blocks triggers `setDeleteId(s.id)`, but the parent div's `onClick={() => openEdit(s)}` fires simultaneously despite `stopPropagation`. On mobile, the tiny button (3x3 icon) is nearly impossible to tap. The AlertDialog `onOpenChange={() => setDeleteId(null)}` also races with the confirm action.
-
-2. **Missing scheduling features**: The schedule only manages time shifts. There's no way to assign tasks like housecleaning, reception duty, or track completion from within the schedule view.
+### Problem
+1. Room orders appear in the Cashier board — they should only appear in the Room Bill (reception)
+2. Reception needs ability to let guests pay specific orders before checkout (partial bill settlement)
+3. Paid orders not appearing in "Completed" section in cashier
 
 ### Changes
 
-**1. Fix Delete Button** (`WeeklyScheduleManager.tsx`)
-- Make `confirmDelete` capture `deleteId` before the dialog closes by saving it in a ref or local variable
-- Increase touch target size for edit/delete buttons on shift blocks
-- Prevent edit modal from opening when clicking edit/delete icons (the `stopPropagation` exists but the parent click handler on the entire timeline area also fires)
+#### 1. `src/components/service/CashierBoard.tsx` — Exclude room orders
 
-**2. Add Task/Assignment Creation from Schedule** (`WeeklyScheduleManager.tsx`)
-- Add an "Assign Task" button alongside "Add Shift" 
-- New modal to create a task assignment: select employee, pick type (Housecleaning, Reception, Custom), set date/time, add notes
-- For housecleaning: select a room/unit to clean, auto-creates a `housekeeping_orders` entry assigned to the selected employee
-- For other tasks: creates an `employee_tasks` entry with due date and description
-- Tasks appear as colored pills on the timeline (already partially implemented)
+In the active orders query (~line 62) and completed orders query (~line 81), add a filter to exclude orders that have `room_id` set or `payment_type = 'Charge to Room'`:
 
-**3. Show Completion Info on Task Detail** (`WeeklyScheduleManager.tsx`)
-- In the task detail dialog, show who completed the task and when (`completed_at`)
-- For housekeeping pills, show completion status (`cleaning_completed_at`, `completed_by_name`)
-- Make housekeeping pills clickable to show full details (room, status, who inspected/cleaned)
+```typescript
+// Active orders: exclude room orders
+.is('room_id', null)
+.neq('payment_type', 'Charge to Room')
 
-**4. Enhance Task Detail Dialog** (`WeeklyScheduleManager.tsx`)
-- Add edit capability: change title, description, due date, reassign to different employee
-- Add delete capability for tasks
-- Show completion audit trail
+// Completed orders: same exclusion
+.is('room_id', null)  
+.neq('payment_type', 'Charge to Room')
+```
+
+Also remove the "Charge to Room" option from the BillOutPanel payment methods since room charging shouldn't happen from cashier.
+
+#### 2. `src/components/rooms/RoomBillingTab.tsx` — Add selective order payment
+
+Add a "Pay Selected Orders" flow to the Room Billing tab:
+- Add checkboxes next to each unpaid order
+- Add a "Pay Selected" button that opens a payment modal
+- When confirmed, mark selected orders as `Paid` with the chosen payment method and record a `room_transactions` payment entry
+- This lets guests pay specific F&B orders before full checkout
+
+New UI elements:
+- Checkbox on each unpaid order row
+- "Pay Selected (X orders — ₱Y)" button in the action bar
+- Reuse existing `AddPaymentModal` pattern for payment method selection, or create a small inline payment flow
+
+#### 3. Fix "Completed" section in Cashier
+
+The completed query already fetches `status = 'Paid'` orders. The issue is that room orders with `status = 'Paid'` were mixed in. By excluding room orders (change #1), only walk-in/dine-in paid orders will show in Completed — which is correct.
 
 ### Files to Edit
-- `src/components/admin/WeeklyScheduleManager.tsx` — all changes in this single file
+
+| File | Change |
+|------|--------|
+| `src/components/service/CashierBoard.tsx` | Filter out `room_id` orders from active + completed queries; remove "Charge to Room" from payment panel |
+| `src/components/rooms/RoomBillingTab.tsx` | Add multi-select checkboxes on unpaid orders + "Pay Selected" flow with payment method picker |
 
