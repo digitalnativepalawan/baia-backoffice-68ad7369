@@ -706,10 +706,10 @@ const WeeklyScheduleManager = ({ readOnly = false }: { readOnly?: boolean }) => 
     <div className="flex border-b border-border">
       <div className={`shrink-0 ${compact ? 'w-16' : 'w-28'} border-r border-border`} />
       <div className="flex-1 relative" style={{ height: '24px' }}>
-        {HOURS.map((h, i) => (
+        {HOURS.filter(h => h % 3 === 0).map(h => (
           <div key={h} className="absolute top-0 bottom-0 flex items-center"
-            style={{ left: `${(i / TIMELINE_HOURS) * 100}%` }}>
-            <span className={`font-body ${compact ? 'text-[8px]' : 'text-[10px]'} text-muted-foreground whitespace-nowrap pl-0.5`}>
+            style={{ left: `${((h - TIMELINE_START) / TIMELINE_HOURS) * 100}%` }}>
+            <span className={`font-body ${compact ? 'text-[7px]' : 'text-[9px]'} text-muted-foreground whitespace-nowrap pl-0.5`}>
               {fmtHour(h)}
             </span>
           </div>
