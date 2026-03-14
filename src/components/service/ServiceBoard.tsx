@@ -303,6 +303,7 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
         open={!!detailOrder}
         onOpenChange={(open) => { if (!open) setDetailOrder(null); }}
         permissions={permissions}
+        department={department}
         onAction={handleAction}
         resortProfile={resortProfile}
       />

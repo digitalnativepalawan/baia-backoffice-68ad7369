@@ -14,6 +14,7 @@ interface ServiceOrderDetailProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   permissions: string[];
+  department: 'kitchen' | 'bar' | 'reception' | 'cashier';
   onAction: (orderId: string, action: string) => Promise<void>;
   resortProfile?: ResortProfile | null;
 }
@@ -24,7 +25,7 @@ const STATUS_DOT: Record<string, string> = {
   ready: 'bg-emerald-400',
 };
 
-const ServiceOrderDetail = ({ order, open, onOpenChange, permissions, onAction, resortProfile }: ServiceOrderDetailProps) => {
+const ServiceOrderDetail = ({ order, open, onOpenChange, permissions, department, onAction, resortProfile }: ServiceOrderDetailProps) => {
   const [busy, setBusy] = useState<string | null>(null);
 
   if (!order) return null;
@@ -46,12 +47,13 @@ const ServiceOrderDetail = ({ order, open, onOpenChange, permissions, onAction, 
     } finally { setBusy(null); }
   };
 
+  const isViewOnlyDepartment = department === 'cashier';
   const canServe = canEdit(permissions, 'reception') || canEdit(permissions, 'kitchen') || canEdit(permissions, 'bar');
 
   // Build actions based on permissions + order state
   const actions: { label: string; action: string; icon: React.ReactNode; variant: 'default' | 'outline' }[] = [];
 
-  if (canEdit(permissions, 'kitchen') && foodItems.length > 0) {
+  if (!isViewOnlyDepartment && canEdit(permissions, 'kitchen') && foodItems.length > 0) {
     if (order.kitchen_status === 'pending') {
       actions.push({ label: 'Start Preparing (Kitchen)', action: 'kitchen-start', icon: <Flame className="w-5 h-5" />, variant: 'default' });
     } else if (order.kitchen_status === 'preparing') {
@@ -59,7 +61,7 @@ const ServiceOrderDetail = ({ order, open, onOpenChange, permissions, onAction, 
     }
   }
 
-  if (canEdit(permissions, 'bar') && barItems.length > 0) {
+  if (!isViewOnlyDepartment && canEdit(permissions, 'bar') && barItems.length > 0) {
     if (order.bar_status === 'pending') {
       actions.push({ label: 'Start Mixing (Bar)', action: 'bar-start', icon: <GlassWater className="w-5 h-5" />, variant: 'default' });
     } else if (order.bar_status === 'preparing') {
@@ -69,7 +71,7 @@ const ServiceOrderDetail = ({ order, open, onOpenChange, permissions, onAction, 
 
   const canMarkPaid = canEdit(permissions, 'reception') || canManage(permissions, 'orders');
 
-  if (canServe) {
+  if (!isViewOnlyDepartment && canServe) {
     if (order.status === 'Ready') {
       actions.push({
         label: isAutoPayable ? 'Serve & Close' : 'Mark Served',
@@ -79,7 +81,7 @@ const ServiceOrderDetail = ({ order, open, onOpenChange, permissions, onAction, 
       });
     }
   }
-  if (canMarkPaid && order.status === 'Served' && !isAutoPayable) {
+  if (!isViewOnlyDepartment && canMarkPaid && order.status === 'Served' && !isAutoPayable) {
     actions.push({ label: 'Mark Paid', action: 'mark-paid', icon: <CreditCard className="w-5 h-5" />, variant: 'default' });
   }
 
@@ -197,7 +199,11 @@ const ServiceOrderDetail = ({ order, open, onOpenChange, permissions, onAction, 
 
           {actions.length === 0 && !showInvoice && (
             <p className="font-body text-sm text-muted-foreground text-center py-2">
-              {isAutoPayable && order.status === 'Served' ? 'Order auto-closed — charged to room/tab' : 'No actions available'}
+              {isViewOnlyDepartment
+                ? 'View only in cashier queue'
+                : isAutoPayable && order.status === 'Served'
+                  ? 'Order auto-closed — charged to room/tab'
+                  : 'No actions available'}
             </p>
           )}
 
