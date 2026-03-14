@@ -94,7 +94,7 @@ const ServiceOrderCard = ({ order, department, permissions, onAction, onOpenDeta
   // Show invoice button for non-room/tab served/paid orders
   const showInvoice = !isAutoPayable && (order.status === 'Served' || order.status === 'Paid');
 
-  if (deptItems.length === 0 && department !== 'reception') return null;
+  if (deptItems.length === 0 && department !== 'reception' && department !== 'cashier') return null;
 
   const statusKey = department === 'kitchen' ? order.kitchen_status :
                     department === 'bar' ? order.bar_status : order.status;
