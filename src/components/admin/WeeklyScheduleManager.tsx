@@ -395,7 +395,39 @@ const WeeklyScheduleManager = ({ readOnly = false }: { readOnly?: boolean }) => 
     setSelectedDayIdx(new Date().getDay());
   };
 
-  const getDateShifts = (dateStr: string) => schedules.filter(s => s.schedule_date === dateStr);
+  const getDateShifts = (dateStr: string): TimelineSchedule[] => {
+    const prevDateStr = format(addDays(new Date(`${dateStr}T00:00:00`), -1), 'yyyy-MM-dd');
+
+    const todayShifts = schedules
+      .filter(s => s.schedule_date === dateStr)
+      .map<TimelineSchedule>(s => {
+        const timeIn = s.time_in.slice(0, 5);
+        const timeOut = s.time_out.slice(0, 5);
+        const isOvernight = timeOut <= timeIn;
+
+        return {
+          ...s,
+          render_id: s.id,
+          render_time_in: timeIn,
+          render_time_out: isOvernight ? '24:00' : timeOut,
+          continues_to_next: isOvernight,
+        };
+      });
+
+    const carryOverShifts = schedules
+      .filter(s => s.schedule_date === prevDateStr && s.time_out.slice(0, 5) <= s.time_in.slice(0, 5))
+      .map<TimelineSchedule>(s => ({
+        ...s,
+        render_id: `${s.id}-carry-${dateStr}`,
+        render_time_in: '00:00',
+        render_time_out: s.time_out.slice(0, 5),
+        continues_from_previous: true,
+      }));
+
+    return [...carryOverShifts, ...todayShifts].sort((a, b) =>
+      a.render_time_in.localeCompare(b.render_time_in)
+    );
+  };
 
   // Save task assignment
   const saveTask = async () => {
