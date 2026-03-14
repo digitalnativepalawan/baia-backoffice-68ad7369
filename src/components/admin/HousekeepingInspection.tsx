@@ -115,6 +115,7 @@ const HousekeepingInspection = ({ order, onClose, mode }: HousekeepingInspection
   const [supplyQuantities, setSupplyQuantities] = useState<Record<string, number>>({});
   const [cleaningNotes, setCleaningNotes] = useState(order.cleaning_notes || '');
   const [cleaning, setCleaning] = useState(false);
+  const [cleaningChecked, setCleaningChecked] = useState<Record<string, boolean>>({});
 
   // Initialize supply quantities from package defaults
   const initSupplies = (pkgId: string) => {
