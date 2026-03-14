@@ -32,11 +32,11 @@ type Schedule = {
 
 const from = (table: string) => supabase.from(table as any);
 
-const TIMELINE_START = 5;
-const TIMELINE_END = 22;
+const TIMELINE_START = 0;
+const TIMELINE_END = 24;
 const TIMELINE_HOURS = TIMELINE_END - TIMELINE_START;
 
-const HOURS = Array.from({ length: TIMELINE_HOURS + 1 }, (_, i) => TIMELINE_START + i);
+const HOURS = Array.from({ length: TIMELINE_HOURS }, (_, i) => TIMELINE_START + i);
 
 const fmtHour = (h: number) => {
   const ampm = h >= 12 ? 'PM' : 'AM';
