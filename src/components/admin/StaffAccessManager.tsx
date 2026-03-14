@@ -22,9 +22,21 @@ const BUILTIN_ROLE_TEMPLATES: Record<string, string[]> = {
     'payroll:view', 'resort_ops:edit', 'rooms:manage', 'schedules:edit',
     'setup:view', 'tasks:edit', 'timesheet:view', 'documents:view',
   ],
+  assistantGM: [
+    'orders:manage', 'kitchen:edit', 'bar:edit', 'housekeeping:edit',
+    'reception:manage', 'experiences:manage', 'reports:view', 'inventory:view',
+    'payroll:view', 'resort_ops:edit', 'rooms:manage', 'schedules:edit',
+    'setup:view', 'tasks:manage', 'timesheet:manage', 'documents:view',
+  ],
   receptionist: [
     'reception:edit', 'rooms:edit', 'orders:view', 'experiences:view',
     'schedules:view', 'timesheet:edit',
+  ],
+  fbManager: [
+    'orders:manage', 'kitchen:manage', 'bar:manage', 'inventory:manage',
+    'menu:edit', 'reports:view', 'schedules:edit', 'tasks:edit',
+    'timesheet:manage', 'rooms:view', 'reception:view', 'resort_ops:view',
+    'experiences:view', 'setup:view', 'documents:view',
   ],
   chef: [
     'kitchen:edit', 'orders:edit', 'inventory:view', 'schedules:view', 'timesheet:edit',
@@ -32,8 +44,16 @@ const BUILTIN_ROLE_TEMPLATES: Record<string, string[]> = {
   cook: [
     'kitchen:view', 'orders:view', 'schedules:view', 'timesheet:edit',
   ],
+  kitchenHelper: [
+    'kitchen:view', 'orders:view', 'inventory:view', 'tasks:edit',
+    'schedules:view', 'timesheet:edit',
+  ],
   bartender: [
     'bar:edit', 'orders:edit', 'inventory:view', 'schedules:view', 'timesheet:edit',
+  ],
+  waiters: [
+    'orders:edit', 'kitchen:view', 'bar:view', 'rooms:view',
+    'schedules:view', 'timesheet:edit',
   ],
   cashier: [
     'orders:edit', 'reports:view', 'reception:view', 'experiences:view',
@@ -42,6 +62,11 @@ const BUILTIN_ROLE_TEMPLATES: Record<string, string[]> = {
   housekeeping: [
     'housekeeping:edit', 'tasks:edit', 'rooms:view', 'orders:view',
     'schedules:view', 'timesheet:edit',
+  ],
+  toursManager: [
+    'experiences:manage', 'reports:view', 'inventory:view', 'orders:view',
+    'reception:view', 'schedules:edit', 'tasks:edit', 'resort_ops:view',
+    'rooms:view', 'documents:view', 'timesheet:edit',
   ],
   tours: [
     'experiences:edit', 'orders:view', 'reception:view', 'rooms:view',
