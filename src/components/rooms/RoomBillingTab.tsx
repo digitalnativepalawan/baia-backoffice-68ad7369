@@ -132,7 +132,8 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
     .reduce((s, o) => s + Number(o.service_charge || 0), 0);
   const unpaidOrdersSubtotal = unpaidOrdersTotal - unpaidOrdersSCTotal;
   const activeToursTotal = tours.filter((t: any) => t.status !== 'cancelled').reduce((s: number, t: any) => s + Number(t.price || 0), 0);
-  const balance = totalCharges - totalPayments + unpaidOrdersTotal + activeToursTotal;
+  const activeRequestsTotal = requests.filter((r: any) => r.status !== 'cancelled').reduce((s: number, r: any) => s + Number(r.price || 0), 0);
+  const balance = totalCharges - totalPayments + unpaidOrdersTotal + activeToursTotal + activeRequestsTotal;
 
   const staffName = localStorage.getItem('emp_display_name') || localStorage.getItem('emp_name') || 'Staff';
 

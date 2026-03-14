@@ -978,11 +978,17 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
   const { data: bookingData, refetch: refetchBooking } = useQuery({
     queryKey: ['guest-bill-agreement', session.booking_id],
     queryFn: async () => {
-      const { data } = await supabase.from('resort_ops_bookings').select('bill_agreed_at').eq('id', session.booking_id).maybeSingle();
+      const { data } = await supabase.from('resort_ops_bookings').select('bill_agreed_at, room_rate, check_in, check_out').eq('id', session.booking_id).maybeSingle();
       return data as any;
     },
   });
   const billAgreedAt = bookingData?.bill_agreed_at;
+  const bookingRoomRate = bookingData?.room_rate || 0;
+  const bookingCheckIn = bookingData?.check_in;
+  const bookingCheckOut = bookingData?.check_out;
+  const bookingNights = bookingCheckIn && bookingCheckOut
+    ? Math.max(1, Math.round((new Date(bookingCheckOut).getTime() - new Date(bookingCheckIn).getTime()) / 86400000))
+    : 0;
 
   const handleAgree = async () => {
     setAgreeing(true);
@@ -1157,7 +1163,8 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
   const unpaidOrdersSCTotal = unpaidOrders.reduce((s: number, o: any) => s + (o.service_charge || 0), 0);
   const unpaidOrdersSubtotal = unpaidOrdersTotal - unpaidOrdersSCTotal;
   const activeToursTotal = [...completedTours, ...pendingTours].reduce((s: number, t: any) => s + Number(t.price || 0), 0);
-  const balance = totalCharges - totalPayments + unpaidOrdersTotal + activeToursTotal;
+  const activeRequestsTotal = [...completedRequests, ...pendingRequests].reduce((s: number, r: any) => s + Number(r.price || 0), 0);
+  const balance = totalCharges - totalPayments + unpaidOrdersTotal + activeToursTotal + activeRequestsTotal;
   const hasPending = pendingTours.length > 0 || pendingRequests.length > 0;
 
   // Separate room charges (accommodation, room_charge, adjustment) for clear display
@@ -1166,6 +1173,25 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
   return (
     <div className="space-y-4">
       <h2 className="font-display text-lg text-foreground">My Bill</h2>
+
+      {/* Stay Details */}
+      {bookingRoomRate > 0 && (
+        <div className="bg-card border border-border rounded-lg p-4 space-y-1">
+          <p className="font-display text-xs tracking-wider text-muted-foreground uppercase">Stay Details</p>
+          <div className="flex justify-between">
+            <span className="font-body text-sm text-muted-foreground">Room Rate</span>
+            <span className="font-body text-sm text-foreground">₱{bookingRoomRate.toLocaleString()}/night</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="font-body text-sm text-muted-foreground">Duration</span>
+            <span className="font-body text-sm text-foreground">{bookingNights} night{bookingNights !== 1 ? 's' : ''}</span>
+          </div>
+          <div className="flex justify-between border-t border-border pt-1">
+            <span className="font-body text-sm text-muted-foreground font-medium">Room Total</span>
+            <span className="font-body text-sm text-foreground font-medium">₱{(bookingRoomRate * bookingNights).toLocaleString()}</span>
+          </div>
+        </div>
+      )}
 
       {/* Balance summary */}
       <div className="bg-card border border-border rounded-lg p-4">
@@ -1184,6 +1210,18 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
               <span className="font-body text-sm text-amber-400">₱{unpaidOrdersSCTotal.toLocaleString()}</span>
             </div>
           </>
+        )}
+        {activeToursTotal > 0 && (
+          <div className="flex justify-between mb-2">
+            <span className="font-body text-sm text-muted-foreground">Tours & Experiences</span>
+            <span className="font-body text-sm text-foreground">₱{activeToursTotal.toLocaleString()}</span>
+          </div>
+        )}
+        {activeRequestsTotal > 0 && (
+          <div className="flex justify-between mb-2">
+            <span className="font-body text-sm text-muted-foreground">Transport & Rentals</span>
+            <span className="font-body text-sm text-foreground">₱{activeRequestsTotal.toLocaleString()}</span>
+          </div>
         )}
         <div className="flex justify-between mb-2">
           <span className="font-body text-sm text-muted-foreground">Total Payments</span>
