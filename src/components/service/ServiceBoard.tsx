@@ -101,7 +101,7 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
 
   // Filter for department relevance
   const relevantOrders = useMemo(() => {
-    if (department === 'reception') return orders;
+    if (department === 'reception' || department === 'cashier') return orders;
     return orders.filter(o => {
       const items = (o.items as any[]) || [];
       return items.some(i => {
