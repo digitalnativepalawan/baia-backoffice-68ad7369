@@ -11,7 +11,7 @@ import ServiceOrderCard from './ServiceOrderCard';
 import ServiceOrderDetail from './ServiceOrderDetail';
 
 const KANBAN_COLS_DEFAULT = ['New', 'Preparing', 'Ready'] as const;
-const KANBAN_COLS_RECEPTION = ['New', 'Preparing', 'Ready', 'Bill Out'] as const;
+const KANBAN_COLS_RECEPTION = ['New', 'Preparing', 'Ready'] as const;
 
 const COL_COLORS: Record<string, string> = {
   New: 'border-t-gold',
