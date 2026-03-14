@@ -246,6 +246,68 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
     qc.invalidateQueries({ queryKey: ['billing-requests'] });
   };
 
+  // ── Selective payment helpers ──
+  const toggleOrderSelection = (orderId: string) => {
+    setSelectedOrderIds(prev => {
+      const next = new Set(prev);
+      if (next.has(orderId)) next.delete(orderId); else next.add(orderId);
+      return next;
+    });
+  };
+
+  const selectAllUnpaid = () => {
+    if (selectedOrderIds.size === unpaidOrders.filter(o => o.payment_type !== 'Charge to Room').length) {
+      setSelectedOrderIds(new Set());
+    } else {
+      setSelectedOrderIds(new Set(unpaidOrders.filter(o => o.payment_type !== 'Charge to Room').map(o => o.id)));
+    }
+  };
+
+  const selectedTotal = unpaidOrders
+    .filter(o => selectedOrderIds.has(o.id))
+    .reduce((s, o) => s + Number(o.total || 0) + Number(o.service_charge || 0), 0);
+
+  const handlePaySelected = async () => {
+    if (!paySelectedMethod || selectedOrderIds.size === 0) return;
+    setPaySelectedBusy(true);
+    try {
+      const ids = Array.from(selectedOrderIds);
+      for (const id of ids) {
+        await supabase.from('orders').update({
+          status: 'Paid',
+          payment_type: paySelectedMethod,
+          closed_at: new Date().toISOString(),
+        }).eq('id', id);
+      }
+      // Record a payment transaction on the room ledger
+      await (supabase.from('room_transactions' as any) as any).insert({
+        unit_id: unit.id,
+        unit_name: unit.name,
+        guest_name: guestName,
+        booking_id: booking?.id || null,
+        transaction_type: 'payment',
+        amount: -selectedTotal,
+        tax_amount: 0,
+        service_charge_amount: 0,
+        total_amount: -selectedTotal,
+        payment_method: paySelectedMethod,
+        staff_name: staffName,
+        notes: `Partial payment for ${ids.length} F&B order(s)`,
+      });
+      await logAudit('created', 'room_transactions', unit.id, `Partial payment ₱${selectedTotal.toLocaleString()} via ${paySelectedMethod} for ${ids.length} orders — ${unit.name}`);
+      qc.invalidateQueries({ queryKey: ['billing-room-orders'] });
+      qc.invalidateQueries({ queryKey: ['room-transactions', unit.id] });
+      setSelectedOrderIds(new Set());
+      setShowPaySelected(false);
+      setPaySelectedMethod('');
+      toast.success(`${ids.length} order(s) paid — ₱${selectedTotal.toLocaleString()}`);
+    } catch {
+      toast.error('Failed to process payment');
+    } finally {
+      setPaySelectedBusy(false);
+    }
+  };
+
   const orderStatusColor = (s: string) => {
     switch (s) {
       case 'New': return 'bg-blue-500/20 text-blue-300 border-blue-500/30';
