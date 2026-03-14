@@ -198,6 +198,9 @@ const StaffOrdersView = () => {
     }
 
     qc.invalidateQueries({ queryKey: ['orders-staff'] });
+    qc.invalidateQueries({ queryKey: ['orders-admin'] });
+    qc.invalidateQueries({ queryKey: ['orders-kitchen'] });
+    qc.invalidateQueries({ queryKey: ['orders-bar'] });
     toast.success(`Order → ${nextStatus}`);
   };
 

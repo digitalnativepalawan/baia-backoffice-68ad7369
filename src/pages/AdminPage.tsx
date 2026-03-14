@@ -116,6 +116,7 @@ const AdminPage = () => {
       .channel('admin-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
         qc.invalidateQueries({ queryKey: ['orders-admin'] });
+        qc.invalidateQueries({ queryKey: ['orders-staff'] });
         qc.invalidateQueries({ queryKey: ['tabs-admin'] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tabs' }, () => {

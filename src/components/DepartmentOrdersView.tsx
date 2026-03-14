@@ -193,6 +193,10 @@ const DepartmentOrdersView = ({ department, embedded = false }: DepartmentOrders
     }
 
     qc.invalidateQueries({ queryKey: [`orders-${department}`] });
+    qc.invalidateQueries({ queryKey: ['orders-admin'] });
+    qc.invalidateQueries({ queryKey: ['orders-staff'] });
+    qc.invalidateQueries({ queryKey: ['orders-kitchen'] });
+    qc.invalidateQueries({ queryKey: ['orders-bar'] });
     toast.success(`${department === 'kitchen' ? 'Kitchen' : 'Bar'} → ${DEPT_STATUS_LABELS[nextDeptStatus]}`);
   };
 
