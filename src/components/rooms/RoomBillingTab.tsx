@@ -6,11 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
 import {
   DollarSign, RefreshCw, LogOut, UtensilsCrossed, MapPin, Bike, Truck,
   Trash2, Gift, FileText, CreditCard, Palmtree, CheckCircle, Pencil, Check, X,
-  AlertTriangle, MessageSquare,
+  AlertTriangle, MessageSquare, ShoppingCart,
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import AddPaymentModal from './AddPaymentModal';
@@ -19,6 +21,7 @@ import CheckoutModal from './CheckoutModal';
 import PrintBill from './PrintBill';
 import { toast } from 'sonner';
 import { logAudit } from '@/lib/auditLog';
+import { usePaymentMethods } from '@/hooks/usePaymentMethods';
 
 const from = (t: string) => supabase.from(t as any) as any;
 
