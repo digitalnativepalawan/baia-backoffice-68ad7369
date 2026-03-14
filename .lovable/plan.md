@@ -1,37 +1,50 @@
 
 
-## Plan: Fix Schedule Delete & Enhance Task/Assignment Scheduling
+## Plan: Fix Slow Room Loading in Service Order Screen
 
-### Issues Found
+### Root Cause
 
-1. **Delete button bug**: The trash icon on shift blocks triggers `setDeleteId(s.id)`, but the parent div's `onClick={() => openEdit(s)}` fires simultaneously despite `stopPropagation`. On mobile, the tiny button (3x3 icon) is nearly impossible to tap. The AlertDialog `onOpenChange={() => setDeleteId(null)}` also races with the confirm action.
+The `occupiedGuests` query in `OrderType.tsx` (lines 46-85) makes **3 separate queries** then does O(N^2) string matching in JavaScript:
+1. Query `resort_ops_units` (all units)
+2. Query `resort_ops_bookings` with guest join (all active bookings)
+3. Filter `units` (from a separate useQuery) by matching unit names case-insensitively
 
-2. **Missing scheduling features**: The schedule only manages time shifts. There's no way to assign tasks like housecleaning, reception duty, or track completion from within the schedule view.
+Additionally, the query **depends on `units` data** from another useQuery — if that hasn't loaded yet, the filter produces nothing until re-render.
 
-### Changes
+### Fix
 
-**1. Fix Delete Button** (`WeeklyScheduleManager.tsx`)
-- Make `confirmDelete` capture `deleteId` before the dialog closes by saving it in a ref or local variable
-- Increase touch target size for edit/delete buttons on shift blocks
-- Prevent edit modal from opening when clicking edit/delete icons (the `stopPropagation` exists but the parent click handler on the entire timeline area also fires)
+#### 1. Replace with a single optimized query (`OrderType.tsx`)
 
-**2. Add Task/Assignment Creation from Schedule** (`WeeklyScheduleManager.tsx`)
-- Add an "Assign Task" button alongside "Add Shift" 
-- New modal to create a task assignment: select employee, pick type (Housecleaning, Reception, Custom), set date/time, add notes
-- For housecleaning: select a room/unit to clean, auto-creates a `housekeeping_orders` entry assigned to the selected employee
-- For other tasks: creates an `employee_tasks` entry with due date and description
-- Tasks appear as colored pills on the timeline (already partially implemented)
+Instead of 3 queries + JS matching, do one query on `resort_ops_bookings` with joins:
 
-**3. Show Completion Info on Task Detail** (`WeeklyScheduleManager.tsx`)
-- In the task detail dialog, show who completed the task and when (`completed_at`)
-- For housekeeping pills, show completion status (`cleaning_completed_at`, `completed_by_name`)
-- Make housekeeping pills clickable to show full details (room, status, who inspected/cleaned)
+```typescript
+const today = new Date().toISOString().split('T')[0];
+const { data } = await supabase
+  .from('resort_ops_bookings')
+  .select('id, check_in, check_out, unit_id, resort_ops_guests(full_name), resort_ops_units(name)')
+  .lte('check_in', today)
+  .gt('check_out', today);
+```
 
-**4. Enhance Task Detail Dialog** (`WeeklyScheduleManager.tsx`)
-- Add edit capability: change title, description, due date, reassign to different employee
-- Add delete capability for tasks
-- Show completion audit trail
+Then match results back to `units` by name (still needed for unit IDs used in the order flow), but now it's a single DB round-trip.
 
-### Files to Edit
-- `src/components/admin/WeeklyScheduleManager.tsx` — all changes in this single file
+Also add `staleTime: 30000` to cache the result for 30s across re-renders.
+
+#### 2. Add database indexes (migration)
+
+```sql
+CREATE INDEX IF NOT EXISTS idx_resort_ops_bookings_dates ON resort_ops_bookings(check_in, check_out);
+CREATE INDEX IF NOT EXISTS idx_resort_ops_bookings_unit_id ON resort_ops_bookings(unit_id);
+```
+
+#### 3. Remove dependency on `units` query completion
+
+Currently `occupiedGuests` uses `(units || []).filter(...)` where `units` comes from a separate `useQuery`. This creates a timing dependency. Instead, query units inline or merge the occupied-guests logic to be self-contained by also fetching the `units` list inside the same queryFn (single additional query, but no cross-query dependency).
+
+### Files to edit
+
+| File | Change |
+|------|--------|
+| `src/pages/OrderType.tsx` | Rewrite `occupiedGuests` queryFn to use single joined query + add staleTime |
+| Database migration | Add indexes on `resort_ops_bookings(check_in, check_out)` and `resort_ops_bookings(unit_id)` |
 
