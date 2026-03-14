@@ -459,7 +459,7 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
             className="font-display text-xs tracking-wider min-h-[44px]">
             Adjustment
           </Button>
-          <PrintBill unitName={unit.name} guestName={guestName} booking={booking} transactions={transactions} roomOrders={roomOrders} tours={tours} />
+          <PrintBill unitName={unit.name} guestName={guestName} booking={booking} transactions={transactions} roomOrders={roomOrders} tours={tours} requests={requests} />
           {booking && (
             <Button size="sm" variant="destructive" onClick={() => setShowCheckout(true)}
               className="font-display text-xs tracking-wider gap-1 min-h-[44px]">
