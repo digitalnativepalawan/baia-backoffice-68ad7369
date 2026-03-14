@@ -375,12 +375,18 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
                     <Palmtree className="w-3.5 h-3.5 text-amber-400" />
                     <p className="font-display text-sm text-foreground tracking-wider">{b.tour_name}</p>
                   </div>
-                  <p className="font-body text-xs text-muted-foreground mt-1">
-                    {b.tour_date && format(new Date(b.tour_date + 'T00:00:00'), 'MMM d')} · {b.pickup_time || ''} · {b.pax} pax
-                  </p>
-                  <p className="font-body text-xs text-muted-foreground">Guest: {b.guest_name}</p>
-                  {Number(b.price) > 0 && <p className="font-body text-xs text-foreground">₱{Number(b.price).toLocaleString()}</p>}
-                  {b.notes && <p className="font-body text-[10px] text-muted-foreground italic">{b.notes}</p>}
+                   <p className="font-body text-xs text-muted-foreground mt-1">
+                     <span className="inline-flex items-center gap-1"><CalendarDays className="w-3 h-3" />{b.tour_date && format(new Date(b.tour_date + 'T00:00:00'), 'EEE, MMM d, yyyy')}</span>
+                     {' · '}{b.pickup_time || ''} · {b.pax} pax
+                   </p>
+                   <p className="font-body text-xs text-muted-foreground">Guest: {b.guest_name}</p>
+                   {Number(b.price) > 0 && <p className="font-body text-xs text-foreground">₱{Number(b.price).toLocaleString()}</p>}
+                   {b.notes && (
+                     <div className="flex items-start gap-1 mt-1">
+                       <StickyNote className="w-3 h-3 text-amber-400 mt-0.5 flex-shrink-0" />
+                       <p className="font-body text-[11px] text-amber-400/80 italic">{b.notes}</p>
+                     </div>
+                   )}
                 </div>
                 <Badge className={`font-body text-xs ${statusColor('pending')}`}>pending</Badge>
               </div>
