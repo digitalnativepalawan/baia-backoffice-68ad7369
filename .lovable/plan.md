@@ -1,37 +1,37 @@
 
 
-## Plan: Fix Permission Persistence & Remove "Manage" Level from UI
+## Plan: Fix Schedule Delete & Enhance Task/Assignment Scheduling
 
-### Root Cause of Permissions Resetting
+### Issues Found
 
-The `syncPermissionsFromRoles` function (line 238) deletes ALL `employee_permissions` for an employee and re-inserts only what the roles define. When an admin manually cycles a permission (e.g., sets Rooms to "View"), it writes directly to `employee_permissions`. But the next time any role is added/removed, `syncPermissionsFromRoles` wipes those manual changes and recalculates purely from roles — causing the "keeps changing" behavior.
+1. **Delete button bug**: The trash icon on shift blocks triggers `setDeleteId(s.id)`, but the parent div's `onClick={() => openEdit(s)}` fires simultaneously despite `stopPropagation`. On mobile, the tiny button (3x3 icon) is nearly impossible to tap. The AlertDialog `onOpenChange={() => setDeleteId(null)}` also races with the confirm action.
 
-Additionally, the delete loop uses the stale React-cached `permissions` array, so it may miss recently-added records.
+2. **Missing scheduling features**: The schedule only manages time shifts. There's no way to assign tasks like housecleaning, reception duty, or track completion from within the schedule view.
 
 ### Changes
 
-#### 1. Remove "Manage" from the permission cycling UI (`StaffAccessManager.tsx`)
+**1. Fix Delete Button** (`WeeklyScheduleManager.tsx`)
+- Make `confirmDelete` capture `deleteId` before the dialog closes by saving it in a ref or local variable
+- Increase touch target size for edit/delete buttons on shift blocks
+- Prevent edit modal from opening when clicking edit/delete icons (the `stopPropagation` exists but the parent click handler on the entire timeline area also fires)
 
-- Remove `THREE_LEVEL_SECTIONS` constant entirely
-- All sections cycle: **Off → View → Edit → Off** (3 states only)
-- Remove "Manage" from `LEVEL_LABELS` display and `LEVEL_COLORS` in the cycling buttons
-- Update `cyclePermission` and `cycleRolePerm` to always use the 2-level cycle
-- Keep `manage` working internally in `permissions.ts` for backward compatibility (existing `manage` entries still grant access), but the UI never sets it going forward
+**2. Add Task/Assignment Creation from Schedule** (`WeeklyScheduleManager.tsx`)
+- Add an "Assign Task" button alongside "Add Shift" 
+- New modal to create a task assignment: select employee, pick type (Housecleaning, Reception, Custom), set date/time, add notes
+- For housecleaning: select a room/unit to clean, auto-creates a `housekeeping_orders` entry assigned to the selected employee
+- For other tasks: creates an `employee_tasks` entry with due date and description
+- Tasks appear as colored pills on the timeline (already partially implemented)
 
-#### 2. Fix permission sync to not lose manual overrides (`StaffAccessManager.tsx`)
+**3. Show Completion Info on Task Detail** (`WeeklyScheduleManager.tsx`)
+- In the task detail dialog, show who completed the task and when (`completed_at`)
+- For housekeeping pills, show completion status (`cleaning_completed_at`, `completed_by_name`)
+- Make housekeeping pills clickable to show full details (room, status, who inspected/cleaned)
 
-- Change `syncPermissionsFromRoles` to use a single SQL delete query (`delete().eq('employee_id', empId)`) instead of iterating the stale cached array — ensures all old rows are actually removed
-- After role sync, preserve any manual override by merging: role-derived permissions set the baseline, but if the admin has manually set a higher level on a module, keep the higher one
-- Alternatively (simpler): make individual permission badges **read-only** when roles are assigned, showing the effective level from roles. This eliminates the conflict entirely — roles are the single source of truth
+**4. Enhance Task Detail Dialog** (`WeeklyScheduleManager.tsx`)
+- Add edit capability: change title, description, due date, reassign to different employee
+- Add delete capability for tasks
+- Show completion audit trail
 
-#### 3. Update role template modal cycling (`StaffAccessManager.tsx`)
-
-- Same removal of "Manage" from the role creation/edit modal cycling
-- Templates that currently include `:manage` permissions will continue to work but display as "Edit" in the UI
-
-### Files
-
-| File | Change |
-|------|--------|
-| `src/components/admin/StaffAccessManager.tsx` | Remove manage cycling, fix sync delete query, clarify read-only when roles assigned |
+### Files to Edit
+- `src/components/admin/WeeklyScheduleManager.tsx` — all changes in this single file
 

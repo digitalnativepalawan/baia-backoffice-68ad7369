@@ -17,25 +17,25 @@ const from = (table: string) => supabase.from(table as any);
 const BUILTIN_ROLE_TEMPLATES: Record<string, string[]> = {
   admin: ['admin'],
   gm: [
-    'orders:manage', 'kitchen:edit', 'bar:edit', 'housekeeping:edit',
-    'reception:manage', 'experiences:manage', 'reports:view', 'inventory:view',
-    'payroll:view', 'resort_ops:edit', 'rooms:manage', 'schedules:edit',
+    'orders:edit', 'kitchen:edit', 'bar:edit', 'housekeeping:edit',
+    'reception:edit', 'experiences:edit', 'reports:view', 'inventory:view',
+    'payroll:view', 'resort_ops:edit', 'rooms:edit', 'schedules:edit',
     'setup:view', 'tasks:edit', 'timesheet:view', 'documents:view',
   ],
   assistantGM: [
-    'orders:manage', 'kitchen:edit', 'bar:edit', 'housekeeping:edit',
-    'reception:manage', 'experiences:manage', 'reports:view', 'inventory:view',
-    'payroll:view', 'resort_ops:edit', 'rooms:manage', 'schedules:edit',
-    'setup:view', 'tasks:manage', 'timesheet:manage', 'documents:view',
+    'orders:edit', 'kitchen:edit', 'bar:edit', 'housekeeping:edit',
+    'reception:edit', 'experiences:edit', 'reports:view', 'inventory:view',
+    'payroll:view', 'resort_ops:edit', 'rooms:edit', 'schedules:edit',
+    'setup:view', 'tasks:edit', 'timesheet:edit', 'documents:view',
   ],
   receptionist: [
     'reception:edit', 'rooms:edit', 'orders:view', 'experiences:view',
     'schedules:view', 'timesheet:edit',
   ],
   fbManager: [
-    'orders:manage', 'kitchen:manage', 'bar:manage', 'inventory:manage',
+    'orders:edit', 'kitchen:edit', 'bar:edit', 'inventory:edit',
     'menu:edit', 'reports:view', 'schedules:edit', 'tasks:edit',
-    'timesheet:manage', 'rooms:view', 'reception:view', 'resort_ops:view',
+    'timesheet:edit', 'rooms:view', 'reception:view', 'resort_ops:view',
     'experiences:view', 'setup:view', 'documents:view',
   ],
   chef: [
@@ -64,7 +64,7 @@ const BUILTIN_ROLE_TEMPLATES: Record<string, string[]> = {
     'schedules:view', 'timesheet:edit',
   ],
   toursManager: [
-    'experiences:manage', 'reports:view', 'inventory:view', 'orders:view',
+    'experiences:edit', 'reports:view', 'inventory:view', 'orders:view',
     'reception:view', 'schedules:edit', 'tasks:edit', 'resort_ops:view',
     'rooms:view', 'documents:view', 'timesheet:edit',
   ],
@@ -127,14 +127,12 @@ const GRANULAR_PERMISSIONS = [
   { key: 'documents', label: 'Documents' },
 ] as const;
 
-const THREE_LEVEL_SECTIONS = new Set(['reception', 'experiences', 'orders']);
-
-const LEVEL_LABELS: Record<PermissionLevel, string> = { off: 'Off', view: 'View', edit: 'Edit', manage: 'Manage' };
+const LEVEL_LABELS: Record<PermissionLevel, string> = { off: 'Off', view: 'View', edit: 'Edit', manage: 'Edit' };
 const LEVEL_COLORS: Record<PermissionLevel, string> = {
   off: 'bg-muted text-muted-foreground',
   view: 'bg-blue-600/20 text-blue-400 border-blue-500/40',
   edit: 'bg-emerald-600/20 text-emerald-400 border-emerald-500/40',
-  manage: 'bg-purple-600/20 text-purple-400 border-purple-500/40',
+  manage: 'bg-emerald-600/20 text-emerald-400 border-emerald-500/40',
 };
 
 const PERM_LEVELS: Record<string, number> = { off: 0, view: 1, edit: 2, manage: 3 };
@@ -237,14 +235,13 @@ const StaffAccessManager = () => {
   /* ── Write combined permissions from roles to employee_permissions ── */
   const syncPermissionsFromRoles = async (empId: string, roleKeys: string[]) => {
     const combined = combineRolePermissions(roleKeys, customRoles);
-    // Delete existing
-    const empPerms = permissions.filter(p => p.employee_id === empId);
-    for (const p of empPerms) {
-      await from('employee_permissions').delete().eq('id', p.id);
-    }
+    // Delete ALL existing permissions for this employee in one query (avoids stale cache issues)
+    await from('employee_permissions').delete().eq('employee_id', empId);
     // Insert combined
-    for (const perm of combined) {
-      await from('employee_permissions').insert({ employee_id: empId, permission: perm });
+    if (combined.length > 0) {
+      await from('employee_permissions').insert(
+        combined.map(perm => ({ employee_id: empId, permission: perm }))
+      );
     }
     qc.invalidateQueries({ queryKey: ['employee-permissions'] });
   };
@@ -287,7 +284,6 @@ const StaffAccessManager = () => {
   const cyclePermission = async (empId: string, section: string) => {
     const empPerms = getEmpPermissions(empId);
     const current = getPermissionLevel(empPerms, section);
-    const isThreeLevel = THREE_LEVEL_SECTIONS.has(section);
 
     const toRemove = permissions.filter(
       p => p.employee_id === empId && (p.permission === section || p.permission === `${section}:view` || p.permission === `${section}:edit` || p.permission === `${section}:manage`)
@@ -296,12 +292,9 @@ const StaffAccessManager = () => {
       await from('employee_permissions').delete().eq('id', p.id);
     }
 
+    // Always cycle: Off → View → Edit → Off (no manage)
     let nextLevel: PermissionLevel;
-    if (isThreeLevel) {
-      nextLevel = current === 'off' ? 'view' : current === 'view' ? 'edit' : current === 'edit' ? 'manage' : 'off';
-    } else {
-      nextLevel = current === 'off' ? 'view' : current === 'view' ? 'edit' : 'off';
-    }
+    nextLevel = current === 'off' ? 'view' : current === 'view' ? 'edit' : 'off';
     if (nextLevel !== 'off') {
       await from('employee_permissions').insert({ employee_id: empId, permission: `${section}:${nextLevel}` });
     }
@@ -340,15 +333,11 @@ const StaffAccessManager = () => {
 
   const cycleRolePerm = (section: string) => {
     const current = getPermissionLevel(rolePerms, section);
-    const isThreeLevel = THREE_LEVEL_SECTIONS.has(section);
     const cleaned = rolePerms.filter(p => p !== section && p !== `${section}:view` && p !== `${section}:edit` && p !== `${section}:manage`);
 
+    // Always cycle: Off → View → Edit → Off (no manage)
     let nextLevel: PermissionLevel;
-    if (isThreeLevel) {
-      nextLevel = current === 'off' ? 'view' : current === 'view' ? 'edit' : current === 'edit' ? 'manage' : 'off';
-    } else {
-      nextLevel = current === 'off' ? 'view' : current === 'view' ? 'edit' : 'off';
-    }
+    nextLevel = current === 'off' ? 'view' : current === 'view' ? 'edit' : 'off';
     if (nextLevel !== 'off') {
       cleaned.push(`${section}:${nextLevel}`);
     }
@@ -511,17 +500,23 @@ const StaffAccessManager = () => {
                 </p>
               )}
 
-              {/* Granular permissions */}
+              {/* Granular permissions — read-only when roles are assigned (roles are source of truth) */}
               <div className={`space-y-1.5 mt-2 ${empIsAdmin ? 'opacity-40 pointer-events-none' : ''}`}>
+                {empRoles.length > 0 && !empIsAdmin && (
+                  <p className="font-body text-[10px] text-muted-foreground italic mb-1">
+                    Permissions set by roles — remove roles to edit manually
+                  </p>
+                )}
                 {GRANULAR_PERMISSIONS.map(({ key, label }) => {
                   const level = empIsAdmin ? 'edit' : getPermissionLevel(empPerms, key);
+                  const hasRoles = empRoles.length > 0;
                   return (
                     <div key={key} className="flex items-center justify-between">
                       <span className="font-body text-xs text-muted-foreground">{label}</span>
                       <button
-                        onClick={() => cyclePermission(emp.id, key)}
-                        disabled={empIsAdmin}
-                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-display tracking-wider border transition-colors ${LEVEL_COLORS[level]}`}
+                        onClick={() => !hasRoles && cyclePermission(emp.id, key)}
+                        disabled={empIsAdmin || hasRoles}
+                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-display tracking-wider border transition-colors ${LEVEL_COLORS[level]} ${hasRoles ? 'opacity-60 cursor-default' : ''}`}
                       >
                         {LEVEL_LABELS[level]}
                       </button>
