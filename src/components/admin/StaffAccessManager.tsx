@@ -17,25 +17,25 @@ const from = (table: string) => supabase.from(table as any);
 const BUILTIN_ROLE_TEMPLATES: Record<string, string[]> = {
   admin: ['admin'],
   gm: [
-    'orders:manage', 'kitchen:edit', 'bar:edit', 'housekeeping:edit',
-    'reception:manage', 'experiences:manage', 'reports:view', 'inventory:view',
-    'payroll:view', 'resort_ops:edit', 'rooms:manage', 'schedules:edit',
+    'orders:edit', 'kitchen:edit', 'bar:edit', 'housekeeping:edit',
+    'reception:edit', 'experiences:edit', 'reports:view', 'inventory:view',
+    'payroll:view', 'resort_ops:edit', 'rooms:edit', 'schedules:edit',
     'setup:view', 'tasks:edit', 'timesheet:view', 'documents:view',
   ],
   assistantGM: [
-    'orders:manage', 'kitchen:edit', 'bar:edit', 'housekeeping:edit',
-    'reception:manage', 'experiences:manage', 'reports:view', 'inventory:view',
-    'payroll:view', 'resort_ops:edit', 'rooms:manage', 'schedules:edit',
-    'setup:view', 'tasks:manage', 'timesheet:manage', 'documents:view',
+    'orders:edit', 'kitchen:edit', 'bar:edit', 'housekeeping:edit',
+    'reception:edit', 'experiences:edit', 'reports:view', 'inventory:view',
+    'payroll:view', 'resort_ops:edit', 'rooms:edit', 'schedules:edit',
+    'setup:view', 'tasks:edit', 'timesheet:edit', 'documents:view',
   ],
   receptionist: [
     'reception:edit', 'rooms:edit', 'orders:view', 'experiences:view',
     'schedules:view', 'timesheet:edit',
   ],
   fbManager: [
-    'orders:manage', 'kitchen:manage', 'bar:manage', 'inventory:manage',
+    'orders:edit', 'kitchen:edit', 'bar:edit', 'inventory:edit',
     'menu:edit', 'reports:view', 'schedules:edit', 'tasks:edit',
-    'timesheet:manage', 'rooms:view', 'reception:view', 'resort_ops:view',
+    'timesheet:edit', 'rooms:view', 'reception:view', 'resort_ops:view',
     'experiences:view', 'setup:view', 'documents:view',
   ],
   chef: [
@@ -64,7 +64,7 @@ const BUILTIN_ROLE_TEMPLATES: Record<string, string[]> = {
     'schedules:view', 'timesheet:edit',
   ],
   toursManager: [
-    'experiences:manage', 'reports:view', 'inventory:view', 'orders:view',
+    'experiences:edit', 'reports:view', 'inventory:view', 'orders:view',
     'reception:view', 'schedules:edit', 'tasks:edit', 'resort_ops:view',
     'rooms:view', 'documents:view', 'timesheet:edit',
   ],
