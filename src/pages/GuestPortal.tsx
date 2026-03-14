@@ -674,18 +674,36 @@ const ReviewView = ({ session, qc, onDone }: { session: GuestPortalSession; qc: 
   return (
     <div className="space-y-4">
       <h2 className="font-display text-lg text-foreground">Write a Review</h2>
-      {categories.map((c: any) => (
-        <div key={c.id} className="space-y-1">
-          <p className="font-body text-sm text-foreground">{c.category_name}</p>
-          <div className="flex gap-1">
-            {[1, 2, 3, 4, 5].map(star => (
-              <button key={star} onClick={() => setRatings(r => ({ ...r, [c.category_name]: star }))} className="text-2xl transition-colors">
-                {(ratings[c.category_name] || 0) >= star ? <span className="text-accent">★</span> : <span className="text-muted-foreground">☆</span>}
-              </button>
-            ))}
+      {categories.map((c: any) => {
+        const selected = ratings[c.category_name] || 0;
+        return (
+          <div key={c.id} className="space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="font-body text-sm text-foreground">{c.category_name}</p>
+              {selected > 0 && (
+                <span className="font-display text-sm text-accent">{selected}/10</span>
+              )}
+            </div>
+            <div className="flex gap-1">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
+                <button
+                  key={num}
+                  onClick={() => setRatings(r => ({ ...r, [c.category_name]: num }))}
+                  className={`flex-1 h-9 rounded text-xs font-display tracking-wider border transition-colors ${
+                    selected === num
+                      ? 'bg-accent text-accent-foreground border-accent'
+                      : selected >= num
+                        ? 'bg-accent/20 text-accent border-accent/40'
+                        : 'bg-secondary text-muted-foreground border-border hover:border-foreground/30'
+                  }`}
+                >
+                  {num}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
       <Textarea value={comments} onChange={e => setComments(e.target.value)} placeholder="Any additional comments..." className="bg-secondary border-border text-foreground min-h-[100px]" />
       <Button onClick={submit} disabled={submitting} className="w-full">{submitting ? 'Submitting...' : 'Submit Review'}</Button>
     </div>
