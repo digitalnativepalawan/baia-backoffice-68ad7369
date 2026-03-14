@@ -21,7 +21,7 @@ const COL_COLORS: Record<string, string> = {
 };
 
 interface ServiceBoardProps {
-  department: 'kitchen' | 'bar' | 'reception';
+  department: 'kitchen' | 'bar' | 'reception' | 'cashier';
 }
 
 const ServiceBoard = ({ department }: ServiceBoardProps) => {
@@ -101,7 +101,7 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
 
   // Filter for department relevance
   const relevantOrders = useMemo(() => {
-    if (department === 'reception') return orders;
+    if (department === 'reception' || department === 'cashier') return orders;
     return orders.filter(o => {
       const items = (o.items as any[]) || [];
       return items.some(i => {
@@ -313,7 +313,7 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
 /** Mobile tab-based view for phones */
 const MobileTabView = ({ columns, department, permissions, onAction, onOpenDetail, resortProfile }: {
   columns: Record<string, any[]>;
-  department: 'kitchen' | 'bar' | 'reception';
+  department: 'kitchen' | 'bar' | 'reception' | 'cashier';
   permissions: string[];
   onAction: (orderId: string, action: string) => Promise<void>;
   onOpenDetail: (order: any) => void;

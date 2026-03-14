@@ -22,7 +22,7 @@ const STATUS_DOT: Record<string, string> = {
 
 interface ServiceOrderCardProps {
   order: any;
-  department: 'kitchen' | 'bar' | 'reception';
+  department: 'kitchen' | 'bar' | 'reception' | 'cashier';
   permissions: string[];
   onAction?: (orderId: string, action: string) => Promise<void>;
   onOpenDetail?: (order: any) => void;
