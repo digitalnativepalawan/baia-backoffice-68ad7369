@@ -30,6 +30,14 @@ type Schedule = {
   time_in: string; time_out: string; created_at: string; updated_at: string;
 };
 
+type TimelineSchedule = Schedule & {
+  render_id: string;
+  render_time_in: string;
+  render_time_out: string;
+  continues_from_previous?: boolean;
+  continues_to_next?: boolean;
+};
+
 const from = (table: string) => supabase.from(table as any);
 
 const TIMELINE_START = 0;
@@ -143,12 +151,13 @@ const WeeklyScheduleManager = ({ readOnly = false }: { readOnly?: boolean }) => 
 
   const startStr = format(weekStart, 'yyyy-MM-dd');
   const endStr = format(addDays(weekStart, 6), 'yyyy-MM-dd');
+  const fetchStartStr = format(addDays(weekStart, -1), 'yyyy-MM-dd');
 
   const { data: schedules = [] } = useQuery<Schedule[]>({
     queryKey: ['weekly-schedules', startStr],
     queryFn: async () => {
       const { data } = await supabase.from('weekly_schedules').select('*')
-        .gte('schedule_date', startStr).lte('schedule_date', endStr);
+        .gte('schedule_date', fetchStartStr).lte('schedule_date', endStr);
       return (data || []) as Schedule[];
     },
   });
@@ -386,7 +395,39 @@ const WeeklyScheduleManager = ({ readOnly = false }: { readOnly?: boolean }) => 
     setSelectedDayIdx(new Date().getDay());
   };
 
-  const getDateShifts = (dateStr: string) => schedules.filter(s => s.schedule_date === dateStr);
+  const getDateShifts = (dateStr: string): TimelineSchedule[] => {
+    const prevDateStr = format(addDays(new Date(`${dateStr}T00:00:00`), -1), 'yyyy-MM-dd');
+
+    const todayShifts = schedules
+      .filter(s => s.schedule_date === dateStr)
+      .map<TimelineSchedule>(s => {
+        const timeIn = s.time_in.slice(0, 5);
+        const timeOut = s.time_out.slice(0, 5);
+        const isOvernight = timeOut <= timeIn;
+
+        return {
+          ...s,
+          render_id: s.id,
+          render_time_in: timeIn,
+          render_time_out: isOvernight ? '24:00' : timeOut,
+          continues_to_next: isOvernight,
+        };
+      });
+
+    const carryOverShifts = schedules
+      .filter(s => s.schedule_date === prevDateStr && s.time_out.slice(0, 5) <= s.time_in.slice(0, 5))
+      .map<TimelineSchedule>(s => ({
+        ...s,
+        render_id: `${s.id}-carry-${dateStr}`,
+        render_time_in: '00:00',
+        render_time_out: s.time_out.slice(0, 5),
+        continues_from_previous: true,
+      }));
+
+    return [...carryOverShifts, ...todayShifts].sort((a, b) =>
+      a.render_time_in.localeCompare(b.render_time_in)
+    );
+  };
 
   // Save task assignment
   const saveTask = async () => {
@@ -475,12 +516,14 @@ const WeeklyScheduleManager = ({ readOnly = false }: { readOnly?: boolean }) => 
   };
 
   // Shift Block Component
-  const ShiftBlock = ({ s, compact = false }: { s: Schedule; compact?: boolean }) => {
+  const ShiftBlock = ({ s, compact = false }: { s: TimelineSchedule; compact?: boolean }) => {
     const type = inferShiftType(s.time_in, s.time_out);
-    const left = timeToPercent(s.time_in.slice(0, 5));
-    const isOvernight = s.time_out.slice(0, 5) <= s.time_in.slice(0, 5);
-    const right = isOvernight ? 100 : timeToPercent(s.time_out.slice(0, 5));
+    const renderTimeIn = s.render_time_in || s.time_in.slice(0, 5);
+    const renderTimeOut = s.render_time_out || s.time_out.slice(0, 5);
+    const left = timeToPercent(renderTimeIn);
+    const right = timeToPercent(renderTimeOut);
     const width = Math.max(right - left, 2);
+    const isContinuation = !!(s.continues_from_previous || s.continues_to_next);
     const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const actionClickedRef = useRef(false);
 
@@ -535,7 +578,7 @@ const WeeklyScheduleManager = ({ readOnly = false }: { readOnly?: boolean }) => 
               </div>
               <div className="text-[9px] font-body text-foreground/60 truncate">
                 {fmtTime(s.time_in)} – {fmtTime(s.time_out)}
-                {isOvernight && <span className="ml-0.5 text-[8px] text-indigo-400">⏩</span>}
+                {isContinuation && <span className="ml-0.5 text-[8px] text-muted-foreground">↔</span>}
               </div>
               <span className={`text-[8px] font-display ${SHIFT_TEXT_COLORS[type]} opacity-80`}>{type}</span>
             </div>
@@ -623,7 +666,7 @@ const WeeklyScheduleManager = ({ readOnly = false }: { readOnly?: boolean }) => 
               <div key={h} className="absolute top-0 bottom-0 border-r border-border/30"
                 style={{ left: `${((h - TIMELINE_START) / TIMELINE_HOURS) * 100}%` }} />
             ))}
-            {shifts.map(s => <ShiftBlock key={s.id} s={s} compact={compact} />)}
+            {shifts.map(s => <ShiftBlock key={s.render_id} s={s} compact={compact} />)}
             <TooltipProvider delayDuration={200}>
               {tasks.map(task => {
                 const pos = getTaskPosition(task);
