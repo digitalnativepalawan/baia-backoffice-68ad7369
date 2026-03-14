@@ -197,7 +197,8 @@ const HousekeeperPage = ({ embedded = false }: { embedded?: boolean }) => {
         </div>
       )}
 
-      {/* New Assignments */}
+      {/* New Assignments — only visible to managers */}
+      {isManager && (
       <section className="mb-6">
         <h2 className="font-display text-sm tracking-wider text-muted-foreground uppercase mb-3 flex items-center gap-2">
           <ClipboardCheck className="w-4 h-4" /> Assignments ({pendingOrders.length})
