@@ -22,9 +22,21 @@ const BUILTIN_ROLE_TEMPLATES: Record<string, string[]> = {
     'payroll:view', 'resort_ops:edit', 'rooms:manage', 'schedules:edit',
     'setup:view', 'tasks:edit', 'timesheet:view', 'documents:view',
   ],
+  assistantGM: [
+    'orders:manage', 'kitchen:edit', 'bar:edit', 'housekeeping:edit',
+    'reception:manage', 'experiences:manage', 'reports:view', 'inventory:view',
+    'payroll:view', 'resort_ops:edit', 'rooms:manage', 'schedules:edit',
+    'setup:view', 'tasks:manage', 'timesheet:manage', 'documents:view',
+  ],
   receptionist: [
     'reception:edit', 'rooms:edit', 'orders:view', 'experiences:view',
     'schedules:view', 'timesheet:edit',
+  ],
+  fbManager: [
+    'orders:manage', 'kitchen:manage', 'bar:manage', 'inventory:manage',
+    'menu:edit', 'reports:view', 'schedules:edit', 'tasks:edit',
+    'timesheet:manage', 'rooms:view', 'reception:view', 'resort_ops:view',
+    'experiences:view', 'setup:view', 'documents:view',
   ],
   chef: [
     'kitchen:edit', 'orders:edit', 'inventory:view', 'schedules:view', 'timesheet:edit',
@@ -32,8 +44,16 @@ const BUILTIN_ROLE_TEMPLATES: Record<string, string[]> = {
   cook: [
     'kitchen:view', 'orders:view', 'schedules:view', 'timesheet:edit',
   ],
+  kitchenHelper: [
+    'kitchen:view', 'orders:view', 'inventory:view', 'tasks:edit',
+    'schedules:view', 'timesheet:edit',
+  ],
   bartender: [
     'bar:edit', 'orders:edit', 'inventory:view', 'schedules:view', 'timesheet:edit',
+  ],
+  waiters: [
+    'orders:edit', 'kitchen:view', 'bar:view', 'rooms:view',
+    'schedules:view', 'timesheet:edit',
   ],
   cashier: [
     'orders:edit', 'reports:view', 'reception:view', 'experiences:view',
@@ -42,6 +62,11 @@ const BUILTIN_ROLE_TEMPLATES: Record<string, string[]> = {
   housekeeping: [
     'housekeeping:edit', 'tasks:edit', 'rooms:view', 'orders:view',
     'schedules:view', 'timesheet:edit',
+  ],
+  toursManager: [
+    'experiences:manage', 'reports:view', 'inventory:view', 'orders:view',
+    'reception:view', 'schedules:edit', 'tasks:edit', 'resort_ops:view',
+    'rooms:view', 'documents:view', 'timesheet:edit',
   ],
   tours: [
     'experiences:edit', 'orders:view', 'reception:view', 'rooms:view',
@@ -63,12 +88,17 @@ const BUILTIN_ROLE_TEMPLATES: Record<string, string[]> = {
 const BUILTIN_ROLE_LABELS: Record<string, string> = {
   admin: 'Admin',
   gm: 'General Manager',
+  assistantGM: 'Assistant GM',
   receptionist: 'Receptionist',
+  fbManager: 'F&B Manager',
   chef: 'Chef',
   cook: 'Cook',
+  kitchenHelper: 'Kitchen Helper',
   bartender: 'Bartender / Barista',
+  waiters: 'Waiters',
   cashier: 'Cashier',
   housekeeping: 'Housekeeping',
+  toursManager: 'Tours Manager',
   tours: 'Tours',
   transportation: 'Transportation',
   maintenance: 'Maintenance',
@@ -408,9 +438,20 @@ const StaffAccessManager = () => {
 
           return (
             <div key={emp.id} className="border border-border rounded-lg p-3">
-              <p className="font-display text-sm text-foreground tracking-wider mb-2">
-                {emp.display_name || emp.name}
-              </p>
+              <div className="flex items-center gap-2 flex-wrap mb-2">
+                <p className="font-display text-sm text-foreground tracking-wider">
+                  {emp.display_name || emp.name}
+                </p>
+                {empRoles.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {empRoles.map((er, idx) => (
+                      <Badge key={er.id} variant={idx === 0 ? 'default' : 'secondary'} className="font-display text-[10px] tracking-wider">
+                        {getRoleLabel(er.role_key, customRoles)}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               {/* Assigned Roles as pills */}
               <div className="flex flex-wrap gap-1.5 mb-2">
