@@ -11,9 +11,10 @@ interface PrintBillProps {
   transactions: RoomTransaction[];
   roomOrders?: any[];
   tours?: any[];
+  requests?: any[];
 }
 
-const PrintBill = ({ unitName, guestName, booking, transactions, roomOrders = [], tours = [] }: PrintBillProps) => {
+const PrintBill = ({ unitName, guestName, booking, transactions, roomOrders = [], tours = [], requests = [] }: PrintBillProps) => {
   const { data: config } = useBillingConfig();
   const { data: profile } = useResortProfile();
   const { data: invoiceSettings } = useInvoiceSettings();
@@ -32,7 +33,11 @@ const PrintBill = ({ unitName, guestName, booking, transactions, roomOrders = []
     const activeTours = tours.filter((t: any) => t.status !== 'cancelled');
     const toursTotal = activeTours.reduce((s: number, t: any) => s + Number(t.price || 0), 0);
 
-    const balance = totalCharges - totalPayments + fnbTotal;
+    // Active requests (transport, rentals)
+    const activeRequests = requests.filter((r: any) => r.status !== 'cancelled');
+
+    // Balance includes everything
+    const balance = totalCharges - totalPayments + fnbTotal + toursTotal;
 
     const staffNames = [...new Set(transactions.map(t => t.staff_name))].join(', ');
 
@@ -61,6 +66,7 @@ body { font-family: 'Courier New', monospace; max-width: 300px; margin: 0 auto; 
 .bold { font-weight: bold; }
 h2, h3 { margin: 4px 0; }
 .small { font-size: 10px; color: #555; }
+.label { font-size: 10px; color: #444; }
 </style></head><body>
 <div class="center">
   ${profile?.logo_url ? `<img src="${profile.logo_url}" alt="" style="max-height:${profile?.logo_size || 64}px;margin:0 auto 4px;" />` : ''}
@@ -80,7 +86,8 @@ h2, h3 { margin: 4px 0; }
 </div>
 <div class="line"></div>
 <h3>CHARGES</h3>
-${charges.map(t => `<div class="row"><span>${format(new Date(t.created_at), 'M/d h:mma')}</span><span>₱${t.total_amount.toLocaleString()}</span></div>
+${charges.map(t => `<div class="row"><span class="label">${t.notes || t.transaction_type.replace(/_/g, ' ')}</span><span>₱${t.total_amount.toLocaleString()}</span></div>
+<div style="font-size:10px;color:#888">&nbsp;&nbsp;${format(new Date(t.created_at), 'M/d h:mma')}</div>
 ${config?.show_itemized_taxes ? `<div style="font-size:10px;color:#666">&nbsp;&nbsp;Sub:₱${t.amount.toLocaleString()} Tax:₱${t.tax_amount.toLocaleString()} SC:₱${t.service_charge_amount.toLocaleString()}</div>` : ''}`).join('')}
 <div class="line"></div>
 <div class="row bold"><span>Room Charges</span><span>₱${totalCharges.toLocaleString()}</span></div>
@@ -103,9 +110,14 @@ ${activeTours.length > 0 ? `
 ${activeTours.map((t: any) => `<div class="row"><span>${t.tour_name} (${t.pax}pax)</span><span>₱${Number(t.price || 0).toLocaleString()}</span></div>
 <div style="font-size:10px;color:#666">&nbsp;&nbsp;${t.tour_date} · ${t.status}</div>`).join('')}
 <div class="row bold"><span>Tours Total</span><span>₱${toursTotal.toLocaleString()}</span></div>` : ''}
+${activeRequests.length > 0 ? `
+<div class="line"></div>
+<h3>TRANSPORT & RENTALS</h3>
+${activeRequests.map((r: any) => `<div class="row"><span>${r.request_type}</span><span>${r.status}</span></div>
+<div style="font-size:10px;color:#666">&nbsp;&nbsp;${r.details}</div>`).join('')}` : ''}
 <div class="line"></div>
 <h3>PAYMENTS</h3>
-${payments.map(t => `<div class="row"><span>${t.payment_method}</span><span>₱${Math.abs(t.total_amount).toLocaleString()}</span></div>`).join('')}
+${payments.map(t => `<div class="row"><span>${t.payment_method}${t.notes ? ` — ${t.notes}` : ''}</span><span>₱${Math.abs(t.total_amount).toLocaleString()}</span></div>`).join('')}
 <div class="row bold"><span>Total Paid</span><span>₱${totalPayments.toLocaleString()}</span></div>
 <div class="line"></div>
 <div class="row bold" style="font-size:14px"><span>BALANCE</span><span>₱${balance.toLocaleString()}</span></div>
