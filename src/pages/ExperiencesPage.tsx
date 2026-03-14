@@ -458,7 +458,19 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
                     <p className="font-body text-xs text-muted-foreground mt-1">
                       {b.pickup_time || ''} · {b.guest_name} · {b.pax} pax
                     </p>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <CalendarDays className="w-3 h-3 text-muted-foreground" />
+                      <p className="font-body text-xs text-muted-foreground">
+                        {b.tour_date && format(new Date(b.tour_date + 'T00:00:00'), 'EEE, MMM d, yyyy')}
+                      </p>
+                    </div>
                     {Number(b.price) > 0 && <p className="font-body text-xs text-foreground">₱{Number(b.price).toLocaleString()}</p>}
+                    {b.notes && (
+                      <div className="flex items-start gap-1 mt-1">
+                        <StickyNote className="w-3 h-3 text-amber-400 mt-0.5 flex-shrink-0" />
+                        <p className="font-body text-[11px] text-amber-400/80 italic">{b.notes}</p>
+                      </div>
+                    )}
                   </div>
                   <Badge className={`font-body text-xs ${statusColor(b.status)}`}>{b.status}</Badge>
                 </div>
