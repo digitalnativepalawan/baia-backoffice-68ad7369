@@ -10,6 +10,7 @@ import { format, subDays } from 'date-fns';
 import { toast } from 'sonner';
 import { canEdit } from '@/lib/permissions';
 import EditTourModal from '@/components/rooms/EditTourModal';
+import EditRequestModal from '@/components/rooms/EditRequestModal';
 
 const from = (table: string) => supabase.from(table as any);
 
