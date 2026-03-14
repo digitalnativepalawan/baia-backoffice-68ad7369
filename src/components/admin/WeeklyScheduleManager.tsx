@@ -76,6 +76,7 @@ const inferShiftType = (time_in: string, time_out: string): string => {
 const SHIFT_COLORS: Record<string, string> = {
   Morning: 'bg-blue-500/30 border-blue-500/50',
   Evening: 'bg-purple-500/30 border-purple-500/50',
+  Night: 'bg-indigo-500/30 border-indigo-500/50',
   Maintenance: 'bg-green-500/30 border-green-500/50',
   Broken: 'bg-orange-500/30 border-orange-500/50',
   Custom: 'bg-accent/20 border-accent/40',
@@ -84,6 +85,7 @@ const SHIFT_COLORS: Record<string, string> = {
 const SHIFT_TEXT_COLORS: Record<string, string> = {
   Morning: 'text-blue-300',
   Evening: 'text-purple-300',
+  Night: 'text-indigo-300',
   Maintenance: 'text-green-300',
   Broken: 'text-orange-300',
   Custom: 'text-accent',
