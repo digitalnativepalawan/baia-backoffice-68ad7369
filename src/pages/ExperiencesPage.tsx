@@ -5,10 +5,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
-import { ArrowLeft, MapPin, CheckCircle, Palmtree, Car, Bike, ChevronDown, History, MessageCircle, Droplets, ConciergeBell } from 'lucide-react';
+import { ArrowLeft, MapPin, CheckCircle, Palmtree, Car, Bike, ChevronDown, History, MessageCircle, Droplets, ConciergeBell, Pencil, CalendarDays, StickyNote } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { toast } from 'sonner';
 import { canEdit } from '@/lib/permissions';
+import EditTourModal from '@/components/rooms/EditTourModal';
 
 const from = (table: string) => supabase.from(table as any);
 
@@ -34,6 +35,7 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
   const staffName = session?.name || 'Staff';
 
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [editTour, setEditTour] = useState<any>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -373,12 +375,18 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
                     <Palmtree className="w-3.5 h-3.5 text-amber-400" />
                     <p className="font-display text-sm text-foreground tracking-wider">{b.tour_name}</p>
                   </div>
-                  <p className="font-body text-xs text-muted-foreground mt-1">
-                    {b.tour_date && format(new Date(b.tour_date + 'T00:00:00'), 'MMM d')} · {b.pickup_time || ''} · {b.pax} pax
-                  </p>
-                  <p className="font-body text-xs text-muted-foreground">Guest: {b.guest_name}</p>
-                  {Number(b.price) > 0 && <p className="font-body text-xs text-foreground">₱{Number(b.price).toLocaleString()}</p>}
-                  {b.notes && <p className="font-body text-[10px] text-muted-foreground italic">{b.notes}</p>}
+                   <p className="font-body text-xs text-muted-foreground mt-1">
+                     <span className="inline-flex items-center gap-1"><CalendarDays className="w-3 h-3" />{b.tour_date && format(new Date(b.tour_date + 'T00:00:00'), 'EEE, MMM d, yyyy')}</span>
+                     {' · '}{b.pickup_time || ''} · {b.pax} pax
+                   </p>
+                   <p className="font-body text-xs text-muted-foreground">Guest: {b.guest_name}</p>
+                   {Number(b.price) > 0 && <p className="font-body text-xs text-foreground">₱{Number(b.price).toLocaleString()}</p>}
+                   {b.notes && (
+                     <div className="flex items-start gap-1 mt-1">
+                       <StickyNote className="w-3 h-3 text-amber-400 mt-0.5 flex-shrink-0" />
+                       <p className="font-body text-[11px] text-amber-400/80 italic">{b.notes}</p>
+                     </div>
+                   )}
                 </div>
                 <Badge className={`font-body text-xs ${statusColor('pending')}`}>pending</Badge>
               </div>
@@ -405,16 +413,29 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
             {todayTours.map((tour: any) => (
               <div key={tour.id} className="border border-border rounded-lg p-3 space-y-2">
                 <div className="flex justify-between items-start">
-                  <div>
+                  <div className="flex-1 min-w-0 cursor-pointer" onClick={() => canDoEdit && setEditTour(tour)}>
                     <div className="flex items-center gap-2">
                       <MapPin className="w-3.5 h-3.5 text-primary" />
                       <p className="font-display text-sm text-foreground tracking-wider">{tour.tour_name}</p>
+                      {canDoEdit && <Pencil className="w-3 h-3 text-muted-foreground" />}
                     </div>
                     <p className="font-body text-xs text-muted-foreground mt-1">
                       {tour.pickup_time && `${tour.pickup_time} · `}{tour.unit_name} · {tour.pax} pax
                     </p>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <CalendarDays className="w-3 h-3 text-muted-foreground" />
+                      <p className="font-body text-xs text-muted-foreground">
+                        {format(new Date(tour.tour_date + 'T00:00:00'), 'EEE, MMM d, yyyy')}
+                      </p>
+                    </div>
                     {tour.provider && <p className="font-body text-xs text-muted-foreground">Provider: {tour.provider}</p>}
                     {Number(tour.price) > 0 && <p className="font-body text-xs text-foreground">₱{Number(tour.price).toLocaleString()}</p>}
+                    {tour.notes && (
+                      <div className="flex items-start gap-1 mt-1">
+                        <StickyNote className="w-3 h-3 text-amber-400 mt-0.5 flex-shrink-0" />
+                        <p className="font-body text-[11px] text-amber-400/80 italic">{tour.notes}</p>
+                      </div>
+                    )}
                   </div>
                   <Badge className={`font-body text-xs ${statusColor(tour.status)}`}>{tour.status}</Badge>
                 </div>
@@ -443,7 +464,19 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
                     <p className="font-body text-xs text-muted-foreground mt-1">
                       {b.pickup_time || ''} · {b.guest_name} · {b.pax} pax
                     </p>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <CalendarDays className="w-3 h-3 text-muted-foreground" />
+                      <p className="font-body text-xs text-muted-foreground">
+                        {b.tour_date && format(new Date(b.tour_date + 'T00:00:00'), 'EEE, MMM d, yyyy')}
+                      </p>
+                    </div>
                     {Number(b.price) > 0 && <p className="font-body text-xs text-foreground">₱{Number(b.price).toLocaleString()}</p>}
+                    {b.notes && (
+                      <div className="flex items-start gap-1 mt-1">
+                        <StickyNote className="w-3 h-3 text-amber-400 mt-0.5 flex-shrink-0" />
+                        <p className="font-body text-[11px] text-amber-400/80 italic">{b.notes}</p>
+                      </div>
+                    )}
                   </div>
                   <Badge className={`font-body text-xs ${statusColor(b.status)}`}>{b.status}</Badge>
                 </div>
@@ -464,12 +497,21 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
         <div className="mb-6 space-y-2">
           <h2 className="font-display text-xs tracking-wider text-muted-foreground uppercase">Upcoming Tours</h2>
           {upcomingTours.slice(0, 10).map((tour: any) => (
-            <div key={tour.id} className="border border-border rounded-lg p-3 flex justify-between items-center">
+            <div key={tour.id} className="border border-border rounded-lg p-3 flex justify-between items-start cursor-pointer" onClick={() => canDoEdit && setEditTour(tour)}>
               <div>
-                <p className="font-display text-sm text-foreground tracking-wider">{tour.tour_name}</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-display text-sm text-foreground tracking-wider">{tour.tour_name}</p>
+                  {canDoEdit && <Pencil className="w-3 h-3 text-muted-foreground" />}
+                </div>
                 <p className="font-body text-xs text-muted-foreground">
-                  {format(new Date(tour.tour_date + 'T00:00:00'), 'MMM d')} · {tour.unit_name} · {tour.pax} pax
+                  {format(new Date(tour.tour_date + 'T00:00:00'), 'EEE, MMM d')} · {tour.unit_name} · {tour.pax} pax
                 </p>
+                {tour.notes && (
+                  <div className="flex items-start gap-1 mt-1">
+                    <StickyNote className="w-3 h-3 text-amber-400 mt-0.5 flex-shrink-0" />
+                    <p className="font-body text-[11px] text-amber-400/80 italic">{tour.notes}</p>
+                  </div>
+                )}
               </div>
               <Badge className={`font-body text-xs ${statusColor(tour.status)}`}>{tour.status}</Badge>
             </div>
@@ -552,6 +594,15 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
           </CollapsibleContent>
         </Collapsible>
       )}
+
+      {/* Edit Tour Modal */}
+      <EditTourModal
+        open={!!editTour}
+        onOpenChange={(open) => !open && setEditTour(null)}
+        tour={editTour}
+        unitName={editTour?.unit_name || ''}
+        bookingId={editTour?.booking_id || null}
+      />
     </div>
   );
 };
