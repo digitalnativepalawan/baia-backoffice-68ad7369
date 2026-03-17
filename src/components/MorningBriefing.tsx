@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
+import { doesBookingCoverOperationalDay, shouldTreatBookingAsOccupiedWithoutManualCheckIn } from '@/lib/receptionOccupancy';
 import {
   Sun, BedDouble, LogIn, LogOut, Sparkles, UtensilsCrossed,
   ClipboardList, Zap, MapPin, Bell, Car,
@@ -10,6 +11,8 @@ const from = (table: string) => supabase.from(table as any);
 
 const getManilaDate = () =>
   new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+
+const normalizeRoomName = (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase();
 
 const getManilaTimeStr = () =>
   new Date().toLocaleString('en-PH', {
@@ -42,12 +45,12 @@ function useMorningBriefing() {
   return useQuery<BriefingData>({
     queryKey: ['morning-briefing', today],
     queryFn: async () => {
-      const [
-        unitsRes, bookingsRes, ordersRes, tasksRes, employeesRes, opsUnitsRes,
-        toursRes, requestsRes,
-      ] = await Promise.all([
-        from('units').select('id, status'),
-        from('resort_ops_bookings').select('id, check_in, check_out, unit_id, resort_ops_guests(full_name), resort_ops_units:unit_id(name)'),
+        const [
+          unitsRes, bookingsRes, ordersRes, tasksRes, employeesRes, opsUnitsRes,
+          toursRes, requestsRes,
+        ] = await Promise.all([
+          from('units').select('id, status, unit_name'),
+          from('resort_ops_bookings').select('id, check_in, check_out, unit_id, resort_ops_guests(full_name), resort_ops_units:unit_id(name)'),
         from('orders')
           .select('id', { count: 'exact', head: true })
           .in('status', ['New', 'Preparing']),
@@ -79,13 +82,19 @@ function useMorningBriefing() {
       const requests = (requestsRes.data as any[]) || [];
 
       // --- Stats ---
-      const unitStatusMap = new Map(units.map((u: any) => [u.id, u.status]));
+      const opsUnitNameById = new Map(opsUnits.map((u: any) => [u.id, u.name]));
+      const opsUnitIdByName = new Map(opsUnits.map((u: any) => [normalizeRoomName(u.name), u.id]));
+      const unitStatusMap = new Map<string, string>();
 
-      const occupiedRooms = units.filter((u) => {
-        if (u.status === 'occupied') return true;
-        return bookings.some(
-          (b: any) => b.unit_id === u.id && b.check_in <= today && b.check_out > today
-        );
+      units.forEach((u: any) => {
+        const opsUnitId = opsUnitIdByName.get(normalizeRoomName(u.unit_name || ''));
+        if (opsUnitId) unitStatusMap.set(opsUnitId, u.status);
+      });
+
+      const occupiedRooms = opsUnits.filter((unit: any) => {
+        const displayStatus = unitStatusMap.get(unit.id);
+        if (displayStatus === 'occupied') return true;
+        return bookings.some((b: any) => b.unit_id === unit.id && shouldTreatBookingAsOccupiedWithoutManualCheckIn(b, today));
       }).length;
 
       const roomsToClean = units.filter(
@@ -93,7 +102,12 @@ function useMorningBriefing() {
       ).length;
 
       const todayArrivals = bookings.filter((b: any) => b.check_in === today);
-      const todayDepartures = bookings.filter((b: any) => b.check_out === today);
+      const todayDepartures = bookings.filter((b: any) => b.check_out === today && doesBookingCoverOperationalDay(b, today));
+
+      const pendingArrivals = todayArrivals.filter((b: any) => {
+        const unitStatus = unitStatusMap.get(b.unit_id);
+        return unitStatus !== 'occupied';
+      });
 
       // --- Admin tasks ---
       const empMap = new Map(employees.map((e: any) => [e.id, e.display_name || e.name || 'Staff']));
@@ -107,15 +121,12 @@ function useMorningBriefing() {
 
       const getUnitName = (b: any) => {
         if (b.resort_ops_units?.name) return b.resort_ops_units.name;
-        const u = opsUnits.find((ou: any) => ou.id === b.unit_id);
-        return u?.name || 'Room';
+        return opsUnitNameById.get(b.unit_id) || 'Room';
       };
       const getGuestName = (b: any) => b.resort_ops_guests?.full_name || 'Guest';
 
       // Arrivals — only show if unit is NOT already occupied (guest hasn't checked in yet)
-      todayArrivals.forEach((b: any) => {
-        const unitStatus = unitStatusMap.get(b.unit_id);
-        if (unitStatus === 'occupied') return; // Already checked in, skip
+      pendingArrivals.forEach((b: any) => {
         opsTasks.push({
           label: `Prepare ${getUnitName(b)} for arrival — ${getGuestName(b)}`,
           icon: 'arrival',
@@ -135,12 +146,9 @@ function useMorningBriefing() {
 
       // Rooms to clean
       if (roomsToClean > 0) {
-        const dirtyNames = units
-          .filter((u) => u.status === 'dirty' || u.status === 'cleaning' || u.status === 'to_clean')
-          .map((u) => {
-            const ou = opsUnits.find((o: any) => o.id === u.id);
-            return ou?.name || 'Room';
-          });
+          const dirtyNames = units
+            .filter((u) => u.status === 'dirty' || u.status === 'cleaning' || u.status === 'to_clean')
+            .map((u) => u.unit_name || 'Room');
         opsTasks.push({
           label: `Clean ${dirtyNames.length} room${dirtyNames.length > 1 ? 's' : ''}: ${dirtyNames.join(', ')}`,
           icon: 'clean',
@@ -179,13 +187,13 @@ function useMorningBriefing() {
         opsTasks.push({ label: 'All clear — no pending operations', icon: 'kitchen' });
       }
 
-      return {
-        occupiedRooms,
-        totalRooms,
-        arrivalsToday: todayArrivals.length,
-        departuresToday: todayDepartures.length,
-        roomsToClean,
-        pendingKitchenOrders: pendingKitchenCount,
+        return {
+          occupiedRooms,
+          totalRooms,
+          arrivalsToday: pendingArrivals.length,
+          departuresToday: todayDepartures.length,
+          roomsToClean,
+          pendingKitchenOrders: pendingKitchenCount,
         adminTasks,
         opsTasks,
       };

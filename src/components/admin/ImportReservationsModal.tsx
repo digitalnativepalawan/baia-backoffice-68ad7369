@@ -6,6 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Download, Upload, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { shouldTreatBookingAsOccupiedWithoutManualCheckIn } from '@/lib/receptionOccupancy';
 import { toast } from 'sonner';
 
 const from = (table: string) => supabase.from(table as any);
@@ -250,9 +251,11 @@ function getTodayManila(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
 }
 
-function isActiveToday(checkIn: string, checkOut: string): boolean {
-  const today = getTodayManila();
-  return Boolean(checkIn && checkOut && checkIn <= today && today < checkOut);
+function shouldSyncImportedRoomAsOccupied(checkIn: string, checkOut: string): boolean {
+  return shouldTreatBookingAsOccupiedWithoutManualCheckIn(
+    { check_in: checkIn, check_out: checkOut },
+    getTodayManila(),
+  );
 }
 
 function deriveNightlyRate(row: ParsedRow): number {
@@ -589,7 +592,7 @@ const ImportReservationsModal = ({ open, onOpenChange, guests, units, onComplete
           const roomCount = Math.max(row.roomNumbers.length, 1);
           const roomRate = deriveNightlyRate(row);
           const paidPerRoom = row.amountPaid > 0 ? row.amountPaid / roomCount : 0;
-          const activeToday = isActiveToday(row.checkIn, row.checkOut);
+          const shouldMarkImportedStayOccupied = shouldSyncImportedRoomAsOccupied(row.checkIn, row.checkOut);
 
           let insertedForRow = 0;
 
@@ -617,7 +620,7 @@ const ImportReservationsModal = ({ open, onOpenChange, guests, units, onComplete
             if (!displayUnit) {
               const unitInsert: Record<string, any> = {
                 unit_name: roomName,
-                status: activeToday ? 'occupied' : 'ready',
+                status: shouldMarkImportedStayOccupied ? 'occupied' : 'ready',
                 active: true,
               };
               if (roomTypeId) unitInsert.room_type_id = roomTypeId;
@@ -634,7 +637,7 @@ const ImportReservationsModal = ({ open, onOpenChange, guests, units, onComplete
             } else {
               const unitPatch: Record<string, any> = {};
               if (roomTypeId && !displayUnit.room_type_id) unitPatch.room_type_id = roomTypeId;
-              if (activeToday && displayUnit.status !== 'occupied') unitPatch.status = 'occupied';
+              if (shouldMarkImportedStayOccupied && displayUnit.status !== 'occupied') unitPatch.status = 'occupied';
               if (displayUnit.active === false) unitPatch.active = true;
 
               if (Object.keys(unitPatch).length > 0) {

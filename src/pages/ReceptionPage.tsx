@@ -21,8 +21,9 @@ import { toast } from 'sonner';
 import { format, addDays } from 'date-fns';
 import { usePaymentMethods } from '@/hooks/usePaymentMethods';
 import { useRoomTransactions } from '@/hooks/useRoomTransactions';
-import { canEdit, canManage, hasAccess } from '@/lib/permissions';
 import { logAudit } from '@/lib/auditLog';
+import { canEdit, canManage, hasAccess } from '@/lib/permissions';
+import { doesBookingCoverOperationalDay, shouldTreatBookingAsOccupiedWithoutManualCheckIn } from '@/lib/receptionOccupancy';
 import ReceptionCalendar from '@/components/reception/ReceptionCalendar';
 import RoomBillingTab from '@/components/rooms/RoomBillingTab';
 import type { BookingWithGuest, ResortUnit } from '@/components/reception/calendarUtils';
@@ -279,25 +280,27 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
   const resolveResortUnit = (roomName: string) =>
     resortUnits.find((ru: any) => ru.name.toLowerCase().trim() === roomName.toLowerCase().trim());
 
+  const getDerivedOccupiedBooking = (unit: any) => {
+    const resortUnit = resolveResortUnit(unit.name);
+    if (!resortUnit) return null;
+    return bookings.find((b: any) =>
+      b.unit_id === resortUnit.id && shouldTreatBookingAsOccupiedWithoutManualCheckIn(b, today)
+    ) || null;
+  };
+
   const getUnitStatus = (unit: any): 'occupied' | 'to_clean' | 'ready' => {
     const raw = (unit as any).status || 'ready';
     if (raw === 'occupied') return 'occupied';
     if (raw === 'to_clean') return 'to_clean';
-    // Fallback: check if there's an active booking for this unit
-    const resortUnit = resolveResortUnit(unit.name);
-    if (resortUnit) {
-      const hasActiveBooking = bookings.some((b: any) =>
-        b.unit_id === resortUnit.id && b.check_in <= today && b.check_out > today
-      );
-      if (hasActiveBooking) return 'occupied';
-    }
-    return 'ready';
+    return getDerivedOccupiedBooking(unit) ? 'occupied' : 'ready';
   };
 
   const getActiveBooking = (unit: any) => {
     const resortUnit = resolveResortUnit(unit.name);
-    if (!resortUnit) return null;
-    return bookings.find((b: any) => b.unit_id === resortUnit.id && b.check_in <= today && b.check_out > today) || null;
+    if (!resortUnit || getUnitStatus(unit) !== 'occupied') return null;
+    return bookings.find((b: any) =>
+      b.unit_id === resortUnit.id && doesBookingCoverOperationalDay(b, today)
+    ) || null;
   };
 
   // Today's arrivals
@@ -417,19 +420,22 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
     prevHasPendingRef.current = hasPendingAlerts;
   }, [hasPendingAlerts, playChime]);
 
-  // Auto-heal: sync units.status when booking says occupied but status is ready
+  // Auto-heal: sync units.status when a prior check-in should still be in-house
   useEffect(() => {
     units.forEach((unit: any) => {
       if (unit.status === 'ready') {
         const ru = resolveResortUnit(unit.name);
-        if (ru && bookings.some((b: any) => b.unit_id === ru.id && b.check_in <= today && b.check_out > today)) {
+        if (
+          ru &&
+          bookings.some((b: any) => b.unit_id === ru.id && shouldTreatBookingAsOccupiedWithoutManualCheckIn(b, today))
+        ) {
           from('units').update({ status: 'occupied' }).eq('id', unit.id).then(() => {
             qc.invalidateQueries({ queryKey: ['rooms-units'] });
           });
         }
       }
     });
-  }, [units, bookings, resortUnits]);
+  }, [units, bookings, resortUnits, today]);
 
   // Realtime subscriptions for guest_requests and tour_bookings
   useEffect(() => {
@@ -713,6 +719,7 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
 
       qc.invalidateQueries({ queryKey: ['rooms-bookings'] });
       qc.invalidateQueries({ queryKey: ['rooms-units'] });
+      qc.invalidateQueries({ queryKey: ['morning-briefing'] });
       qc.invalidateQueries({ queryKey: ['room-transactions', unit.id] });
       setCheckInModalOpen(false);
       setCheckInBooking(null);

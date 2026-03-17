@@ -254,6 +254,7 @@ const CheckoutModal = ({ open, onOpenChange, unitId, unitName, guestName, bookin
       qc.invalidateQueries({ queryKey: ['service-orders'] });
       qc.invalidateQueries({ queryKey: ['rooms-bookings'] });
       qc.invalidateQueries({ queryKey: ['rooms-units'] });
+      qc.invalidateQueries({ queryKey: ['morning-briefing'] });
       qc.invalidateQueries({ queryKey: ['housekeeping-orders'] });
       qc.invalidateQueries({ queryKey: ['housekeeping-orders-all'] });
       qc.invalidateQueries({ queryKey: ['all-requests-experiences'] });

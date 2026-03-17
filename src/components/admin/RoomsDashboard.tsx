@@ -18,6 +18,7 @@ import EditGuestModal from '@/components/rooms/EditGuestModal';
 import EditTourModal from '@/components/rooms/EditTourModal';
 import GuestActivityTimeline from '@/components/rooms/GuestActivityTimeline';
 import { compressImage } from '@/lib/imageCompress';
+import { doesBookingCoverOperationalDay, getManilaDateKey, shouldTreatBookingAsOccupiedWithoutManualCheckIn } from '@/lib/receptionOccupancy';
 
 const from = (table: string) => supabase.from(table as any) as any;
 
@@ -198,25 +199,34 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
     },
   });
 
-  // Get unit status
-  const getUnitStatus = (unit: any): 'occupied' | 'to_clean' | 'ready' => {
-    return (unit as any).status || 'ready';
-  };
-
   // Resolve resort_ops_unit for a room name
   const resolveResortUnit = (roomName: string) => {
     return resortUnits.find((ru: any) => ru.name.toLowerCase().trim() === roomName.toLowerCase().trim());
   };
 
+  const today = getManilaDateKey();
+
+  // Get unit status
+  const getUnitStatus = (unit: any): 'occupied' | 'to_clean' | 'ready' => {
+    const rawStatus = (unit as any).status || 'ready';
+    if (rawStatus === 'occupied') return 'occupied';
+    if (rawStatus === 'to_clean') return 'to_clean';
+    const resortUnit = resolveResortUnit(unit.name);
+    if (!resortUnit) return 'ready';
+    const derivedOccupiedBooking = bookings.find((b: any) =>
+      b.unit_id === resortUnit.id && shouldTreatBookingAsOccupiedWithoutManualCheckIn(b, today)
+    );
+    return derivedOccupiedBooking ? 'occupied' : 'ready';
+  };
+
   // Active booking
   const getActiveBooking = (unit: any) => {
-    if (!unit) return null;
-    const unitStatus = getUnitStatus(unit);
-    if (unitStatus !== 'occupied') return null;
-    const today = new Date().toISOString().split('T')[0];
+    if (!unit || getUnitStatus(unit) !== 'occupied') return null;
     const resortUnit = resolveResortUnit(unit.name);
     if (!resortUnit) return null;
-    return bookings.find((b: any) => b.unit_id === resortUnit.id && b.check_in <= today && b.check_out >= today) || null;
+    return bookings.find((b: any) =>
+      b.unit_id === resortUnit.id && doesBookingCoverOperationalDay(b, today)
+    ) || null;
   };
 
   const currentBooking = getActiveBooking(selectedUnit);
@@ -429,10 +439,11 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
   const getUnitGuest = (unitName: string) => {
     const unit = units.find((u: any) => u.name === unitName);
     if (!unit || getUnitStatus(unit) !== 'occupied') return null;
-    const today = new Date().toISOString().split('T')[0];
     const resortUnit = resolveResortUnit(unitName);
     if (!resortUnit) return null;
-    return bookings.find((b: any) => b.unit_id === resortUnit.id && b.check_in <= today && b.check_out >= today) || null;
+    return bookings.find((b: any) =>
+      b.unit_id === resortUnit.id && doesBookingCoverOperationalDay(b, today)
+    ) || null;
   };
 
   const getUnitVibeRisk = (unitName: string) => {
