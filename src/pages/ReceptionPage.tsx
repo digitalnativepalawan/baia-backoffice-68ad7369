@@ -409,22 +409,10 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
     prevHasPendingRef.current = hasPendingAlerts;
   }, [hasPendingAlerts, playChime]);
 
-  // Auto-heal: sync units.status when a prior check-in should still be in-house
+  // Display-only mode: do not auto-sync stale occupied state from bookings here.
   useEffect(() => {
-    units.forEach((unit: any) => {
-      if (unit.status === 'ready') {
-        const ru = resolveResortUnit(unit.name);
-        if (
-          ru &&
-          bookings.some((b: any) => b.unit_id === ru.id && shouldTreatBookingAsOccupiedWithoutManualCheckIn(b, today))
-        ) {
-          from('units').update({ status: 'occupied' }).eq('id', unit.id).then(() => {
-            qc.invalidateQueries({ queryKey: ['rooms-units'] });
-          });
-        }
-      }
-    });
-  }, [units, bookings, resortUnits, today]);
+    return;
+  }, []);
 
   // Realtime subscriptions for guest_requests and tour_bookings
   useEffect(() => {
