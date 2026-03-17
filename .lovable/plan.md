@@ -1,37 +1,47 @@
 
+Problem identified:
+- The importer is already calculating the 6 problematic rows correctly, but the UI only previews the first 8 rows total.
+- Because of `const previewRows = rows.slice(0, 8)`, any invalid rows outside those first 8 never appear in the list, so the user sees “6 with issues” but cannot see which ones.
 
-## Plan: Fix Schedule Delete & Enhance Task/Assignment Scheduling
+What to change
+1. Update the preview logic in `src/components/admin/ImportReservationsModal.tsx` so invalid rows are always visible.
+   - Do not limit the preview to the first 8 raw rows only.
+   - Show all rows with errors first, then show a capped set of valid rows underneath.
+2. Add a small summary area above the list:
+   - “6 rows need attention”
+   - optionally a button/chip like “Show only issues / Show all”
+3. Keep inline row-level errors exactly where they are now, since that part already exists and is good.
+4. Preserve current import behavior:
+   - cancelled rows remain deselected
+   - duplicates remain skipped
+   - valid rows still selectable/importable
+   - no changes to reservation, reception, guest, or housekeeping flows
 
-### Issues Found
+Recommended implementation
+- Replace:
+  - `previewRows = rows.slice(0, 8)`
+- With derived lists like:
+  - `issueRows = rows.filter(row => row.errors.length > 0)`
+  - `validRows = rows.filter(row => row.errors.length === 0)`
+  - `previewRows = [...issueRows, ...validRows.slice(0, N)]`
+- Adjust the “+ X more rows” message so it counts only hidden valid rows, not hidden issue rows.
+- Optionally add a filter toggle:
+  - default to “show issues first”
+  - allow “show all parsed rows”
 
-1. **Delete button bug**: The trash icon on shift blocks triggers `setDeleteId(s.id)`, but the parent div's `onClick={() => openEdit(s)}` fires simultaneously despite `stopPropagation`. On mobile, the tiny button (3x3 icon) is nearly impossible to tap. The AlertDialog `onOpenChange={() => setDeleteId(null)}` also races with the confirm action.
+Why this fixes it
+- The parser and validation are working.
+- The problem is visibility, not import logic.
+- By always surfacing invalid rows, the user can immediately see the exact 6 issue rows and their inline reasons.
 
-2. **Missing scheduling features**: The schedule only manages time shifts. There's no way to assign tasks like housecleaning, reception duty, or track completion from within the schedule view.
+Files to update
+- `src/components/admin/ImportReservationsModal.tsx`
 
-### Changes
+Expected result
+- When the modal says “115 rows parsed · 6 with issues · 109 valid”, those 6 issue rows will always be visible in the preview with their exact error messages.
+- The rest of the importer behavior remains unchanged.
 
-**1. Fix Delete Button** (`WeeklyScheduleManager.tsx`)
-- Make `confirmDelete` capture `deleteId` before the dialog closes by saving it in a ref or local variable
-- Increase touch target size for edit/delete buttons on shift blocks
-- Prevent edit modal from opening when clicking edit/delete icons (the `stopPropagation` exists but the parent click handler on the entire timeline area also fires)
-
-**2. Add Task/Assignment Creation from Schedule** (`WeeklyScheduleManager.tsx`)
-- Add an "Assign Task" button alongside "Add Shift" 
-- New modal to create a task assignment: select employee, pick type (Housecleaning, Reception, Custom), set date/time, add notes
-- For housecleaning: select a room/unit to clean, auto-creates a `housekeeping_orders` entry assigned to the selected employee
-- For other tasks: creates an `employee_tasks` entry with due date and description
-- Tasks appear as colored pills on the timeline (already partially implemented)
-
-**3. Show Completion Info on Task Detail** (`WeeklyScheduleManager.tsx`)
-- In the task detail dialog, show who completed the task and when (`completed_at`)
-- For housekeeping pills, show completion status (`cleaning_completed_at`, `completed_by_name`)
-- Make housekeeping pills clickable to show full details (room, status, who inspected/cleaned)
-
-**4. Enhance Task Detail Dialog** (`WeeklyScheduleManager.tsx`)
-- Add edit capability: change title, description, due date, reassign to different employee
-- Add delete capability for tasks
-- Show completion audit trail
-
-### Files to Edit
-- `src/components/admin/WeeklyScheduleManager.tsx` — all changes in this single file
-
+Technical note
+- Current row error rendering is already present at:
+  - `row.errors.map(...)`
+- So this is mainly a preview-list ordering/visibility fix, not a parser rewrite.
