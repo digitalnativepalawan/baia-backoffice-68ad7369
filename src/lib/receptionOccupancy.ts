@@ -42,7 +42,7 @@ export const shouldTreatBookingAsOccupiedWithoutManualCheckIn = (
   today = getManilaDateKey(),
 ) => {
   if (!booking?.check_in || !booking?.check_out) return false;
-  return booking.check_in < today && booking.check_out >= today;
+  return booking.check_in < today && booking.check_out > today;
 };
 
 const getOperationalGuestName = (booking: OperationalBookingLike | null | undefined) =>
