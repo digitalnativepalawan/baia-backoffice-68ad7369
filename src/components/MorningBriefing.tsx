@@ -140,7 +140,7 @@ function useMorningBriefing() {
       };
       const getGuestName = (b: any) => b.resort_ops_guests?.full_name || 'Guest';
 
-      // Arrivals — only show if unit is NOT already occupied (guest hasn't checked in yet)
+      // Arrivals — only show guests not yet checked in
       pendingArrivals.forEach((b: any) => {
         opsTasks.push({
           label: `Prepare ${getUnitName(b)} for arrival — ${getGuestName(b)}`,
@@ -149,10 +149,8 @@ function useMorningBriefing() {
         });
       });
 
-      // Departures — only show if unit is still occupied (guest hasn't checked out yet)
-      todayDepartures.forEach((b: any) => {
-        const unitStatus = unitStatusMap.get(b.unit_id);
-        if (unitStatus !== 'occupied') return; // Already checked out, skip
+      // Departures — only show guests still in-house and pending checkout
+      pendingDepartures.forEach((b: any) => {
         opsTasks.push({
           label: `Checkout pending: ${getUnitName(b)} — ${getGuestName(b)}`,
           icon: 'departure',
