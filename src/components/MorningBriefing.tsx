@@ -91,23 +91,38 @@ function useMorningBriefing() {
         if (opsUnitId) unitStatusMap.set(opsUnitId, u.status);
       });
 
-      const occupiedRooms = opsUnits.filter((unit: any) => {
-        const displayStatus = unitStatusMap.get(unit.id);
-        if (displayStatus === 'occupied') return true;
-        return bookings.some((b: any) => b.unit_id === unit.id && shouldTreatBookingAsOccupiedWithoutManualCheckIn(b, today));
-      }).length;
+      const bookingsByUnitId = new Map<string, any[]>();
+      bookings.forEach((booking: any) => {
+        if (!booking.unit_id) return;
+        const current = bookingsByUnitId.get(booking.unit_id) || [];
+        current.push(booking);
+        bookingsByUnitId.set(booking.unit_id, current);
+      });
+
+      const unitWorkflowById = new Map(
+        opsUnits.map((unit: any) => [
+          unit.id,
+          resolveOperationalUnitWorkflow({
+            bookings: bookingsByUnitId.get(unit.id) || [],
+            rawStatus: unitStatusMap.get(unit.id),
+            today,
+          }),
+        ])
+      );
+
+      const occupiedRooms = opsUnits.filter((unit: any) => unitWorkflowById.get(unit.id)?.displayStatus === 'occupied').length;
 
       const roomsToClean = units.filter(
         (u) => u.status === 'dirty' || u.status === 'cleaning' || u.status === 'to_clean'
       ).length;
 
-      const todayArrivals = bookings.filter((b: any) => b.check_in === today);
-      const todayDepartures = bookings.filter((b: any) => b.check_out === today && doesBookingCoverOperationalDay(b, today));
+      const pendingArrivals = opsUnits
+        .map((unit: any) => unitWorkflowById.get(unit.id)?.pendingArrival)
+        .filter(Boolean);
 
-      const pendingArrivals = todayArrivals.filter((b: any) => {
-        const unitStatus = unitStatusMap.get(b.unit_id);
-        return unitStatus !== 'occupied';
-      });
+      const pendingDepartures = opsUnits
+        .map((unit: any) => unitWorkflowById.get(unit.id)?.pendingDeparture)
+        .filter(Boolean);
 
       // --- Admin tasks ---
       const empMap = new Map(employees.map((e: any) => [e.id, e.display_name || e.name || 'Staff']));
