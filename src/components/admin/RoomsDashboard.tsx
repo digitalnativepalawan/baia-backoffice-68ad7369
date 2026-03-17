@@ -434,13 +434,12 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
 
   const getUnitGuest = (unitName: string) => {
     const unit = units.find((u: any) => u.name === unitName);
-    if (!unit || getUnitStatus(unit) !== 'occupied') return null;
-    const resortUnit = resolveResortUnit(unitName);
-    if (!resortUnit) return null;
-    return bookings.find((b: any) =>
-      b.unit_id === resortUnit.id && doesBookingCoverOperationalDay(b, today)
-    ) || null;
+    return unit ? getUnitWorkflow(unit).activeBooking : null;
   };
+
+  const getTodayArrivalBooking = (unit: any) => getUnitWorkflow(unit).pendingArrival;
+
+  const getTodayDepartureBooking = (unit: any) => getUnitWorkflow(unit).pendingDeparture;
 
   const getUnitVibeRisk = (unitName: string) => {
     const records = vibeRecords.filter((v: any) => v.unit_name === unitName && !v.checked_out);
