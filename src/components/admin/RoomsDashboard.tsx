@@ -206,28 +206,24 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
 
   const today = getManilaDateKey();
 
-  // Get unit status
-  const getUnitStatus = (unit: any): 'occupied' | 'to_clean' | 'ready' => {
-    const rawStatus = (unit as any).status || 'ready';
-    if (rawStatus === 'occupied') return 'occupied';
-    if (rawStatus === 'to_clean') return 'to_clean';
+  const getUnitWorkflow = (unit: any) => {
     const resortUnit = resolveResortUnit(unit.name);
-    if (!resortUnit) return 'ready';
-    const derivedOccupiedBooking = bookings.find((b: any) =>
-      b.unit_id === resortUnit.id && shouldTreatBookingAsOccupiedWithoutManualCheckIn(b, today)
-    );
-    return derivedOccupiedBooking ? 'occupied' : 'ready';
+    const unitBookings = resortUnit
+      ? bookings.filter((b: any) => b.unit_id === resortUnit.id)
+      : [];
+
+    return resolveOperationalUnitWorkflow({
+      bookings: unitBookings,
+      rawStatus: unit.status,
+      today,
+    });
   };
 
+  // Get unit status
+  const getUnitStatus = (unit: any): 'occupied' | 'to_clean' | 'ready' => getUnitWorkflow(unit).displayStatus;
+
   // Active booking
-  const getActiveBooking = (unit: any) => {
-    if (!unit || getUnitStatus(unit) !== 'occupied') return null;
-    const resortUnit = resolveResortUnit(unit.name);
-    if (!resortUnit) return null;
-    return bookings.find((b: any) =>
-      b.unit_id === resortUnit.id && doesBookingCoverOperationalDay(b, today)
-    ) || null;
-  };
+  const getActiveBooking = (unit: any) => getUnitWorkflow(unit).activeBooking;
 
   const currentBooking = getActiveBooking(selectedUnit);
   const guestId = (currentBooking as any)?.guest_id;
