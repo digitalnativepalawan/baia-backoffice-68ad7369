@@ -329,6 +329,7 @@ const ImportReservationsModal = ({ open, onOpenChange, guests, units, onComplete
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
+  const [showOnlyIssues, setShowOnlyIssues] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const downloadTemplate = () => {
