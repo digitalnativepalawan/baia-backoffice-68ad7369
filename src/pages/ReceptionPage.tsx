@@ -23,7 +23,7 @@ import { usePaymentMethods } from '@/hooks/usePaymentMethods';
 import { useRoomTransactions } from '@/hooks/useRoomTransactions';
 import { logAudit } from '@/lib/auditLog';
 import { canEdit, canManage, hasAccess } from '@/lib/permissions';
-import { doesBookingCoverOperationalDay, shouldTreatBookingAsOccupiedWithoutManualCheckIn } from '@/lib/receptionOccupancy';
+import { resolveOperationalUnitWorkflow } from '@/lib/receptionOccupancy';
 import ReceptionCalendar from '@/components/reception/ReceptionCalendar';
 import RoomBillingTab from '@/components/rooms/RoomBillingTab';
 import type { BookingWithGuest, ResortUnit } from '@/components/reception/calendarUtils';
