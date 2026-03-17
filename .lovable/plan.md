@@ -1,73 +1,37 @@
 
-Problem
-- The system still shows Thierry as “Check In” because the current shared room resolver only looks at:
-  - booking dates
-  - raw room status
-- It does not persist or read an explicit “this reservation has already been checked in” marker.
-- I confirmed today’s COT(1) booking has a room password set, which means the check-in action did run, but the UI still treats it as a pending arrival because the resolver has no durable booking-level check-in signal to use.
 
-What I found
-- Reception reserved-arrivals flow updates only `room_password` and `password_expires_at`, then sets the room to `occupied`.
-- The booking table does not currently have `checked_in_at` / `checked_out_at`.
-- The display logic in `src/lib/receptionOccupancy.ts` still computes:
-  - `pendingArrival` from `check_in === today`
-  - `activeBooking` mostly from room status and date overlap
-- On a same-day arrival / extension-review case, that makes the booking stay in the “Arrivals / Check In” path even after staff has already checked them in.
+## Plan: Fix Schedule Delete & Enhance Task/Assignment Scheduling
 
-Why this needs to stay in the existing format
-- You already have a real check-in workflow coded in Reception.
-- The fix should preserve that workflow, not replace it with ad hoc room-status logic.
-- The UI should treat “checked in” as a booking event, not just “room is occupied”.
+### Issues Found
 
-Implementation plan
-1. Add explicit booking lifecycle fields
-- Add `checked_in_at` and `checked_out_at` to the bookings table.
-- Backfill only where it is safe:
-  - do not guess historic data broadly
-  - optionally infer current-day already-checked-in bookings that clearly have check-in artifacts if needed, but keep this conservative
+1. **Delete button bug**: The trash icon on shift blocks triggers `setDeleteId(s.id)`, but the parent div's `onClick={() => openEdit(s)}` fires simultaneously despite `stopPropagation`. On mobile, the tiny button (3x3 icon) is nearly impossible to tap. The AlertDialog `onOpenChange={() => setDeleteId(null)}` also races with the confirm action.
 
-2. Update the existing Reception check-in / checkout handlers
-- In `ReceptionPage.tsx`:
-  - on reservation check-in, set `checked_in_at`
-  - on walk-in check-in, create the booking with `checked_in_at`
-  - on checkout, set `checked_out_at`
-- Keep all existing side effects:
-  - room password generation
-  - room status changes
-  - billing and audit logs
-  - housekeeping workflow
+2. **Missing scheduling features**: The schedule only manages time shifts. There's no way to assign tasks like housecleaning, reception duty, or track completion from within the schedule view.
 
-3. Teach the shared occupancy resolver about actual check-in state
-- Extend `src/lib/receptionOccupancy.ts` so it uses:
-  - checked-in booking = `checked_in_at` is set and `checked_out_at` is not set
-  - pending arrival = arrival today without `checked_in_at`
-  - pending departure = departure today with `checked_in_at` and no `checked_out_at`
-- Preserve your current turnover / extension-review behavior, but make the booking lifecycle the source of truth.
+### Changes
 
-4. Align Reception, Admin, and Morning Briefing
-- `ReceptionPage.tsx`
-  - Arrivals Today should only show bookings not yet checked in
-  - Current Guests should show Thierry immediately after check-in
-- `RoomsDashboard.tsx`
-  - “Arrival Today / Check In Guest” should disappear once the booking is checked in
-  - room detail header and badges should reflect the actual booking state
-- `MorningBriefing.tsx`
-  - arrivals/departures counts should follow checked-in / checked-out state, not just raw dates
+**1. Fix Delete Button** (`WeeklyScheduleManager.tsx`)
+- Make `confirmDelete` capture `deleteId` before the dialog closes by saving it in a ref or local variable
+- Increase touch target size for edit/delete buttons on shift blocks
+- Prevent edit modal from opening when clicking edit/delete icons (the `stopPropagation` exists but the parent click handler on the entire timeline area also fires)
 
-5. Preserve current UX
-- Keep the existing reception check-in modal/button flow exactly as the primary path
-- Do not replace it with a new admin-only shortcut
-- The visible change should simply be: after check-in, the guest moves through the proper in-house flow automatically
+**2. Add Task/Assignment Creation from Schedule** (`WeeklyScheduleManager.tsx`)
+- Add an "Assign Task" button alongside "Add Shift" 
+- New modal to create a task assignment: select employee, pick type (Housecleaning, Reception, Custom), set date/time, add notes
+- For housecleaning: select a room/unit to clean, auto-creates a `housekeeping_orders` entry assigned to the selected employee
+- For other tasks: creates an `employee_tasks` entry with due date and description
+- Tasks appear as colored pills on the timeline (already partially implemented)
 
-Files likely to change
-- `src/lib/receptionOccupancy.ts`
-- `src/pages/ReceptionPage.tsx`
-- `src/components/admin/RoomsDashboard.tsx`
-- `src/components/MorningBriefing.tsx`
-- a new database migration for booking lifecycle timestamps
+**3. Show Completion Info on Task Detail** (`WeeklyScheduleManager.tsx`)
+- In the task detail dialog, show who completed the task and when (`completed_at`)
+- For housekeeping pills, show completion status (`cleaning_completed_at`, `completed_by_name`)
+- Make housekeeping pills clickable to show full details (room, status, who inspected/cleaned)
 
-Expected result
-- When you check in Thierry in COT(1), he should stop showing as “Check In”.
-- He should move into the normal occupied / in-house flow.
-- Same-day arrivals that are not yet checked in will still remain in the arrival format you already designed.
-- Checkout and housekeeping behavior will continue to work through the same channels already coded.
+**4. Enhance Task Detail Dialog** (`WeeklyScheduleManager.tsx`)
+- Add edit capability: change title, description, due date, reassign to different employee
+- Add delete capability for tasks
+- Show completion audit trail
+
+### Files to Edit
+- `src/components/admin/WeeklyScheduleManager.tsx` — all changes in this single file
+

@@ -627,6 +627,8 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
       await from('resort_ops_bookings').update({
         room_password: roomPassword,
         password_expires_at: expiresAt.toISOString(),
+        checked_in_at: new Date().toISOString(),
+        checked_out_at: null,
       }).eq('id', checkInBooking.id);
 
       await supabase.from('units').update({ status: 'occupied' } as any).eq('id', unit.id);
@@ -765,6 +767,7 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
         platform: walkInForm.platform,
         check_in: walkInForm.checkIn,
         check_out: walkInForm.checkOut,
+        checked_in_at: new Date().toISOString(),
         adults: parseInt(walkInForm.adults) || 1,
         children: parseInt(walkInForm.children) || 0,
         room_rate: parseFloat(walkInForm.roomRate) || 0,
@@ -902,7 +905,10 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
         await logAudit('created', 'room_transactions', checkOutUnit.id, `Late check-out fee: ₱${lateFee.toLocaleString()} for ${checkOutBooking.resort_ops_guests?.full_name} in ${checkOutUnit.name}`);
       }
 
-      await from('resort_ops_bookings').update({ check_out: today }).eq('id', checkOutBooking.id);
+      await from('resort_ops_bookings').update({
+        check_out: today,
+        checked_out_at: new Date().toISOString(),
+      }).eq('id', checkOutBooking.id);
       await supabase.from('units').update({ status: 'to_clean' } as any).eq('id', checkOutUnit.id);
 
       const existing = activeHkOrders.find((o: any) => o.unit_name === checkOutUnit.name);

@@ -50,7 +50,7 @@ function useMorningBriefing() {
           toursRes, requestsRes,
         ] = await Promise.all([
           from('units').select('id, status, unit_name'),
-          from('resort_ops_bookings').select('id, check_in, check_out, unit_id, resort_ops_guests(full_name), resort_ops_units:unit_id(name)'),
+          from('resort_ops_bookings').select('id, check_in, check_out, checked_in_at, checked_out_at, unit_id, resort_ops_guests(full_name), resort_ops_units:unit_id(name)'),
         from('orders')
           .select('id', { count: 'exact', head: true })
           .in('status', ['New', 'Preparing']),

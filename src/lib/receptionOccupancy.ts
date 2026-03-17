@@ -8,6 +8,8 @@ export interface OperationalGuestLike {
 }
 
 export interface OperationalBookingLike extends OperationalBookingDates {
+  checked_in_at?: string | null;
+  checked_out_at?: string | null;
   resort_ops_guests?: OperationalGuestLike | null;
   guest_name?: string | null;
 }
@@ -29,19 +31,26 @@ export interface OperationalUnitWorkflow<TBooking extends OperationalBookingLike
 export const getManilaDateKey = () =>
   new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
 
+const isBookingCheckedOut = (booking: OperationalBookingLike | null | undefined) =>
+  Boolean(booking?.checked_out_at);
+
+const isBookingCheckedIn = (booking: OperationalBookingLike | null | undefined) =>
+  Boolean(booking?.checked_in_at) && !isBookingCheckedOut(booking);
+
 export const doesBookingCoverOperationalDay = (
-  booking: OperationalBookingDates | null | undefined,
+  booking: OperationalBookingLike | null | undefined,
   today = getManilaDateKey(),
 ) => {
-  if (!booking?.check_in || !booking?.check_out) return false;
+  if (!booking?.check_in || !booking?.check_out || isBookingCheckedOut(booking)) return false;
   return booking.check_in <= today && booking.check_out >= today;
 };
 
 export const shouldTreatBookingAsOccupiedWithoutManualCheckIn = (
-  booking: OperationalBookingDates | null | undefined,
+  booking: OperationalBookingLike | null | undefined,
   today = getManilaDateKey(),
 ) => {
   if (!booking?.check_in || !booking?.check_out) return false;
+  if (booking.checked_in_at || booking.checked_out_at) return false;
   return booking.check_in < today && booking.check_out > today;
 };
 
@@ -82,11 +91,17 @@ export const resolveOperationalUnitWorkflow = <TBooking extends OperationalBooki
 }): OperationalUnitWorkflow<TBooking> => {
   const { bookings, rawStatus, today = getManilaDateKey() } = params;
 
-  const todayArrival = bookings.find(booking => booking.check_in === today) || null;
-  const todayDeparture =
-    bookings.find(booking => booking.check_out === today && doesBookingCoverOperationalDay(booking, today)) || null;
-  const derivedOccupiedBooking =
-    bookings.find(booking => shouldTreatBookingAsOccupiedWithoutManualCheckIn(booking, today)) || null;
+  const openBookings = bookings.filter(booking => !isBookingCheckedOut(booking));
+  const todayArrival = openBookings.find(booking => booking.check_in === today) || null;
+  const todayDeparture = openBookings.find(
+    booking => booking.check_out === today && isBookingCheckedIn(booking),
+  ) || null;
+  const checkedInBooking = openBookings.find(
+    booking => isBookingCheckedIn(booking) && doesBookingCoverOperationalDay(booking, today),
+  ) || null;
+  const derivedOccupiedBooking = checkedInBooking || openBookings.find(
+    booking => shouldTreatBookingAsOccupiedWithoutManualCheckIn(booking, today),
+  ) || null;
 
   const isTurnover = Boolean(todayArrival && todayDeparture);
   const isExtensionReview =
@@ -97,28 +112,14 @@ export const resolveOperationalUnitWorkflow = <TBooking extends OperationalBooki
     );
 
   const housekeepingStatus = rawStatus === 'to_clean' || rawStatus === 'dirty' || rawStatus === 'cleaning';
-  const occupiedStatus = rawStatus === 'occupied';
 
-  const activeBooking = housekeepingStatus
-    ? null
-    : occupiedStatus
-      ? todayDeparture && !isExtensionReview
-        ? todayDeparture
-        : derivedOccupiedBooking || (todayArrival && !todayDeparture ? todayArrival : null)
-      : derivedOccupiedBooking;
+  const activeBooking = housekeepingStatus ? null : derivedOccupiedBooking;
 
   const pendingDeparture =
-    !housekeepingStatus &&
-    todayDeparture &&
-    !isExtensionReview &&
-    (occupiedStatus || Boolean(derivedOccupiedBooking))
-      ? todayDeparture
-      : null;
+    !housekeepingStatus && todayDeparture && !isExtensionReview ? todayDeparture : null;
 
   const pendingArrival =
-    todayArrival && (!occupiedStatus || Boolean(todayDeparture) || isExtensionReview)
-      ? todayArrival
-      : null;
+    todayArrival && !todayArrival.checked_in_at ? todayArrival : null;
 
   return {
     displayStatus: housekeepingStatus ? 'to_clean' : activeBooking ? 'occupied' : 'ready',

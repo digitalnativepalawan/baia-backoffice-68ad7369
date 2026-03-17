@@ -516,6 +516,7 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
       const { error: bErr } = await from('resort_ops_bookings').insert({
         guest_id: gId, unit_id: resortUnit.id, platform: checkInForm.platform,
         check_in: checkInForm.checkIn, check_out: checkInForm.checkOut,
+        checked_in_at: new Date().toISOString(),
         adults: parseInt(checkInForm.adults) || 1, children: parseInt(checkInForm.children) || 0,
         room_rate: parseFloat(checkInForm.roomRate) || 0, notes: checkInForm.notes || '',
         special_requests: checkInForm.specialRequests || '',
@@ -544,7 +545,10 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
     if (readOnly) { toast.error('View-only access'); return; }
     if (!currentBooking) return;
     const today = new Date().toISOString().split('T')[0];
-    const { error } = await from('resort_ops_bookings').update({ check_out: today }).eq('id', currentBooking.id);
+    const { error } = await from('resort_ops_bookings').update({
+      check_out: today,
+      checked_out_at: new Date().toISOString(),
+    }).eq('id', currentBooking.id);
     if (error) { toast.error('Checkout failed'); return; }
     await supabase.from('units').update({ status: 'to_clean' } as any).eq('id', selectedUnit.id);
     const existingOrder = housekeepingOrders.find((o: any) => o.unit_name === selectedUnit.name);
