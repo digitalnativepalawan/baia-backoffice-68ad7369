@@ -723,6 +723,7 @@ const ImportReservationsModal = ({ open, onOpenChange, guests, units, onComplete
   const reset = () => {
     setRows([]);
     setResult(null);
+    setShowOnlyIssues(false);
     if (fileRef.current) fileRef.current.value = '';
   };
 
@@ -732,10 +733,13 @@ const ImportReservationsModal = ({ open, onOpenChange, guests, units, onComplete
   };
 
   const validSelected = rows.filter((row) => row.selected && row.errors.length === 0).length;
-  const previewRows = rows.slice(0, 8);
-  const extraCount = Math.max(rows.length - previewRows.length, 0);
-  const validRowCount = rows.filter((row) => row.errors.length === 0).length;
-  const invalidRowCount = rows.length - validRowCount;
+  const issueRows = rows.filter((row) => row.errors.length > 0);
+  const validRows = rows.filter((row) => row.errors.length === 0);
+  const previewValidRows = showOnlyIssues ? [] : validRows.slice(0, 8);
+  const previewRows = showOnlyIssues ? issueRows : [...issueRows, ...previewValidRows];
+  const extraCount = showOnlyIssues ? Math.max(rows.length - issueRows.length, 0) : Math.max(validRows.length - previewValidRows.length, 0);
+  const validRowCount = validRows.length;
+  const invalidRowCount = issueRows.length;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
