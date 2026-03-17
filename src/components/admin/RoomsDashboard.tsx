@@ -1506,6 +1506,12 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
                   <p className="font-body text-xs text-muted-foreground">
                     {format(new Date(booking.check_in + 'T00:00:00'), 'MMM d')} – {format(new Date(booking.check_out + 'T00:00:00'), 'MMM d')}
                   </p>
+                  {arrivalBooking && (
+                    <p className="font-body text-[10px] text-blue-400 mt-1 truncate">
+                      Next: {arrivalBooking.resort_ops_guests?.full_name || 'Guest'}
+                      {workflow.isExtensionReview ? ' · Review extension' : ' · Arrival today'}
+                    </p>
+                  )}
                   {workflow.isExtensionReview && (
                     <Badge variant="outline" className="font-body text-[10px] mt-1 border-blue-500/40 text-blue-400">Review extension</Badge>
                   )}

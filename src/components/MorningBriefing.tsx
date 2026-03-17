@@ -195,6 +195,16 @@ function useMorningBriefing() {
         });
       }
 
+      opsUnits.forEach((unit: any) => {
+        const workflow = unitWorkflowById.get(unit.id);
+        if (!workflow?.isExtensionReview || !workflow.pendingArrival) return;
+        opsTasks.push({
+          label: `Review possible stay extension in ${unit.name} — ${getGuestName(workflow.pendingArrival)}`,
+          icon: 'request',
+          urgent: true,
+        });
+      });
+
       // If nothing, show all-clear
       if (opsTasks.length === 0) {
         opsTasks.push({ label: 'All clear — no pending operations', icon: 'kitchen' });

@@ -1122,12 +1122,18 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
           {todayArrivals.map((b: any) => {
             const guest = b.resort_ops_guests;
             const unitName = getUnitNameForBooking(b);
+            const unit = units.find((u: any) => u.name === unitName);
+            const workflow = unit ? getUnitWorkflow(unit) : null;
             return (
-              <div key={b.id} className="border border-emerald-500/30 bg-emerald-500/5 rounded-lg p-3 flex justify-between items-center">
+              <div key={b.id} className="border border-emerald-500/30 bg-emerald-500/5 rounded-lg p-3 flex justify-between items-center gap-3">
                 <div>
                   <p className="font-display text-sm text-foreground tracking-wider">{unitName}</p>
                   <p className="font-body text-xs text-muted-foreground">{guest?.full_name || 'Guest'} · {b.adults} adult{b.adults > 1 ? 's' : ''}</p>
                   <p className="font-body text-xs text-muted-foreground">{b.platform} · ₱{Number(b.room_rate).toLocaleString()}/night</p>
+                  <p className="font-body text-[10px] text-emerald-400">Ready for Check-in</p>
+                  {workflow?.isExtensionReview && (
+                    <p className="font-body text-[10px] text-blue-400">Flag for review: possible duplicate / stay extension</p>
+                  )}
                 </div>
                 {canDoEdit && (
                   <Button size="sm" onClick={() => { setCheckInBooking(b); setCheckInModalOpen(true); }}
