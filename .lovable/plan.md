@@ -1,37 +1,104 @@
 
+Goal
 
-## Plan: Fix Schedule Delete & Enhance Task/Assignment Scheduling
+Add a one-click “Setup Data Download” inside Admin → Setup that exports the configuration you want as a ZIP of CSV files, ready to upload into the cloned onboarding app later.
 
-### Issues Found
+What I’ll build
 
-1. **Delete button bug**: The trash icon on shift blocks triggers `setDeleteId(s.id)`, but the parent div's `onClick={() => openEdit(s)}` fires simultaneously despite `stopPropagation`. On mobile, the tiny button (3x3 icon) is nearly impossible to tap. The AlertDialog `onOpenChange={() => setDeleteId(null)}` also races with the confirm action.
+1. Add a dedicated export panel in Admin → Setup
+- Place it near the top of the Setup tab so it’s easy to find.
+- Include a clear label like “Download Setup Data”.
+- Show one primary button to generate the ZIP.
+- Because you chose full employee records, show a warning that the export includes sensitive employee login/PIN-related fields.
 
-2. **Missing scheduling features**: The schedule only manages time shifts. There's no way to assign tasks like housecleaning, reception duty, or track completion from within the schedule view.
+2. Export the setup data as a ZIP of CSV files
+The ZIP will include these CSVs:
+- resort_profile.csv
+- invoice_settings.csv
+- billing_config.csv
+- payment_methods.csv
+- resort_tables.csv
+- order_types.csv
+- menu_categories.csv
+- room_types.csv
+- housekeeping_checklists.csv
+- cleaning_packages.csv
+- cleaning_package_items.csv
+- employees.csv
+- employee_roles.csv
+- employee_permissions.csv
+- staff_roles.csv
 
-### Changes
+3. Preserve the relationships needed for later import
+Some setup data depends on other tables:
+- housekeeping_checklists → room_types
+- cleaning_packages → room_types
+- cleaning_package_items → cleaning_packages + ingredients
 
-**1. Fix Delete Button** (`WeeklyScheduleManager.tsx`)
-- Make `confirmDelete` capture `deleteId` before the dialog closes by saving it in a ref or local variable
-- Increase touch target size for edit/delete buttons on shift blocks
-- Prevent edit modal from opening when clicking edit/delete icons (the `stopPropagation` exists but the parent click handler on the entire timeline area also fires)
+To make the later upload easier, I’ll export relationship fields in a migration-friendly way:
+- keep the raw IDs
+- also include readable helper columns where useful, such as room type name and package name
+This is especially important for housekeeping package items, so the cloned app can map records safely even if IDs differ.
 
-**2. Add Task/Assignment Creation from Schedule** (`WeeklyScheduleManager.tsx`)
-- Add an "Assign Task" button alongside "Add Shift" 
-- New modal to create a task assignment: select employee, pick type (Housecleaning, Reception, Custom), set date/time, add notes
-- For housecleaning: select a room/unit to clean, auto-creates a `housekeeping_orders` entry assigned to the selected employee
-- For other tasks: creates an `employee_tasks` entry with due date and description
-- Tasks appear as colored pills on the timeline (already partially implemented)
+4. Reuse the existing download pattern already in the app
+I found the project already uses:
+- JSZip for ZIP creation
+- Blob + URL.createObjectURL for downloads
+- CSV generation patterns in existing admin exports
+So I’ll follow that same approach for consistency.
 
-**3. Show Completion Info on Task Detail** (`WeeklyScheduleManager.tsx`)
-- In the task detail dialog, show who completed the task and when (`completed_at`)
-- For housekeeping pills, show completion status (`cleaning_completed_at`, `completed_by_name`)
-- Make housekeeping pills clickable to show full details (room, status, who inspected/cleaned)
+5. Keep this client-side only
+- No database schema changes needed
+- No backend function needed
+- No migration needed
+This is a pure admin export feature that reads existing setup tables and downloads a file locally.
 
-**4. Enhance Task Detail Dialog** (`WeeklyScheduleManager.tsx`)
-- Add edit capability: change title, description, due date, reassign to different employee
-- Add delete capability for tasks
-- Show completion audit trail
+Implementation approach
 
-### Files to Edit
-- `src/components/admin/WeeklyScheduleManager.tsx` — all changes in this single file
+- Create a small reusable admin component, likely something like `SetupExportCard`
+- Mount it inside `src/pages/AdminPage.tsx` under the Setup tab
+- Use the existing Supabase client to query all required tables
+- Build CSV content table-by-table
+- Bundle everything with JSZip
+- Download a file like `setup-export-YYYYMMDD-HHmm.zip`
+- Show loading and success/error toast states
 
+Important design decisions
+
+- Include full employee records as requested, including current employee fields like pay/contact/login-related columns
+- Also include employee roles, permissions, and custom staff roles so the cloned app can reconstruct access setup properly
+- Include `room_types` even though you didn’t list it explicitly, because housekeeping checklist/package data depends on it
+- For package items, include readable mapping columns to avoid import headaches later
+
+Technical details
+
+Files likely involved
+- `src/pages/AdminPage.tsx`
+- new component such as `src/components/admin/SetupExportCard.tsx`
+
+Code patterns to follow
+- ZIP export pattern from `src/components/admin/AccountingExport.tsx`
+- CSV download pattern from menu/report exports
+- Setup tab placement in `src/pages/AdminPage.tsx`
+
+Data sources confirmed in code
+- `resort_profile`
+- `invoice_settings`
+- `billing_config`
+- `payment_methods`
+- `resort_tables`
+- `order_types`
+- `menu_categories`
+- `room_types`
+- `housekeeping_checklists`
+- `cleaning_packages`
+- `cleaning_package_items`
+- `employees`
+- `employee_roles`
+- `employee_permissions`
+- `staff_roles`
+
+Notes / caveats
+- `cleaning_package_items` references ingredients, but ingredients were not requested. I’ll make the export more upload-safe by including readable ingredient-related mapping fields where possible, rather than relying only on IDs.
+- Since this export contains sensitive employee data, I’ll add a visible warning and confirmation step before download.
+- This plan covers download only; the later upload/import flow into the cloned app can be built against the same CSV structure.
