@@ -1682,6 +1682,8 @@ export type Database = {
           bill_agreed_at: string | null
           check_in: string
           check_out: string
+          checked_in_at: string | null
+          checked_out_at: string | null
           children: number
           commission_applied: number
           created_at: string
@@ -1709,6 +1711,8 @@ export type Database = {
           bill_agreed_at?: string | null
           check_in: string
           check_out: string
+          checked_in_at?: string | null
+          checked_out_at?: string | null
           children?: number
           commission_applied?: number
           created_at?: string
@@ -1736,6 +1740,8 @@ export type Database = {
           bill_agreed_at?: string | null
           check_in?: string
           check_out?: string
+          checked_in_at?: string | null
+          checked_out_at?: string | null
           children?: number
           commission_applied?: number
           created_at?: string
