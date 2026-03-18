@@ -11,8 +11,8 @@ import {
   TrendingUp, Calendar, DollarSign,
 } from 'lucide-react';
 
-const BASE = 'https://rukgsweczvwowxrrcapy.supabase.co/functions/v1';
-const AUTH = 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ1a2dzd2VjenZ3b3d4cnJjYXB5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NTQwNTksImV4cCI6MjA4OTIzMDA1OX0.w38keg79UkGfD5F7iPHIWFbHlL0Ep324sCwZkMgluVY';
+const BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
+const AUTH = `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`;
 
 const apiFetch = async (path: string) => {
   const res = await fetch(`${BASE}${path}`, {
