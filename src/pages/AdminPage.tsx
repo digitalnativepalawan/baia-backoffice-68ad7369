@@ -40,6 +40,7 @@ import OrderArchive from '@/components/admin/OrderArchive';
 import GuestPortalConfig from '@/components/admin/GuestPortalConfig';
 import DepartmentOrdersView from '@/components/DepartmentOrdersView';
 import IntegrationReadinessDashboard from '@/components/integration/IntegrationReadinessDashboard';
+import LiveOpsDashboard from '@/components/admin/LiveOpsDashboard';
 
 import { deductInventoryForOrder } from '@/lib/inventoryDeduction';
 import { hasAccess, canEdit, canViewDocuments } from '@/lib/permissions';
