@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Check, X, DollarSign, Clock, Users, Download, Banknote, Star, Settings, Phone, MessageCircle, Lock, ListTodo, MessageSquare } from 'lucide-react';
+import { Plus, Pencil, Trash2, Check, X, DollarSign, Clock, Users, Download, Banknote, Star, Settings, Phone, MessageCircle, Lock, ListTodo, MessageSquare, Monitor } from 'lucide-react';
 import { format, startOfDay, endOfDay, subDays, startOfWeek, startOfMonth, previousSunday, nextSaturday, isSunday, addDays, getDay } from 'date-fns';
 import { usePayrollSettings } from '@/hooks/usePayrollSettings';
 import EmployeeTaskList from '@/components/employee/EmployeeTaskList';
