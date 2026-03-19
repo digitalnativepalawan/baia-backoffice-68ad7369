@@ -625,7 +625,7 @@ const PayrollDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
       )}
 
       {/* Sub-view toggle */}
-      <div className="grid grid-cols-3 gap-1">
+      <div className="grid grid-cols-4 gap-1">
         {([
           { key: 'employees' as SubView, label: 'Team', icon: Users },
           { key: 'shifts' as SubView, label: 'Shifts', icon: Clock },
@@ -636,7 +636,7 @@ const PayrollDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
           { key: 'settings' as SubView, label: 'Settings', icon: Settings },
         ]).map(({ key, label, icon: Icon }) => (
           <Button key={key} size="sm" variant={subView === key ? 'default' : 'outline'}
-            onClick={() => setSubView(key)} className="font-display text-xs tracking-wider gap-1 w-full">
+            onClick={() => setSubView(key)} className="font-display text-xs tracking-wider gap-1 w-full min-h-[44px]">
             <Icon className="w-3.5 h-3.5" /> {label}
           </Button>
         ))}
