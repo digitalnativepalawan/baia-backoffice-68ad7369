@@ -363,6 +363,9 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
       pickup_time: tourPickupTime.trim(),
       notes: tourNotes.trim(),
     });
+    import('@/lib/telegram').then(({ notifyTelegram }) => {
+      notifyTelegram('tours,managers', `🚐 New Booking\n${currentBooking?.resort_ops_guests?.full_name || selectedUnit.name}\n${tourName.trim()} - ${tourDate}${tourPickupTime.trim() ? ' ' + tourPickupTime.trim() : ''}`);
+    });
     setTourName(''); setTourDate(''); setTourPax('1'); setTourPrice('');
     setTourProvider(''); setTourPickupTime(''); setTourNotes('');
     setTourCatalogMode('catalog');

@@ -213,6 +213,11 @@ const CheckoutModal = ({ open, onOpenChange, unitId, unitName, guestName, bookin
 
       await supabase.from('units').update({ status: 'to_clean' } as any).eq('id', unitId);
 
+      // Telegram notification
+      import('@/lib/telegram').then(({ notifyTelegram }) => {
+        notifyTelegram('reception,managers', `🚪 Check-out\n${guestName || 'Guest'} - ${unitName}`);
+      });
+
       // Transition existing HK order to 'cleaning' (post-checkout phase)
       const hkEmployee = hkEmployees.find((e: any) => e.id === selectedHousekeeper);
 

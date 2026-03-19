@@ -902,6 +902,12 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
       }).eq('id', checkOutBooking.id);
       await supabase.from('units').update({ status: 'to_clean' } as any).eq('id', checkOutUnit.id);
 
+      // Telegram notification
+      import('@/lib/telegram').then(({ notifyTelegram }) => {
+        const gName = checkOutBooking.resort_ops_guests?.full_name || 'Guest';
+        notifyTelegram('reception,managers', `🚪 Check-out\n${gName} - ${checkOutUnit.name}`);
+      });
+
       const existing = activeHkOrders.find((o: any) => o.unit_name === checkOutUnit.name);
 
       if (!existing) {
