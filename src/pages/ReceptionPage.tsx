@@ -1496,6 +1496,8 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
         </div>
       )}
 
+      {/* ── Closed Checkouts (admin can reopen) ── */}
+      <ClosedCheckoutsPanel isAdmin={isAdmin} />
 
       {/* ── 🧹 Needs Cleaning — Live Housekeeping Progress ── */}
       {activeHkOrders.length > 0 && (
