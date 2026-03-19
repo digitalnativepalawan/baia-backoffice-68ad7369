@@ -119,17 +119,21 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
       const field = department === 'kitchen' ? 'kitchen_status' : 'bar_status';
       relevantOrders.forEach(o => {
         const deptStatus = o[field] as string;
-        if (o.status === 'Paid') {
+        // Once dept is done (ready) or order is served/paid → Completed (collapsed)
+        if (o.status === 'Paid' || o.status === 'Served') {
           const isRoomOrder = o.room_id || o.payment_type === 'Charge to Room';
           if (!isRoomOrder) cols.Completed.push(o);
+        } else if (deptStatus === 'ready') {
+          // Dept finished — move to Completed for kitchen/bar view
+          cols.Completed.push(o);
+        } else if (deptStatus === 'pending' && (o.status === 'New' || o.status === 'Preparing')) {
+          cols.New.push(o);
+        } else if (deptStatus === 'preparing') {
+          cols.Preparing.push(o);
         }
-        else if (o.status === 'Served') cols.Ready.push(o); // All served stay visible until paid
-        else if (deptStatus === 'pending' && (o.status === 'New' || o.status === 'Preparing')) cols.New.push(o);
-        else if (deptStatus === 'preparing') cols.Preparing.push(o);
-        else if (deptStatus === 'ready' || o.status === 'Ready') cols.Ready.push(o);
       });
     } else {
-      // Reception: Served and Paid go to Completed
+      // Reception/Cashier view
       relevantOrders.forEach(o => {
         if (o.status === 'New') cols.New.push(o);
         else if (o.status === 'Preparing') cols.Preparing.push(o);
@@ -192,7 +196,14 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
         updateData.status = 'Ready';
       }
     } else if (action === 'mark-served') {
-      updateData.status = 'Served';
+      const isTabOrRoom = order.room_id || order.payment_type === 'Charge to Room' || order.tab_id;
+      if (isTabOrRoom) {
+        // Auto-close tab/room orders — they appear on guest folio / cashier tab
+        updateData.status = 'Paid';
+        updateData.closed_at = new Date().toISOString();
+      } else {
+        updateData.status = 'Served';
+      }
     } else if (action === 'mark-paid') {
       updateData.status = 'Paid';
       updateData.closed_at = new Date().toISOString();

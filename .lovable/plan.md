@@ -1,47 +1,37 @@
 
 
-## Plan: Fix Kitchen Display — Auto-Clear Ready Orders
+## Plan: Fix Schedule Delete & Enhance Task/Assignment Scheduling
 
-### Problem
-In the Kitchen service board, orders stay stuck in the "Ready" column after `kitchen_status = 'ready'` even though kitchen's job is done. Additionally, `Served` orders are incorrectly pushed back into the Ready column for kitchen/bar views (line 126 of ServiceBoard.tsx).
+### Issues Found
 
-### Root Cause (ServiceBoard.tsx lines 118-130)
-```
-// Current broken logic for kitchen/bar:
-else if (o.status === 'Served') cols.Ready.push(o);        // ← BUG: Served shouldn't show in kitchen
-else if (deptStatus === 'ready' || o.status === 'Ready') cols.Ready.push(o);  // ← Keeps ready orders visible forever
-```
+1. **Delete button bug**: The trash icon on shift blocks triggers `setDeleteId(s.id)`, but the parent div's `onClick={() => openEdit(s)}` fires simultaneously despite `stopPropagation`. On mobile, the tiny button (3x3 icon) is nearly impossible to tap. The AlertDialog `onOpenChange={() => setDeleteId(null)}` also races with the confirm action.
 
-### Fix: 2 files changed
+2. **Missing scheduling features**: The schedule only manages time shifts. There's no way to assign tasks like housecleaning, reception duty, or track completion from within the schedule view.
 
-**1. `src/components/service/ServiceBoard.tsx`** — Column bucketing for kitchen/bar
-- Once `kitchen_status = 'ready'` (or `bar_status = 'ready'`), move order to **Completed** section (collapsible), not the Ready column
-- Remove the line that puts `Served` orders into kitchen's Ready column
-- Ready column in kitchen/bar will only show orders where dept status is 'ready' AND overall status is still `Preparing` (i.e., waiting for the other department to finish — mixed food+drink orders)
-- Once overall status hits `Ready`, `Served`, or `Paid`, the order moves to Completed for kitchen/bar
+### Changes
 
-**2. `src/components/service/ServiceBoard.tsx`** — handleAction for `mark-served`
-- When "Serve & Close" is triggered on a tab/room order (`isAutoPayable`), also set `status = 'Paid'` and `closed_at` so it fully closes. This ensures tab orders move to the cashier/tab system cleanly and don't linger.
+**1. Fix Delete Button** (`WeeklyScheduleManager.tsx`)
+- Make `confirmDelete` capture `deleteId` before the dialog closes by saving it in a ref or local variable
+- Increase touch target size for edit/delete buttons on shift blocks
+- Prevent edit modal from opening when clicking edit/delete icons (the `stopPropagation` exists but the parent click handler on the entire timeline area also fires)
 
-### Resulting Flow
-```text
-Kitchen view:
-  New → Preparing → (mark ready) → Completed (collapsed)
+**2. Add Task/Assignment Creation from Schedule** (`WeeklyScheduleManager.tsx`)
+- Add an "Assign Task" button alongside "Add Shift" 
+- New modal to create a task assignment: select employee, pick type (Housecleaning, Reception, Custom), set date/time, add notes
+- For housecleaning: select a room/unit to clean, auto-creates a `housekeeping_orders` entry assigned to the selected employee
+- For other tasks: creates an `employee_tasks` entry with due date and description
+- Tasks appear as colored pills on the timeline (already partially implemented)
 
-Service/Reception view:
-  New → Preparing → Ready → [Serve & Close] → Tab/Room folio
+**3. Show Completion Info on Task Detail** (`WeeklyScheduleManager.tsx`)
+- In the task detail dialog, show who completed the task and when (`completed_at`)
+- For housekeeping pills, show completion status (`cleaning_completed_at`, `completed_by_name`)
+- Make housekeeping pills clickable to show full details (room, status, who inspected/cleaned)
 
-Cashier:
-  Sees tab orders → "Close Tab" / "Charge to Room"
+**4. Enhance Task Detail Dialog** (`WeeklyScheduleManager.tsx`)
+- Add edit capability: change title, description, due date, reassign to different employee
+- Add delete capability for tasks
+- Show completion audit trail
 
-Guest Portal:
-  Sees order on their folio in real-time
-```
-
-### What stays visible where
-| Order State | Kitchen | Reception | Cashier | Guest Portal |
-|---|---|---|---|---|
-| kitchen_status=ready | Completed (collapsed) | Ready column | Ready column | Shows as "Preparing" |
-| Served (tab/room) | Hidden | Hidden (auto-closed) | Tab dashboard | Shows on folio |
-| Served (walk-in) | Hidden | Completed | Bill Out | N/A |
+### Files to Edit
+- `src/components/admin/WeeklyScheduleManager.tsx` — all changes in this single file
 
