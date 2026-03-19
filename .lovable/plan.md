@@ -1,34 +1,26 @@
 
 
-## Plan: Cashier View — Served Orders Only + Smart Guest Detection
+## Plan: Simplify Cashier View
 
-### Problem
-The Cashier currently sees New, Preparing, and Ready orders via both the ServiceBoard kanban and CashierBoard. Cashier should only see Served orders awaiting payment settlement.
+### Current State
+The CashierBoard already filters to Served-only orders and has in-stay guest detection working. However, the UI still has visual clutter: grouped room collapsibles, status dots for kitchen/bar, "BILL OUT" headers, redundant summary strip text.
 
 ### Changes
 
-**1. `src/pages/ServiceCashierPage.tsx` — Remove ServiceBoard**
-- Remove `<ServiceBoard department="cashier" />` and the `<Separator>` — Cashier should not see the kanban pipeline at all.
+**`src/components/service/CashierBoard.tsx`**
 
-**2. `src/components/service/CashierBoard.tsx` — Served-only + smart payment detection**
+1. **Remove `GroupedBillOut` component** — replace with a flat list of `OrderRow` cards. No room grouping, no collapsibles for the main order list.
 
-- **Query filter** (line 63): Change `.in('status', ['New', 'Preparing', 'Ready', 'Served'])` to `.eq('status', 'Served')` — only fetch Served orders.
+2. **Simplify `OrderRow`** — remove kitchen/bar status dots (Flame/GlassWater icons with colored dots). Cashier doesn't care about department prep status. Keep: guest name, location, elapsed time, total amount, and a simple "Pending Payment" badge.
 
-- **Remove bucket logic** (lines 115-131): No more `active` vs `billOut` split. All orders are bill-out by definition since they're all Served.
+3. **Simplify summary strip** (line 188-197) — show just "{n} orders awaiting payment" instead of duplicating "X Served" and "X BILL OUT".
 
-- **Remove "ACTIVE ORDERS" section** (lines 262-277): No longer needed.
+4. **Remove "💰 BILL OUT — Awaiting Payment" header** (line 203) — unnecessary label. The whole view IS bill out.
 
-- **Remove action handlers** (lines 171-211 `handleAction`): Cashier never needs kitchen-start, bar-start, mark-served etc. These are kitchen/bar concerns.
+5. **Clean empty state** — keep the "No served orders awaiting payment" message as-is (already clean).
 
-- **Auto-detect in-stay guest**: When selecting an order in the BillOutPanel, match `order.guest_name` or `order.room_id` against `activeBookings`. If a match is found → show both "Charge to Room" (primary, pre-selected booking) and "Pay Now" (secondary). If no match → show only "Pay Now" payment methods, hide "Charge to Room" option entirely.
+6. **BillOutPanel** — already correct with in-stay detection. No changes needed there.
 
-- **BillOutPanel update** (line 491+): Add an `isInStayGuest` prop. When true, show "Charge to Room" as primary prominent button with pre-selected booking, and "Pay Now" as secondary. When false, hide the "Charge to Room" option and OR divider, show only payment method grid.
-
-- **Confirm handler**: When "Charge to Room" is confirmed, set `payment_type: 'Charge to Room'` and `status: 'Paid'` (existing logic already handles this). Keep room_id assignment from booking.
-
-### Files changed
-- `src/pages/ServiceCashierPage.tsx` (~3 lines removed)
-- `src/components/service/CashierBoard.tsx` (~40 lines changed)
-
-No changes to Kitchen, Bar, or other boards.
-
+### Result
+- Clean flat list of served orders on the left
+- Tap an order → payment panel on right with smart Charge to Room / Pay Now
