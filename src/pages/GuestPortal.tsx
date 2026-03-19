@@ -1255,6 +1255,12 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
           <span className="font-body text-sm text-muted-foreground">Total Payments</span>
           <span className="font-body text-sm text-green-400">₱{totalPayments.toLocaleString()}</span>
         </div>
+        {guestEffectivePrepayment > 0 && (
+          <div className="flex justify-between mb-2">
+            <span className="font-body text-sm text-muted-foreground">Paid via {bookingData.platform}</span>
+            <span className="font-body text-sm text-green-400">₱{guestEffectivePrepayment.toLocaleString()}</span>
+          </div>
+        )}
         <div className="border-t border-border pt-2 flex justify-between">
           <span className="font-body text-sm text-foreground font-medium">Balance</span>
           <span className={`font-body text-sm font-medium ${balance > 0 ? 'text-amber-400' : 'text-green-400'}`}>₱{balance.toLocaleString()}</span>
