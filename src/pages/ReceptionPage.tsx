@@ -680,6 +680,11 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
 
       await logAudit('created', 'units', unit.id, `Check-in: ${checkInBooking.resort_ops_guests?.full_name} to ${unitName}${earlyFee > 0 ? ` (early fee: ₱${earlyFee})` : ''}${roomRate > 0 ? ` — ${nights} nights × ₱${roomRate.toLocaleString()}` : ''}`);
 
+      // Telegram notification
+      import('@/lib/telegram').then(({ notifyTelegram }) => {
+        notifyTelegram('reception,managers', `🏨 Check-in\n${checkInBooking.resort_ops_guests?.full_name || 'Guest'} - ${unitName}\n${nights} night${nights !== 1 ? 's' : ''}`);
+      });
+
       qc.invalidateQueries({ queryKey: ['rooms-bookings'] });
       qc.invalidateQueries({ queryKey: ['rooms-units'] });
       qc.invalidateQueries({ queryKey: ['morning-briefing'] });
