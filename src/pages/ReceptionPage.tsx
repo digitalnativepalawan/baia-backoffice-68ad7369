@@ -680,6 +680,11 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
 
       await logAudit('created', 'units', unit.id, `Check-in: ${checkInBooking.resort_ops_guests?.full_name} to ${unitName}${earlyFee > 0 ? ` (early fee: ₱${earlyFee})` : ''}${roomRate > 0 ? ` — ${nights} nights × ₱${roomRate.toLocaleString()}` : ''}`);
 
+      // Telegram notification
+      import('@/lib/telegram').then(({ notifyTelegram }) => {
+        notifyTelegram('reception,managers', `🏨 Check-in\n${checkInBooking.resort_ops_guests?.full_name || 'Guest'} - ${unitName}\n${nights} night${nights !== 1 ? 's' : ''}`);
+      });
+
       qc.invalidateQueries({ queryKey: ['rooms-bookings'] });
       qc.invalidateQueries({ queryKey: ['rooms-units'] });
       qc.invalidateQueries({ queryKey: ['morning-briefing'] });
@@ -796,6 +801,11 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
 
       await logAudit('created', 'units', walkInUnit.id, `Walk-in check-in: ${walkInForm.guestName.trim()} to ${walkInUnit.name}${walkInRate > 0 ? ` — ${walkInNights} nights × ₱${walkInRate.toLocaleString()}` : ''}`);
 
+      // Telegram notification
+      import('@/lib/telegram').then(({ notifyTelegram }) => {
+        notifyTelegram('reception,managers', `🏨 Check-in\n${walkInForm.guestName.trim()} - ${walkInUnit.name}\n${walkInNights} night${walkInNights !== 1 ? 's' : ''}`);
+      });
+
       qc.invalidateQueries({ queryKey: ['rooms-bookings'] });
       qc.invalidateQueries({ queryKey: ['rooms-units'] });
       qc.invalidateQueries({ queryKey: ['room-transactions', walkInUnit.id] });
@@ -896,6 +906,12 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
         checked_out_at: new Date().toISOString(),
       }).eq('id', checkOutBooking.id);
       await supabase.from('units').update({ status: 'to_clean' } as any).eq('id', checkOutUnit.id);
+
+      // Telegram notification
+      import('@/lib/telegram').then(({ notifyTelegram }) => {
+        const gName = checkOutBooking.resort_ops_guests?.full_name || 'Guest';
+        notifyTelegram('reception,managers', `🚪 Check-out\n${gName} - ${checkOutUnit.name}`);
+      });
 
       const existing = activeHkOrders.find((o: any) => o.unit_name === checkOutUnit.name);
 

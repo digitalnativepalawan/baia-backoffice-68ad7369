@@ -197,7 +197,17 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
       }
     } else if (action === 'mark-served') {
       updateData.status = 'Served';
-    } else if (action === 'mark-paid') {
+    }
+
+    // Telegram notification when order becomes Ready
+    if (updateData.status === 'Ready') {
+      import('@/lib/telegram').then(({ notifyTelegram }) => {
+        const items = ((order.items as any[]) || []).map((i: any) => i.name || i.item_name).join(', ');
+        notifyTelegram('reception', `✅ Order Ready\n${order.guest_name || 'Guest'} - ${items} is ready for delivery`);
+      });
+    }
+
+    if (action === 'mark-paid') {
       updateData.status = 'Paid';
       updateData.closed_at = new Date().toISOString();
     }

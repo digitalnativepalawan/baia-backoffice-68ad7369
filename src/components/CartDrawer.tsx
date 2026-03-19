@@ -340,6 +340,20 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
       setOrderSummary({ itemCount, grandTotal });
       cart.clearCart();
       setSubmitted(true);
+      // Telegram notifications
+      const { notifyTelegram } = await import('@/lib/telegram');
+      const kitchenItems = orderItems.filter(i => i.department === 'kitchen' || i.department === 'both');
+      const barItems = orderItems.filter(i => i.department === 'bar' || i.department === 'both');
+      const loc = selectedLocation || selectedOrderType;
+      if (kitchenItems.length > 0) {
+        const lines = kitchenItems.map(i => `${i.qty}x ${i.name} - ₱${(i.price * i.qty).toLocaleString()}`).join('\n');
+        notifyTelegram('kitchen,managers', `🍽️ New Kitchen Order\n${resolvedGuestName || 'Guest'} - ${loc}\n${lines}`);
+      }
+      if (barItems.length > 0) {
+        const lines = barItems.map(i => `${i.qty}x ${i.name} - ₱${(i.price * i.qty).toLocaleString()}`).join('\n');
+        notifyTelegram('bar,managers', `🍸 New Bar Order\n${resolvedGuestName || 'Guest'} - ${loc}\n${lines}`);
+      }
+
       const toastLabel = (() => {
         const hk = orderItems.some(i => i.department === 'kitchen' || i.department === 'both');
         const hb = orderItems.some(i => i.department === 'bar' || i.department === 'both');

@@ -283,6 +283,9 @@ const MessageReceptionView = ({ session, qc, onDone }: { session: GuestPortalSes
       details: message.trim(),
       status: 'pending',
     });
+    import('@/lib/telegram').then(({ notifyTelegram }) => {
+      notifyTelegram('reception,managers', `🛎️ Guest Request\n${session.guest_name}\nMessage: ${message.trim()}`);
+    });
     qc.invalidateQueries({ queryKey: ['guest-requests-admin'] });
     setSubmitting(false);
     setSent(true);
@@ -350,6 +353,9 @@ const ToursView = ({ session, qc }: { session: GuestPortalSession; qc: any }) =>
       status: 'pending',
       pickup_time: pickupTime,
       notes: notes.trim(),
+    });
+    import('@/lib/telegram').then(({ notifyTelegram }) => {
+      notifyTelegram('tours,managers', `🚐 New Booking\n${session.guest_name}\n${selectedTour.name} - ${date} ${pickupTime}`);
     });
     qc.invalidateQueries({ queryKey: ['tour-bookings-admin'] });
     toast.success('Tour request submitted! Staff will confirm shortly.');
@@ -425,13 +431,17 @@ const TransportView = ({ session, qc }: { session: GuestPortalSession; qc: any }
     setSubmitting(true);
     const label = `${selectedRate.origin} → ${selectedRate.destination}`;
     // Create pending request — NO room charge yet
+    const transportDetail = `${label} — ₱${selectedRate.price} — ${pickupDate} ${pickupTime}`;
     await supabase.from('guest_requests').insert({
       booking_id: session.booking_id,
       room_id: session.room_id,
       guest_name: session.guest_name,
       request_type: 'Transport',
-      details: `${label} — ₱${selectedRate.price} — ${pickupDate} ${pickupTime}`,
+      details: transportDetail,
       status: 'pending',
+    });
+    import('@/lib/telegram').then(({ notifyTelegram }) => {
+      notifyTelegram('tours,managers', `🚐 New Booking\n${session.guest_name}\nTransport: ${transportDetail}`);
     });
     qc.invalidateQueries({ queryKey: ['guest-requests-admin'] });
     toast.success('Transport request submitted! Staff will confirm shortly.');
@@ -519,6 +529,9 @@ const RentalsView = ({ session, qc }: { session: GuestPortalSession; qc: any }) 
       request_type: 'Rental',
       details: detail,
       status: 'pending',
+    });
+    import('@/lib/telegram').then(({ notifyTelegram }) => {
+      notifyTelegram('tours,managers', `🚐 New Booking\n${session.guest_name}\nRental: ${detail}`);
     });
     qc.invalidateQueries({ queryKey: ['guest-requests-admin'] });
     toast.success('Rental request submitted! Staff will confirm shortly.');
@@ -625,6 +638,9 @@ const RequestView = ({ session, qc }: { session: GuestPortalSession; qc: any }) 
       request_type: type,
       details: details.trim(),
       status: 'pending',
+    });
+    import('@/lib/telegram').then(({ notifyTelegram }) => {
+      notifyTelegram('reception,managers', `🛎️ Guest Request\n${session.guest_name}\n${type}: ${details.trim()}`);
     });
     qc.invalidateQueries({ queryKey: ['guest-requests-admin'] });
     toast.success('Request submitted!');
