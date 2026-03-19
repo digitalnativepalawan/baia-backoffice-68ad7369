@@ -673,25 +673,6 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
           notes: `${nights} night${nights !== 1 ? 's' : ''} × ₱${roomRate.toLocaleString()}/night`,
         });
 
-        // For OTA/pre-paid bookings, insert pre-payment
-        const paidAmount = Number(checkInBooking.paid_amount) || 0;
-        if (paidAmount > 0) {
-          const platform = checkInBooking.platform || 'Pre-paid';
-          await (from('room_transactions') as any).insert({
-            unit_id: unit.id,
-            unit_name: unitName,
-            guest_name: guestFullName,
-            booking_id: checkInBooking.id,
-            transaction_type: 'payment',
-            amount: -paidAmount,
-            tax_amount: 0,
-            service_charge_amount: 0,
-            total_amount: -paidAmount,
-            payment_method: platform,
-            staff_name: staffName,
-            notes: `Pre-payment via ${platform}`,
-          });
-        }
       }
 
       await logAudit('created', 'units', unit.id, `Check-in: ${checkInBooking.resort_ops_guests?.full_name} to ${unitName}${earlyFee > 0 ? ` (early fee: ₱${earlyFee})` : ''}${roomRate > 0 ? ` — ${nights} nights × ₱${roomRate.toLocaleString()}` : ''}`);
