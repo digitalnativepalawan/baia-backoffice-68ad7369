@@ -1256,6 +1256,36 @@ export type Database = {
         }
         Relationships: []
       }
+      it_notes: {
+        Row: {
+          category: string
+          comments: string
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+          urls: Json
+        }
+        Insert: {
+          category?: string
+          comments?: string
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          urls?: Json
+        }
+        Update: {
+          category?: string
+          comments?: string
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          urls?: Json
+        }
+        Relationships: []
+      }
       menu_categories: {
         Row: {
           active: boolean
