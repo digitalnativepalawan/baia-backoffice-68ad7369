@@ -773,7 +773,7 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
                   <span className="font-body text-sm text-foreground font-medium flex items-center gap-1.5">
                     {icon} {r.request_type}
                   </span>
-                  <Badge variant="outline" className={`text-[10px] ${tourStatusColor(r.status)}`}>{r.status}</Badge>
+                  <Badge variant="outline" className={`text-[10px] ${tourStatusColor(r.status)}`}>{r.status === 'completed' ? 'Charged' : r.status}</Badge>
                 </div>
                 <p className="font-body text-xs text-muted-foreground">{r.details}</p>
                 <div className="flex items-center justify-between">

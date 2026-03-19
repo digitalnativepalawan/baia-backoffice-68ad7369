@@ -1401,7 +1401,7 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
                   <p className="font-body text-xs text-muted-foreground">{r.details}</p>
                 </div>
               </div>
-              <Badge variant="outline" className="text-[10px] bg-emerald-500/20 text-emerald-300 border-emerald-500/30">Done</Badge>
+              <Badge variant="outline" className="text-[10px] bg-emerald-500/20 text-emerald-300 border-emerald-500/30">Charged to Room</Badge>
             </div>
           ))}
         </div>
