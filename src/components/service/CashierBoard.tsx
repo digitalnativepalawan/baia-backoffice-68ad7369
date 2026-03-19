@@ -144,48 +144,7 @@ const CashierBoard = () => {
     }
   };
 
-  // Handle order actions — never auto-jump to Paid on serve
-  const handleAction = async (orderId: string, action: string) => {
-    const order = orders.find(o => o.id === orderId);
-    if (!order) return;
-    const updateData: any = {};
-
-    if (action === 'kitchen-start') {
-      updateData.kitchen_status = 'preparing';
-      if (order.status === 'New') updateData.status = 'Preparing';
-      const items = ((order.items as any[]) || []).filter((i: any) => {
-        const d = i.department || 'kitchen';
-        return d === 'kitchen' || d === 'both';
-      });
-      if (items.length > 0) await deductInventoryForOrder(orderId, items, 'kitchen');
-    } else if (action === 'kitchen-ready') {
-      updateData.kitchen_status = 'ready';
-      const barItems = ((order.items as any[]) || []).some((i: any) => i.department === 'bar' || i.department === 'both');
-      if (!barItems || order.bar_status === 'ready') updateData.status = 'Ready';
-    } else if (action === 'bar-start') {
-      updateData.bar_status = 'preparing';
-      if (order.status === 'New') updateData.status = 'Preparing';
-      const items = ((order.items as any[]) || []).filter((i: any) => {
-        const d = i.department || 'kitchen';
-        return d === 'bar' || d === 'both';
-      });
-      if (items.length > 0) await deductInventoryForOrder(orderId, items, 'bar');
-    } else if (action === 'bar-ready') {
-      updateData.bar_status = 'ready';
-      const kitchenItems = ((order.items as any[]) || []).some((i: any) => {
-        const d = i.department || 'kitchen';
-        return d === 'kitchen' || d === 'both';
-      });
-      if (!kitchenItems || order.kitchen_status === 'ready') updateData.status = 'Ready';
-    } else if (action === 'mark-served') {
-      // Cashier always goes to Served — never auto-pay
-      updateData.status = 'Served';
-    }
-
-    await supabase.from('orders').update(updateData).eq('id', orderId);
-    qc.invalidateQueries({ queryKey: ['cashier-orders'] });
-    toast.success('Order updated');
-  };
+  // Cashier doesn't need kitchen/bar action handlers — only payment settlement
 
   // Receipt view
   if (receiptOrder) {
