@@ -133,7 +133,10 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
   const unpaidOrdersSubtotal = unpaidOrdersTotal - unpaidOrdersSCTotal;
   const activeToursTotal = tours.filter((t: any) => t.status !== 'cancelled').reduce((s: number, t: any) => s + Number(t.price || 0), 0);
   const activeRequestsTotal = requests.filter((r: any) => r.status !== 'cancelled').reduce((s: number, r: any) => s + Number(r.price || 0), 0);
-  const balance = totalCharges - totalPayments + unpaidOrdersTotal + activeToursTotal + activeRequestsTotal;
+  const otaPrepayment = Number(booking?.paid_amount || 0);
+  const isOtaPlatform = booking?.platform && !['Direct', 'Website', 'direct', 'website'].includes(booking.platform);
+  const effectivePrepayment = isOtaPlatform ? otaPrepayment : 0;
+  const balance = totalCharges - totalPayments - effectivePrepayment + unpaidOrdersTotal + activeToursTotal + activeRequestsTotal;
 
   const staffName = localStorage.getItem('emp_display_name') || localStorage.getItem('emp_name') || 'Staff';
 
