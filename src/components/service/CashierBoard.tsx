@@ -165,6 +165,23 @@ const CashierBoard = () => {
     }
   };
 
+  // Auto-detect in-stay guest for the selected order
+  const selectedOrderInStay = useMemo(() => {
+    if (!selectedOrder) return null;
+    // Match by room_id first, then by guest_name
+    if (selectedOrder.room_id) {
+      return activeBookings.find(b => b.unit_id === selectedOrder.room_id) || null;
+    }
+    if (selectedOrder.guest_name) {
+      const name = selectedOrder.guest_name.toLowerCase().trim();
+      return activeBookings.find(b => {
+        const guestName = b.resort_ops_guests?.full_name?.toLowerCase()?.trim();
+        return guestName && guestName === name;
+      }) || null;
+    }
+    return null;
+  }, [selectedOrder, activeBookings]);
+
   return (
     <div className="min-h-0 flex flex-col md:flex-row md:h-full md:overflow-hidden max-w-full">
       {/* Left: Order list */}
@@ -172,48 +189,30 @@ const CashierBoard = () => {
         {/* Summary */}
         <div className="flex items-center gap-4 px-4 py-2 border-b border-border bg-card/50 flex-shrink-0">
           <span className="font-display text-sm text-foreground tracking-wider">
-            {buckets.active.length + buckets.billOut.length} Active
+            {billOutOrders.length} Served
           </span>
-          {buckets.billOut.length > 0 && (
+          {billOutOrders.length > 0 && (
             <span className="font-body text-xs text-amber-400 font-bold">
-              {buckets.billOut.length} BILL OUT
+              {billOutOrders.length} BILL OUT
             </span>
           )}
         </div>
 
         <div className="flex-1 md:overflow-y-auto">
-          {/* Bill Out section — grouped by room */}
-          {buckets.billOut.length > 0 && (
+          {/* Bill Out section — all served orders */}
+          {billOutOrders.length > 0 && (
             <div className="p-3">
               <h3 className="font-display text-xs tracking-wider text-amber-400 mb-2 px-1">💰 BILL OUT — Awaiting Payment</h3>
               <GroupedBillOut
-                orders={buckets.billOut}
+                orders={billOutOrders}
                 selectedOrderId={selectedOrder?.id}
                 onSelect={handleOrderSelect}
               />
             </div>
           )}
 
-          {/* Active orders */}
-          {buckets.active.length > 0 && (
-            <div className="p-3">
-              <h3 className="font-display text-xs tracking-wider text-muted-foreground mb-2 px-1">ACTIVE ORDERS</h3>
-              <div className="space-y-2">
-                {buckets.active.map(order => (
-                  <OrderRow
-                    key={order.id}
-                    order={order}
-                    selected={selectedOrder?.id === order.id}
-                    onSelect={() => handleOrderSelect(order)}
-                    onAction={handleAction}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {buckets.active.length === 0 && buckets.billOut.length === 0 && (
-            <p className="font-body text-sm text-muted-foreground text-center py-12">No active orders</p>
+          {billOutOrders.length === 0 && (
+            <p className="font-body text-sm text-muted-foreground text-center py-12">No served orders awaiting payment</p>
           )}
 
           {/* Completed — date picker + stacked cards */}
