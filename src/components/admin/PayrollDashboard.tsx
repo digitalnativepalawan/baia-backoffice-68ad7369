@@ -12,6 +12,7 @@ import { usePayrollSettings } from '@/hooks/usePayrollSettings';
 import EmployeeTaskList from '@/components/employee/EmployeeTaskList';
 import StaffAccessManager from '@/components/admin/StaffAccessManager';
 import { buildTeamWhatsAppMessage, openWhatsApp } from '@/lib/messenger';
+import ITNotesSection from '@/components/admin/ITNotesSection';
 import { useResortProfile } from '@/hooks/useResortProfile';
 
 type DateFilter = 'today' | 'yesterday' | 'week' | 'month' | 'all';
