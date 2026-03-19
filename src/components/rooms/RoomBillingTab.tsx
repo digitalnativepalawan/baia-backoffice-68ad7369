@@ -367,7 +367,7 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
     switch (s) {
       case 'booked': case 'pending': return 'bg-amber-500/20 text-amber-300 border-amber-500/30';
       case 'confirmed': return 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
-      case 'completed': return 'bg-muted text-muted-foreground';
+      case 'completed': return 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
       case 'cancelled': return 'bg-destructive/20 text-destructive';
       default: return 'bg-muted text-muted-foreground';
     }
