@@ -119,17 +119,21 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
       const field = department === 'kitchen' ? 'kitchen_status' : 'bar_status';
       relevantOrders.forEach(o => {
         const deptStatus = o[field] as string;
-        if (o.status === 'Paid') {
+        // Once dept is done (ready) or order is served/paid → Completed (collapsed)
+        if (o.status === 'Paid' || o.status === 'Served') {
           const isRoomOrder = o.room_id || o.payment_type === 'Charge to Room';
           if (!isRoomOrder) cols.Completed.push(o);
+        } else if (deptStatus === 'ready') {
+          // Dept finished — move to Completed for kitchen/bar view
+          cols.Completed.push(o);
+        } else if (deptStatus === 'pending' && (o.status === 'New' || o.status === 'Preparing')) {
+          cols.New.push(o);
+        } else if (deptStatus === 'preparing') {
+          cols.Preparing.push(o);
         }
-        else if (o.status === 'Served') cols.Ready.push(o); // All served stay visible until paid
-        else if (deptStatus === 'pending' && (o.status === 'New' || o.status === 'Preparing')) cols.New.push(o);
-        else if (deptStatus === 'preparing') cols.Preparing.push(o);
-        else if (deptStatus === 'ready' || o.status === 'Ready') cols.Ready.push(o);
       });
     } else {
-      // Reception: Served and Paid go to Completed
+      // Reception/Cashier view
       relevantOrders.forEach(o => {
         if (o.status === 'New') cols.New.push(o);
         else if (o.status === 'Preparing') cols.Preparing.push(o);
