@@ -461,16 +461,15 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
     if (!canDoEdit) { toast.error('View-only access'); return; }
     await from('guest_tours').update({ status, confirmed_by: staffName }).eq('id', id);
 
-    // Insert room charge when confirming a guest_tour with a price
-    if (status === 'confirmed' && tour && Number(tour.price) > 0 && tour.booking_id) {
-      // Look up unit by unit_name
+    // Insert room charge when completing a guest_tour with a price
+    if (status === 'completed' && tour && Number(tour.price) > 0 && tour.booking_id) {
       const { data: unit } = await supabase.from('units').select('id, unit_name').eq('unit_name', tour.unit_name).maybeSingle();
       await (supabase.from('room_transactions') as any).insert({
         unit_id: unit?.id || null,
         unit_name: tour.unit_name || '',
         booking_id: tour.booking_id,
         guest_name: '',
-        transaction_type: 'charge',
+        transaction_type: 'tour',
         amount: Number(tour.price),
         tax_amount: 0,
         service_charge_amount: 0,
@@ -492,27 +491,8 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
       confirmed_by: staffName,
     }).eq('id', b.id);
 
-    // Insert room charge
-    if (Number(b.price) > 0 && b.room_id) {
-      const room = await getRoomInfo(b.room_id);
-      await (supabase.from('room_transactions') as any).insert({
-        unit_id: b.room_id,
-        unit_name: room?.unit_name || '',
-        booking_id: b.booking_id,
-        guest_name: b.guest_name || '',
-        transaction_type: 'charge',
-        amount: Number(b.price),
-        tax_amount: 0,
-        service_charge_amount: 0,
-        total_amount: Number(b.price),
-        payment_method: 'Charge to Room',
-        staff_name: staffName,
-        notes: `Tour: ${b.tour_name} (${b.pax} pax) on ${b.tour_date}${b.pickup_time ? ` pickup ${b.pickup_time}` : ''}`,
-      });
-    }
-
     qc.invalidateQueries({ queryKey: ['reception-tour-bookings'] });
-    toast.success('Tour booking confirmed & charged to room');
+    toast.success('Tour booking confirmed');
   };
 
   const cancelTourBooking = async (id: string) => {
@@ -525,11 +505,31 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
     toast.success('Tour booking cancelled');
   };
 
-  const completeTourBooking = async (id: string) => {
+  const completeTourBooking = async (b: any) => {
     if (!canDoEdit) { toast.error('View-only access'); return; }
-    await (supabase.from('tour_bookings') as any).update({ status: 'completed' }).eq('id', id);
+    await (supabase.from('tour_bookings') as any).update({ status: 'completed' }).eq('id', b.id);
+
+    // Insert room charge on completion
+    if (Number(b.price) > 0 && b.room_id) {
+      const room = await getRoomInfo(b.room_id);
+      await (supabase.from('room_transactions') as any).insert({
+        unit_id: b.room_id,
+        unit_name: room?.unit_name || '',
+        booking_id: b.booking_id,
+        guest_name: b.guest_name || '',
+        transaction_type: 'tour',
+        amount: Number(b.price),
+        tax_amount: 0,
+        service_charge_amount: 0,
+        total_amount: Number(b.price),
+        payment_method: 'Charge to Room',
+        staff_name: staffName,
+        notes: `Tour: ${b.tour_name} (${b.pax} pax) on ${b.tour_date}${b.pickup_time ? ` pickup ${b.pickup_time}` : ''}`,
+      });
+    }
+
     qc.invalidateQueries({ queryKey: ['reception-tour-bookings'] });
-    toast.success('Tour completed');
+    toast.success('Tour completed & charged to room');
   };
 
   const updateRequestStatus = async (id: string, status: string, req?: any) => {
@@ -1258,10 +1258,10 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
       )}
 
       {/* ── Tours & Activities Today (with action buttons) ── */}
-      {(todayTours.length > 0 || tourBookings.length > 0) && (
+      {(todayTours.filter((t: any) => t.status !== 'completed' && t.status !== 'cancelled').length > 0 || pendingTourBookings.length > 0 || tourBookings.filter((b: any) => b.status === 'confirmed').length > 0) && (
         <div className="mb-6 space-y-2">
-          <h2 className="font-display text-xs tracking-wider text-muted-foreground uppercase">🏝️ Tours & Activities ({todayTours.length + pendingTourBookings.length})</h2>
-          {todayTours.map((tour: any) => (
+          <h2 className="font-display text-xs tracking-wider text-muted-foreground uppercase">🏝️ Tours & Activities ({todayTours.filter((t: any) => t.status !== 'completed' && t.status !== 'cancelled').length + pendingTourBookings.length + tourBookings.filter((b: any) => b.status === 'confirmed').length})</h2>
+          {todayTours.filter((t: any) => t.status !== 'completed' && t.status !== 'cancelled').map((tour: any) => (
             <div key={tour.id} className="border border-border rounded-lg p-3 space-y-2">
               <div className="flex justify-between items-start">
                 <div>
@@ -1276,13 +1276,13 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
                 </div>
                 <Badge className={`font-body text-xs ${statusColor(tour.status)}`}>{tour.status}</Badge>
               </div>
-              {canDoEdit && tour.status !== 'completed' && tour.status !== 'cancelled' && (
+              {canDoEdit && (
                 <div className="flex gap-2">
                   {tour.status === 'booked' && (
                     <Button size="sm" variant="outline" onClick={() => updateTourStatus(tour.id, 'confirmed', tour)}
                       className="font-display text-xs tracking-wider min-h-[36px]">Confirm</Button>
                   )}
-                  <Button size="sm" onClick={() => updateTourStatus(tour.id, 'completed')}
+                  <Button size="sm" onClick={() => updateTourStatus(tour.id, 'completed', tour)}
                     className="font-display text-xs tracking-wider min-h-[36px]">
                     <CheckCircle className="w-3.5 h-3.5 mr-1" /> Complete
                   </Button>
@@ -1331,7 +1331,7 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
                 <Badge className={`font-body text-xs ${statusColor('confirmed')}`}>confirmed</Badge>
               </div>
               {canDoEdit && (
-                <Button size="sm" onClick={() => completeTourBooking(b.id)}
+                <Button size="sm" onClick={() => completeTourBooking(b)}
                   className="font-display text-xs tracking-wider min-h-[36px]">
                   <CheckCircle className="w-3.5 h-3.5 mr-1" /> Complete
                 </Button>
