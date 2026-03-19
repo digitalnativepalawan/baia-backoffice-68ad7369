@@ -698,7 +698,7 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
               <div key={t.id} className="border border-border rounded-lg p-3 space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-body text-sm text-foreground font-medium">{t.tour_name}</span>
-                  <Badge variant="outline" className={`text-[10px] ${tourStatusColor(t.status)}`}>{t.status}</Badge>
+                  <Badge variant="outline" className={`text-[10px] ${tourStatusColor(t.status)}`}>{t.status === 'completed' ? 'Charged' : t.status}</Badge>
                 </div>
                 <div className="flex gap-3 font-body text-xs text-muted-foreground">
                   <span>{t.tour_date}</span>
