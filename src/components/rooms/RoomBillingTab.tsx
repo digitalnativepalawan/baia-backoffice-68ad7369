@@ -240,10 +240,29 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
   };
 
   const handleCompleteRequest = async (reqId: string) => {
+    const req = requests.find((r: any) => r.id === reqId);
     await from('guest_requests').update({ status: 'completed' }).eq('id', reqId);
+    // Post request charge to room ledger if it has a price
+    if (req && Number(req.price) > 0 && booking?.id) {
+      await (supabase.from('room_transactions' as any) as any).insert({
+        unit_id: unit.id,
+        unit_name: unit.name,
+        guest_name: guestName,
+        booking_id: booking.id,
+        transaction_type: 'service_request',
+        amount: Number(req.price),
+        tax_amount: 0,
+        service_charge_amount: 0,
+        total_amount: Number(req.price),
+        payment_method: '',
+        staff_name: staffName,
+        notes: `${req.request_type}: ${req.details || ''}`.trim(),
+      });
+      qc.invalidateQueries({ queryKey: ['room-transactions', unit.id] });
+    }
     await logAudit('updated', 'guest_requests', reqId, `Marked request completed by ${staffName}`);
     qc.invalidateQueries({ queryKey: ['billing-requests'] });
-    toast.success('Request marked completed');
+    toast.success('Request completed & charged to room');
   };
 
   const handleDeleteTx = async (txId: string, txType: string, amount: number) => {
