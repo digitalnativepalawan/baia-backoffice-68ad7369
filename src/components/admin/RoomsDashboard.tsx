@@ -1482,6 +1482,9 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
         </div>
       )}
 
+      {/* ── Closed Checkouts (admin can reopen) ── */}
+      <ClosedCheckoutsPanel isAdmin={!readOnly} />
+
       {/* Room grid */}
       <h4 className="font-display text-xs tracking-wider text-muted-foreground uppercase">All Rooms</h4>
       <div className="grid grid-cols-2 gap-3">
