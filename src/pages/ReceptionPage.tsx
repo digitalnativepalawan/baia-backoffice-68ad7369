@@ -762,8 +762,10 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
 
       await supabase.from('units').update({ status: 'occupied' } as any).eq('id', walkInUnit.id);
 
-      // ── Auto-post accommodation charge for walk-in ──
+      // ── Auto-post accommodation charge for walk-in (skip for OTA platforms) ──
       const walkInRate = parseFloat(walkInForm.roomRate) || 0;
+      const walkInOtaPlatforms = ['booking.com', 'airbnb', 'agoda', 'expedia', 'hostelworld', 'trip.com'];
+      const isWalkInOta = walkInForm.platform && walkInOtaPlatforms.includes(walkInForm.platform.toLowerCase());
       const walkInNights = Math.max(1, Math.ceil((new Date(walkInForm.checkOut).getTime() - new Date(walkInForm.checkIn).getTime()) / 86400000));
       const { data: newBookings } = await from('resort_ops_bookings')
         .select('id')
