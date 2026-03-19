@@ -11,6 +11,7 @@ const CHAT_IDS: Record<string, number> = {
   housekeeping: -5127212920,
   reception: -4812951231,
   managers: -5233537962,
+  waitstaff: -5220831375,
 };
 
 Deno.serve(async (req) => {

@@ -203,7 +203,7 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
     if (updateData.status === 'Ready') {
       import('@/lib/telegram').then(({ notifyTelegram }) => {
         const items = ((order.items as any[]) || []).map((i: any) => i.name || i.item_name).join(', ');
-        notifyTelegram('reception', `✅ Order Ready\n${order.guest_name || 'Guest'} - ${items} is ready for delivery`);
+        notifyTelegram('reception,managers,waitstaff', `✅ Order Ready\n${order.guest_name || 'Guest'} - ${items} is ready for delivery`);
       });
     }
 
