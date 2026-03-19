@@ -408,15 +408,9 @@ const CheckoutModal = ({ open, onOpenChange, unitId, unitName, guestName, bookin
                 <span className="text-emerald-400">₱{Math.abs(t.total_amount).toLocaleString()}</span>
               </div>
             ))}
-            {effectivePrepayment > 0 && (
-              <div className="flex justify-between font-body text-sm">
-                <span className="text-muted-foreground">Paid via {booking.platform}</span>
-                <span className="text-emerald-400">₱{effectivePrepayment.toLocaleString()}</span>
-              </div>
-            )}
             <div className="flex justify-between font-display text-sm">
               <span className="text-foreground">Total Paid</span>
-              <span className="text-emerald-400">₱{(totalPayments + effectivePrepayment).toLocaleString()}</span>
+              <span className="text-emerald-400">₱{totalPayments.toLocaleString()}</span>
             </div>
           </div>
 

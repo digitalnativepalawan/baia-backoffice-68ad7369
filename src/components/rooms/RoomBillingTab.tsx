@@ -864,12 +864,6 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
           <span className="text-muted-foreground">Total Payments</span>
           <span className="text-green-400">₱{totalPayments.toLocaleString()}</span>
         </div>
-        {effectivePrepayment > 0 && (
-          <div className="flex justify-between font-body text-sm">
-            <span className="text-muted-foreground">Paid via {booking.platform}</span>
-            <span className="text-green-400">₱{effectivePrepayment.toLocaleString()}</span>
-          </div>
-        )}
         <Separator />
         <div className="flex justify-between font-display text-lg tracking-wider">
           <span className="text-foreground">Balance</span>
