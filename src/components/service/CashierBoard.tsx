@@ -426,7 +426,7 @@ const OrderRow = ({ order, selected, onSelect, onAction }: {
 const BillOutPanel = ({
   order, paymentMethods, selectedPayment, onSelectPayment,
   chargeToRoom, onChargeToRoom, activeBookings, selectedBooking,
-  onSelectBooking, onConfirm, busy, onBack, onPreviewReceipt
+  onSelectBooking, onConfirm, busy, onBack, onPreviewReceipt, inStayBooking
 }: {
   order: any;
   paymentMethods: any[];
@@ -441,12 +441,14 @@ const BillOutPanel = ({
   busy: boolean;
   onBack: () => void;
   onPreviewReceipt: () => void;
+  inStayBooking: any | null;
 }) => {
   const items = (order.items as any[]) || [];
   const subtotal = items.reduce((s: number, i: any) => s + i.price * (i.qty || i.quantity || 1), 0);
   const sc = Number(order.service_charge || 0);
   const total = subtotal + sc;
 
+  const isInStay = !!inStayBooking;
   const canConfirm = chargeToRoom ? !!selectedBooking : !!selectedPayment;
 
   return (
@@ -467,7 +469,11 @@ const BillOutPanel = ({
         <Button variant="outline" size="sm" onClick={onPreviewReceipt} className="gap-1.5 font-display text-xs tracking-wider">
           <Printer className="w-3.5 h-3.5" /> Preview
         </Button>
-        <Badge variant="outline" className="font-body text-xs">{order.status}</Badge>
+        {isInStay && (
+          <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 font-body text-[10px]">
+            <BedDouble className="w-3 h-3 mr-1" /> In-Stay
+          </Badge>
+        )}
       </div>
 
       {/* Itemized bill */}
@@ -500,7 +506,44 @@ const BillOutPanel = ({
 
         {/* Payment Method Selection */}
         <div className="space-y-3">
-          <p className="font-display text-xs tracking-wider text-muted-foreground">SELECT PAYMENT METHOD</p>
+          {/* In-stay guest: Charge to Room as primary */}
+          {isInStay && (
+            <>
+              {!chargeToRoom ? (
+                <button
+                  onClick={() => { onChargeToRoom(); onSelectBooking(inStayBooking.id); }}
+                  className="w-full min-h-[56px] rounded-xl border-2 border-blue-400 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 font-display text-sm tracking-wider transition-all flex items-center justify-center gap-2"
+                >
+                  <BedDouble className="w-5 h-5" />
+                  Charge to Room — {inStayBooking.resort_ops_units?.name || 'Room'}
+                </button>
+              ) : (
+                <div className="rounded-xl border-2 border-gold bg-gold/10 p-3 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <BedDouble className="w-4 h-4 text-gold" />
+                    <span className="font-display text-sm tracking-wider text-gold">Charging to {inStayBooking.resort_ops_units?.name || 'Room'}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{inStayBooking.resort_ops_guests?.full_name || 'Guest'}</p>
+                  <button
+                    onClick={() => { onSelectPayment(''); }}
+                    className="text-xs text-muted-foreground underline mt-1"
+                  >
+                    Cancel — pay now instead
+                  </button>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 my-2">
+                <Separator className="flex-1" />
+                <span className="text-xs text-muted-foreground font-display tracking-wider">OR PAY NOW</span>
+                <Separator className="flex-1" />
+              </div>
+            </>
+          )}
+
+          <p className="font-display text-xs tracking-wider text-muted-foreground">
+            {isInStay ? 'PAY NOW' : 'SELECT PAYMENT METHOD'}
+          </p>
           <div className="grid grid-cols-2 gap-2">
             {paymentMethods.map(m => (
               <button
@@ -517,47 +560,11 @@ const BillOutPanel = ({
             ))}
           </div>
 
-          <div className="flex items-center gap-2 my-2">
-            <Separator className="flex-1" />
-            <span className="text-xs text-muted-foreground font-display tracking-wider">OR</span>
-            <Separator className="flex-1" />
-          </div>
-
-          {!chargeToRoom ? (
-            <button
-              onClick={onChargeToRoom}
-              className="w-full min-h-[52px] rounded-xl border-2 border-border bg-card text-foreground hover:border-accent/40 font-display text-sm tracking-wider transition-all flex items-center justify-center gap-2"
-            >
-              <BedDouble className="w-4 h-4" />
-              Charge to Room
-            </button>
-          ) : (
-            <div className="space-y-2">
-              <p className="text-xs text-muted-foreground font-display tracking-wider">SELECT BOOKING</p>
-              {activeBookings.length === 0 && (
-                <p className="text-xs text-muted-foreground italic">No active bookings found</p>
-              )}
-              {activeBookings.map((b: any) => (
-                <button
-                  key={b.id}
-                  onClick={() => onSelectBooking(b.id)}
-                  className={`w-full text-left rounded-xl border-2 p-3 transition-all ${
-                    selectedBooking === b.id
-                      ? 'border-gold bg-gold/10 text-gold'
-                      : 'border-border bg-card text-foreground hover:border-accent/40'
-                  }`}
-                >
-                  <span className="font-display text-sm tracking-wider block">{b.resort_ops_units?.name || 'Unit'}</span>
-                  <span className="text-xs text-muted-foreground">{b.resort_ops_guests?.full_name || 'Guest'}</span>
-                </button>
-              ))}
-              <button
-                onClick={onChargeToRoom}
-                className="text-xs text-muted-foreground underline mt-1"
-              >
-                Cancel — select payment instead
-              </button>
-            </div>
+          {/* Walk-in guest: no Charge to Room option */}
+          {!isInStay && (
+            <p className="font-body text-[10px] text-muted-foreground text-center italic">
+              Guest not found in active bookings — room charging not available
+            </p>
           )}
         </div>
       </div>
@@ -573,7 +580,7 @@ const BillOutPanel = ({
         {busy ? 'Processing…' : (
             <>
               <Check className="w-5 h-5" />
-              {order.status === 'Ready' ? 'Serve & Confirm Payment' : 'Confirm Payment'} — ₱{total.toLocaleString()}
+              Confirm Payment — ₱{total.toLocaleString()}
             </>
           )}
         </Button>
