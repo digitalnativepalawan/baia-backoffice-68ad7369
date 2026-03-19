@@ -491,27 +491,8 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
       confirmed_by: staffName,
     }).eq('id', b.id);
 
-    // Insert room charge
-    if (Number(b.price) > 0 && b.room_id) {
-      const room = await getRoomInfo(b.room_id);
-      await (supabase.from('room_transactions') as any).insert({
-        unit_id: b.room_id,
-        unit_name: room?.unit_name || '',
-        booking_id: b.booking_id,
-        guest_name: b.guest_name || '',
-        transaction_type: 'charge',
-        amount: Number(b.price),
-        tax_amount: 0,
-        service_charge_amount: 0,
-        total_amount: Number(b.price),
-        payment_method: 'Charge to Room',
-        staff_name: staffName,
-        notes: `Tour: ${b.tour_name} (${b.pax} pax) on ${b.tour_date}${b.pickup_time ? ` pickup ${b.pickup_time}` : ''}`,
-      });
-    }
-
     qc.invalidateQueries({ queryKey: ['reception-tour-bookings'] });
-    toast.success('Tour booking confirmed & charged to room');
+    toast.success('Tour booking confirmed');
   };
 
   const cancelTourBooking = async (id: string) => {
