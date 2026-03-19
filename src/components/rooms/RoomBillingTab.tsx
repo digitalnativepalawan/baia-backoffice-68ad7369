@@ -120,8 +120,12 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
     },
   });
 
-  const charges = transactions.filter(t => t.total_amount > 0);
-  const payments = transactions.filter(t => t.total_amount < 0);
+  const otaPlatforms = ['booking.com', 'airbnb', 'agoda', 'expedia', 'hostelworld', 'trip.com'];
+  const isOtaStay = booking?.platform && otaPlatforms.includes(booking.platform.toLowerCase());
+  // Filter out accommodation rows for OTA stays (backward compat for old bad entries)
+  const visibleTransactions = isOtaStay ? transactions.filter(t => t.transaction_type !== 'accommodation') : transactions;
+  const charges = visibleTransactions.filter(t => t.total_amount > 0);
+  const payments = visibleTransactions.filter(t => t.total_amount < 0);
   const totalCharges = charges.reduce((s, t) => s + t.total_amount, 0);
   const totalPayments = Math.abs(payments.reduce((s, t) => s + t.total_amount, 0));
   const unpaidOrdersTotal = unpaidOrders
