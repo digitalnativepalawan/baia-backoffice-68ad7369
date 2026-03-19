@@ -272,6 +272,7 @@ const CheckoutModal = ({ open, onOpenChange, unitId, unitName, guestName, bookin
       qc.invalidateQueries({ queryKey: ['reception-guest-requests'] });
       qc.invalidateQueries({ queryKey: ['reception-tour-bookings'] });
       qc.invalidateQueries({ queryKey: ['reception-tours-today'] });
+      qc.invalidateQueries({ queryKey: ['occupied-guests'] });
       toast.success(`Checkout complete${hkEmployee ? ` — ${hkEmployee.display_name || hkEmployee.name} notified` : ''}`);
       onOpenChange(false);
     } catch {
