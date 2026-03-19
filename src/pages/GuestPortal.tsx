@@ -1180,8 +1180,12 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
     return () => { supabase.removeChannel(channel); };
   }, [session.booking_id, session.room_id, qc]);
 
-  const charges = transactions.filter((t: any) => (t.total_amount || 0) > 0);
-  const payments = transactions.filter((t: any) => (t.total_amount || 0) < 0);
+  const otaPlatforms = ['booking.com', 'airbnb', 'agoda', 'expedia', 'hostelworld', 'trip.com'];
+  const guestIsOta = bookingData?.platform && otaPlatforms.includes(bookingData.platform.toLowerCase());
+  // Filter out accommodation rows for OTA stays
+  const visibleTransactions = guestIsOta ? transactions.filter((t: any) => t.transaction_type !== 'accommodation') : transactions;
+  const charges = visibleTransactions.filter((t: any) => (t.total_amount || 0) > 0);
+  const payments = visibleTransactions.filter((t: any) => (t.total_amount || 0) < 0);
   const totalCharges = charges.reduce((s: number, t: any) => s + (t.total_amount || 0), 0);
   const totalPayments = Math.abs(payments.reduce((s: number, t: any) => s + (t.total_amount || 0), 0));
   const unpaidOrdersTotal = unpaidOrders.reduce((s: number, o: any) => s + (o.total || 0) + (o.service_charge || 0), 0);
@@ -1189,10 +1193,7 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
   const unpaidOrdersSubtotal = unpaidOrdersTotal - unpaidOrdersSCTotal;
   const activeToursTotal = [...completedTours, ...pendingTours].reduce((s: number, t: any) => s + Number(t.price || 0), 0);
   const activeRequestsTotal = [...completedRequests, ...pendingRequests].reduce((s: number, r: any) => s + Number(r.price || 0), 0);
-  const guestOtaPrepayment = Number(bookingData?.paid_amount || 0);
-  const guestIsOta = bookingData?.platform && !['Direct', 'Website', 'direct', 'website'].includes(bookingData.platform);
-  const guestEffectivePrepayment = guestIsOta ? guestOtaPrepayment : 0;
-  const balance = totalCharges - totalPayments - guestEffectivePrepayment + unpaidOrdersTotal + activeToursTotal + activeRequestsTotal;
+  const balance = totalCharges - totalPayments + unpaidOrdersTotal + activeToursTotal + activeRequestsTotal;
   const hasPending = pendingTours.length > 0 || pendingRequests.length > 0;
 
   // Separate room charges (accommodation, room_charge, adjustment) for clear display
