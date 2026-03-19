@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
@@ -9,16 +9,10 @@ import { usePaymentMethods } from '@/hooks/usePaymentMethods';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Clock, Flame, GlassWater, Home, ChevronDown, ChevronUp, CreditCard, Check, ArrowLeft, Printer, CalendarIcon, BedDouble } from 'lucide-react';
+import { Clock, Home, ChevronDown, ChevronUp, CreditCard, Check, ArrowLeft, Printer, CalendarIcon, BedDouble } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { formatDistanceToNow, format } from 'date-fns';
 import CashierReceipt from './CashierReceipt';
-
-const STATUS_DOT: Record<string, string> = {
-  pending: 'bg-muted-foreground',
-  preparing: 'bg-orange-400',
-  ready: 'bg-emerald-400',
-};
 
 const CashierBoard = () => {
   const qc = useQueryClient();
@@ -32,10 +26,6 @@ const CashierBoard = () => {
   const [receiptOrder, setReceiptOrder] = useState<any | null>(null);
   const [completedOpen, setCompletedOpen] = useState(false);
   const [completedDate, setCompletedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const permissions = useMemo(() => {
-    const s = getStaffSession();
-    return s?.permissions || ['admin'];
-  }, []);
 
   // Realtime
   useEffect(() => {
@@ -49,7 +39,7 @@ const CashierBoard = () => {
     return () => { supabase.removeChannel(channel); };
   }, [qc]);
 
-  // Fetch today's Served orders only — Cashier never sees New/Preparing/Ready
+  // Fetch today's Served orders only
   const { data: orders = [] } = useQuery({
     queryKey: ['cashier-orders'],
     queryFn: async () => {
@@ -103,9 +93,6 @@ const CashierBoard = () => {
     },
   });
 
-  // All orders are Served = bill out. No bucket split needed.
-  const billOutOrders = orders;
-
   // Handle payment confirmation
   const handleConfirmPayment = async () => {
     if (!selectedOrder || busy) return;
@@ -129,7 +116,6 @@ const CashierBoard = () => {
 
       await supabase.from('orders').update(updateData).eq('id', selectedOrder.id);
 
-      // Store paid order for receipt display
       setReceiptOrder({ ...selectedOrder, payment_type: paymentType });
       setSelectedOrder(null);
       setSelectedPayment('');
@@ -143,11 +129,8 @@ const CashierBoard = () => {
     }
   };
 
-  // Cashier doesn't need kitchen/bar action handlers — only payment settlement
-
   const activePaymentMethods = paymentMethods.filter(m => m.is_active && m.name !== 'Charge to Room');
 
-  // Handle tapping a completed/paid order — show receipt
   const handleOrderSelect = useCallback((order: any) => {
     if (order.status === 'Paid') {
       setReceiptOrder(order);
@@ -185,31 +168,26 @@ const CashierBoard = () => {
       {/* Left: Order list */}
       <div className="flex-1 flex flex-col md:overflow-hidden border-r border-border/50 min-w-0">
         {/* Summary */}
-        <div className="flex items-center gap-4 px-4 py-2 border-b border-border bg-card/50 flex-shrink-0">
+        <div className="flex items-center gap-4 px-4 py-3 border-b border-border bg-card/50 flex-shrink-0">
           <span className="font-display text-sm text-foreground tracking-wider">
-            {billOutOrders.length} Served
+            {orders.length} order{orders.length !== 1 ? 's' : ''} awaiting payment
           </span>
-          {billOutOrders.length > 0 && (
-            <span className="font-body text-xs text-amber-400 font-bold">
-              {billOutOrders.length} BILL OUT
-            </span>
-          )}
         </div>
 
         <div className="flex-1 md:overflow-y-auto">
-          {/* Bill Out section — all served orders */}
-          {billOutOrders.length > 0 && (
-            <div className="p-3">
-              <h3 className="font-display text-xs tracking-wider text-amber-400 mb-2 px-1">💰 BILL OUT — Awaiting Payment</h3>
-              <GroupedBillOut
-                orders={billOutOrders}
-                selectedOrderId={selectedOrder?.id}
-                onSelect={handleOrderSelect}
-              />
+          {/* Flat list of served orders */}
+          {orders.length > 0 ? (
+            <div className="p-3 space-y-2">
+              {orders.map(order => (
+                <OrderRow
+                  key={order.id}
+                  order={order}
+                  selected={selectedOrder?.id === order.id}
+                  onSelect={() => handleOrderSelect(order)}
+                />
+              ))}
             </div>
-          )}
-
-          {billOutOrders.length === 0 && (
+          ) : (
             <p className="font-body text-sm text-muted-foreground text-center py-12">No served orders awaiting payment</p>
           )}
 
@@ -249,7 +227,7 @@ const CashierBoard = () => {
         </div>
       </div>
 
-      {/* Right: Bill Out / Payment Panel */}
+      {/* Right: Payment Panel */}
       <div className="w-full md:w-[400px] lg:w-[440px] flex-shrink-0 bg-card/50 flex flex-col md:overflow-y-auto">
         {selectedOrder ? (
           <BillOutPanel
@@ -276,109 +254,30 @@ const CashierBoard = () => {
   );
 };
 
-/** Grouped Bill Out — rooms grouped, walk-ins individual */
-const GroupedBillOut = ({ orders, selectedOrderId, onSelect }: {
-  orders: any[];
-  selectedOrderId?: string;
-  onSelect: (order: any) => void;
-}) => {
-  const { roomGroups, ungrouped } = useMemo(() => {
-    const groups: Record<string, any[]> = {};
-    const solo: any[] = [];
-    orders.forEach(o => {
-      if (o.room_id || o.payment_type === 'Charge to Room' || o.tab_id) {
-        const key = o.location_detail || o.order_type || 'Room';
-        if (!groups[key]) groups[key] = [];
-        groups[key].push(o);
-      } else {
-        solo.push(o);
-      }
-    });
-    return { roomGroups: Object.entries(groups), ungrouped: solo };
-  }, [orders]);
-
-  return (
-    <div className="space-y-2">
-      {/* Room groups */}
-      {roomGroups.map(([roomName, roomOrders]) => {
-        const totalAmount = roomOrders.reduce((s: number, o: any) => s + Number(o.total || 0), 0);
-        return (
-          <Collapsible key={roomName} defaultOpen>
-            <CollapsibleTrigger className="w-full flex items-center justify-between rounded-xl border border-border/60 border-l-4 border-l-blue-400 bg-card/90 px-3 py-3 hover:bg-secondary/50 transition-colors">
-              <div className="flex items-center gap-2">
-                <Home className="w-4 h-4 text-blue-400" />
-                <span className="font-display text-sm tracking-wider text-foreground">{roomName}</span>
-                <Badge variant="outline" className="font-body text-[10px] h-5 border-blue-400/50 text-blue-400">
-                  {roomOrders.length} order{roomOrders.length !== 1 ? 's' : ''}
-                </Badge>
-              </div>
-              <span className="font-display text-sm text-gold tabular-nums">₱{totalAmount.toLocaleString()}</span>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="pl-3 pt-1 space-y-1.5">
-              {roomOrders.map(order => (
-                <OrderRow
-                  key={order.id}
-                  order={order}
-                  selected={selectedOrderId === order.id}
-                  onSelect={() => onSelect(order)}
-                />
-              ))}
-            </CollapsibleContent>
-          </Collapsible>
-        );
-      })}
-
-      {/* Ungrouped walk-ins */}
-      {ungrouped.map(order => (
-        <OrderRow
-          key={order.id}
-          order={order}
-          selected={selectedOrderId === order.id}
-          onSelect={() => onSelect(order)}
-        />
-      ))}
-    </div>
-  );
-};
-
-/** Compact order row for the list */
-const OrderRow = ({ order, selected, onSelect, onAction }: {
+/** Clean, minimal order row */
+const OrderRow = ({ order, selected, onSelect }: {
   order: any;
   selected: boolean;
   onSelect: () => void;
-  onAction?: (orderId: string, action: string) => Promise<void>;
 }) => {
-  const items = (order.items as any[]) || [];
   const elapsed = formatDistanceToNow(new Date(order.created_at), { addSuffix: false });
-  const foodItems = items.filter((i: any) => { const d = i.department || 'kitchen'; return d === 'kitchen' || d === 'both'; });
-  const barItems = items.filter((i: any) => i.department === 'bar' || i.department === 'both');
   const isPaid = order.status === 'Paid';
   const isRoomCharge = order.payment_type === 'Charge to Room';
-  const isPendingPayment = order.status === 'Served' || order.status === 'Ready';
-
-  const statusColor = order.status === 'New' ? 'border-l-gold'
-    : order.status === 'Preparing' ? 'border-l-orange-400'
-    : order.status === 'Ready' ? 'border-l-emerald-400'
-    : order.status === 'Served' ? 'border-l-amber-400'
-    : 'border-l-muted';
 
   return (
     <div
       onClick={onSelect}
-      className={`rounded-xl border border-border/60 border-l-4 ${statusColor} p-3 transition-all cursor-pointer active:scale-[0.98] overflow-hidden min-w-0 ${
-        isPaid ? 'opacity-70 hover:opacity-90' : ''
+      className={`rounded-xl border border-border/60 p-3 transition-all cursor-pointer active:scale-[0.98] overflow-hidden min-w-0 ${
+        isPaid ? 'opacity-70 hover:opacity-90' : 'hover:bg-secondary/30'
       } ${selected ? 'ring-2 ring-gold bg-gold/5' : 'bg-card/90'}`}
     >
-      <div className="flex items-start justify-between mb-1">
+      <div className="flex items-start justify-between mb-1.5">
         <div className="min-w-0 flex-1">
           <p className="font-display text-sm text-foreground tracking-wider truncate">
-            {order.location_detail || order.order_type}
+            {order.guest_name || order.location_detail || order.order_type}
           </p>
-          {order.guest_name && (
-            <p className="font-body text-xs text-muted-foreground truncate">{order.guest_name}</p>
-          )}
-          {order.staff_name && (
-            <p className="font-body text-[11px] text-muted-foreground/70 truncate">by {order.staff_name}</p>
+          {order.guest_name && order.location_detail && (
+            <p className="font-body text-xs text-muted-foreground truncate">{order.location_detail}</p>
           )}
         </div>
         <div className="flex items-center gap-1.5 text-muted-foreground flex-shrink-0 ml-2">
@@ -388,33 +287,14 @@ const OrderRow = ({ order, selected, onSelect, onAction }: {
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        {/* Status dots */}
-        <div className="flex items-center gap-2">
-          {foodItems.length > 0 && (
-            <div className="flex items-center gap-1">
-              <div className={`w-2 h-2 rounded-full ${STATUS_DOT[order.kitchen_status] || 'bg-muted-foreground'}`} />
-              <Flame className="w-3 h-3 text-muted-foreground" />
-            </div>
-          )}
-          {barItems.length > 0 && (
-            <div className="flex items-center gap-1">
-              <div className={`w-2 h-2 rounded-full ${STATUS_DOT[order.bar_status] || 'bg-muted-foreground'}`} />
-              <GlassWater className="w-3 h-3 text-muted-foreground" />
-            </div>
-          )}
-        </div>
-
-        <div className="flex-1" />
-
+      <div className="flex items-center justify-between">
         <Badge variant="outline" className={`font-body text-[10px] h-5 ${
           isRoomCharge && isPaid ? 'border-blue-400/50 text-blue-400' :
-          isPendingPayment ? 'border-amber-400/50 text-amber-400' :
-          isPaid ? 'border-emerald-400/50 text-emerald-400' : ''
+          isPaid ? 'border-emerald-400/50 text-emerald-400' :
+          'border-amber-400/50 text-amber-400'
         }`}>
-          {isRoomCharge && isPaid ? 'Room Charge' : isPendingPayment ? 'Pending Payment' : isPaid ? 'Paid' : order.status}
+          {isRoomCharge && isPaid ? 'Room Charge' : isPaid ? 'Paid' : 'Pending Payment'}
         </Badge>
-
         <span className="font-display text-sm text-gold tabular-nums">₱{order.total.toLocaleString()}</span>
       </div>
     </div>
@@ -558,13 +438,6 @@ const BillOutPanel = ({
               </button>
             ))}
           </div>
-
-          {/* Walk-in guest: no Charge to Room option */}
-          {!isInStay && (
-            <p className="font-body text-[10px] text-muted-foreground text-center italic">
-              Guest not found in active bookings — room charging not available
-            </p>
-          )}
         </div>
       </div>
 
@@ -576,7 +449,7 @@ const BillOutPanel = ({
           size="lg"
           className="w-full min-h-[56px] font-display text-base tracking-wider gap-2 bg-gold text-primary-foreground hover:bg-gold/90"
         >
-        {busy ? 'Processing…' : (
+          {busy ? 'Processing…' : (
             <>
               <Check className="w-5 h-5" />
               Confirm Payment — ₱{total.toLocaleString()}
@@ -630,14 +503,12 @@ const DailySummary = ({ completed }: { completed: any[] }) => {
       </div>
 
       <div className="flex-1 px-4 py-4 space-y-5">
-        {/* Register revenue (excluding room charges) */}
         <div className="text-center space-y-1">
           <p className="font-body text-xs text-muted-foreground uppercase tracking-wider">Register Revenue Today</p>
           <p className="font-display text-3xl text-gold tabular-nums">₱{summary.registerRevenue.toLocaleString()}</p>
           <p className="font-body text-xs text-muted-foreground">{summary.orderCount - summary.roomChargeCount} settled order{(summary.orderCount - summary.roomChargeCount) !== 1 ? 's' : ''}</p>
         </div>
 
-        {/* Room charges info */}
         {summary.roomChargeCount > 0 && (
           <div className="rounded-lg bg-blue-500/10 border border-blue-500/20 px-4 py-3 space-y-0.5">
             <div className="flex items-center justify-between">
@@ -652,7 +523,6 @@ const DailySummary = ({ completed }: { completed: any[] }) => {
           </div>
         )}
 
-        {/* Cash highlight */}
         {cashEntry && (
           <div className="rounded-xl border-2 border-gold/40 bg-gold/5 p-4 space-y-1">
             <div className="flex items-center justify-between">
@@ -667,7 +537,6 @@ const DailySummary = ({ completed }: { completed: any[] }) => {
           </div>
         )}
 
-        {/* Breakdown by method */}
         {sortedMethods.length > 0 && (
           <div className="space-y-2">
             <p className="font-display text-xs tracking-wider text-muted-foreground">BREAKDOWN BY METHOD</p>
@@ -685,7 +554,6 @@ const DailySummary = ({ completed }: { completed: any[] }) => {
           </div>
         )}
 
-        {/* Cash transactions list */}
         {cashEntry && cashEntry.count > 0 && (
           <Collapsible>
             <CollapsibleTrigger className="w-full flex items-center justify-between bg-secondary/50 border border-border rounded-lg px-4 py-3 hover:bg-secondary transition-colors">
@@ -712,7 +580,7 @@ const DailySummary = ({ completed }: { completed: any[] }) => {
       </div>
 
       <div className="px-4 py-3 border-t border-border text-center">
-        <p className="font-body text-[10px] text-muted-foreground">Tap an order to open bill & payment · Tap completed orders to reprint</p>
+        <p className="font-body text-[10px] text-muted-foreground">Tap an order to settle · Tap completed to reprint</p>
       </div>
     </div>
   );
