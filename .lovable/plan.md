@@ -1,36 +1,37 @@
 
 
-## Fix: Guest Portal Login Fails on Changeover Days
+## Plan: Fix Schedule Delete & Enhance Task/Assignment Scheduling
 
-### Problem
-On changeover days (when one guest departs and another arrives for the same room), the login query returns only the **newest** booking (`ORDER BY check_in DESC LIMIT 1`). This means the departing guest can never log in because the system only sees the arriving guest's booking.
+### Issues Found
 
-Guest "A Fick" in COT(1) has check_out today (Mar 19), but "Gerard Benedicto" has check_in today (Mar 19). The query picks Benedicto, so Fick's last name never matches.
+1. **Delete button bug**: The trash icon on shift blocks triggers `setDeleteId(s.id)`, but the parent div's `onClick={() => openEdit(s)}` fires simultaneously despite `stopPropagation`. On mobile, the tiny button (3x3 icon) is nearly impossible to tap. The AlertDialog `onOpenChange={() => setDeleteId(null)}` also races with the confirm action.
 
-### Solution
-Change the login logic to check **all active bookings** for the room instead of just one.
+2. **Missing scheduling features**: The schedule only manages time shifts. There's no way to assign tasks like housecleaning, reception duty, or track completion from within the schedule view.
 
-### File: `src/pages/GuestPortal.tsx` — `handleLogin` function
+### Changes
 
-**Current logic (broken):**
-- Query ONE booking for the room where `check_in <= today AND check_out >= today`, ordered by `check_in DESC`
-- Compare entered last name against that single booking
+**1. Fix Delete Button** (`WeeklyScheduleManager.tsx`)
+- Make `confirmDelete` capture `deleteId` before the dialog closes by saving it in a ref or local variable
+- Increase touch target size for edit/delete buttons on shift blocks
+- Prevent edit modal from opening when clicking edit/delete icons (the `stopPropagation` exists but the parent click handler on the entire timeline area also fires)
 
-**New logic (fixed):**
-- Remove `limit(1)` and `.maybeSingle()` — fetch ALL active bookings for the room today
-- Loop through results and find the booking whose guest last name matches the entered password
-- If a match is found, log in with that booking
-- If no match, show error
+**2. Add Task/Assignment Creation from Schedule** (`WeeklyScheduleManager.tsx`)
+- Add an "Assign Task" button alongside "Add Shift" 
+- New modal to create a task assignment: select employee, pick type (Housecleaning, Reception, Custom), set date/time, add notes
+- For housecleaning: select a room/unit to clean, auto-creates a `housekeeping_orders` entry assigned to the selected employee
+- For other tasks: creates an `employee_tasks` entry with due date and description
+- Tasks appear as colored pills on the timeline (already partially implemented)
 
-This naturally handles changeover days: both Fick and Benedicto can log in because the system checks all overlapping bookings, not just the newest one.
+**3. Show Completion Info on Task Detail** (`WeeklyScheduleManager.tsx`)
+- In the task detail dialog, show who completed the task and when (`completed_at`)
+- For housekeeping pills, show completion status (`cleaning_completed_at`, `completed_by_name`)
+- Make housekeeping pills clickable to show full details (room, status, who inspected/cleaned)
 
-### Technical Details
-- Change `.limit(1).maybeSingle()` to just fetching all results (remove both)
-- Replace the single-booking name check with a `.find()` loop over all returned bookings
-- The rest of the login flow (session creation, login tracking) stays the same, just uses the matched booking
+**4. Enhance Task Detail Dialog** (`WeeklyScheduleManager.tsx`)
+- Add edit capability: change title, description, due date, reassign to different employee
+- Add delete capability for tasks
+- Show completion audit trail
 
-### Impact
-- Zero database changes required
-- Only ~15 lines changed in one file
-- Fixes all changeover-day login failures going forward
+### Files to Edit
+- `src/components/admin/WeeklyScheduleManager.tsx` — all changes in this single file
 

@@ -67,25 +67,28 @@ const GuestPortal = () => {
       if (!opsUnit) { toast.error('Room not found'); setLoading(false); return; }
 
       const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
-      const { data: booking } = await supabase
+      const { data: bookings } = await supabase
         .from('resort_ops_bookings')
-        .select('id, check_in, check_out, resort_ops_guests(full_name)')
+        .select('id, check_in, check_out, guest_login_count, resort_ops_guests(full_name)')
         .eq('unit_id', opsUnit.id)
         .lte('check_in', today)
-        .gte('check_out', today)
-        .order('check_in', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .gte('check_out', today);
 
-      if (!booking) { toast.error('No active booking found for this room'); setLoading(false); return; }
+      if (!bookings || bookings.length === 0) { toast.error('No active booking found for this room'); setLoading(false); return; }
 
-      const guestName = (booking as any).resort_ops_guests?.full_name || '';
-      const lastNameFromBooking = guestName.split(' ').pop()?.toLowerCase() || '';
-      if (lastNameFromBooking !== lastName.trim().toLowerCase()) {
+      const enteredLast = lastName.trim().toLowerCase();
+      const booking = bookings.find((b: any) => {
+        const fullName = b.resort_ops_guests?.full_name || '';
+        const bLast = fullName.split(' ').pop()?.toLowerCase() || '';
+        return bLast === enteredLast;
+      });
+
+      if (!booking) {
         toast.error('Last name does not match our records');
         setLoading(false);
         return;
       }
+      const guestName = (booking as any).resort_ops_guests?.full_name || '';
 
       await (supabase.from('resort_ops_bookings') as any).update({
         last_guest_login: new Date().toISOString(),
