@@ -95,7 +95,7 @@ const StaffOrdersView = () => {
   const [activeStatus, setActiveStatus] = useState('New');
 
   const statusCounts = useMemo(() => {
-    const counts: Record<string, number> = { New: 0, Preparing: 0, Served: 0, Paid: 0 };
+    const counts: Record<string, number> = { New: 0, Preparing: 0, Ready: 0, Served: 0, Paid: 0 };
     orders.forEach(o => { if (counts[o.status] !== undefined) counts[o.status]++; });
     return counts;
   }, [orders]);
