@@ -292,9 +292,11 @@ const OrderRow = ({ order, selected, onSelect }: {
         <Badge variant="outline" className={`font-body text-[10px] h-5 ${
           isRoomCharge && isPaid ? 'border-blue-400/50 text-blue-400' :
           isPaid ? 'border-emerald-400/50 text-emerald-400' :
+          isReady ? 'border-cyan-400/50 text-cyan-400' :
           'border-amber-400/50 text-amber-400'
         }`}>
-          {isRoomCharge && isPaid ? 'Room Charge' : isPaid ? 'Paid' : 'Pending Payment'}
+          {isRoomCharge && isPaid ? 'Room Charge' : isPaid ? 'Paid' : isReady ? 'Ready — Awaiting Serve' : 'Pending Payment'}
+        </Badge>
         </Badge>
         <span className="font-display text-sm text-gold tabular-nums">₱{order.total.toLocaleString()}</span>
       </div>
