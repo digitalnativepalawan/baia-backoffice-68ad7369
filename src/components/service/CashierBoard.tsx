@@ -48,7 +48,7 @@ const CashierBoard = () => {
       const { data } = await supabase
         .from('orders')
         .select('*')
-        .eq('status', 'Served')
+        .in('status', ['Ready', 'Served'])
         .gte('created_at', start.toISOString())
         .order('created_at', { ascending: true })
         .limit(300);
