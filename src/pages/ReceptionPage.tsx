@@ -1024,7 +1024,6 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
             const workflow = getUnitWorkflow(unit);
             const guest = (booking as any)?.resort_ops_guests;
             const nights = booking ? Math.max(1, Math.ceil((new Date(booking.check_out).getTime() - new Date(booking.check_in).getTime()) / 86400000)) : 0;
-            const roomOrders: any[] = [];
             const isDepartingToday = Boolean(workflow.pendingDeparture);
             const incomingArrival = workflow.pendingArrival;
 
@@ -1061,11 +1060,6 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
                       <Badge className="font-body text-[10px] bg-amber-500/20 text-amber-400 border-amber-500/40 flex items-center gap-0.5">
                         <AlertTriangle className="w-2.5 h-2.5" /> Dispute
                       </Badge>
-                    )}
-                    {roomOrders.length > 0 && (
-                      <span className="font-body text-[10px] text-muted-foreground flex items-center gap-1">
-                        <UtensilsCrossed className="w-3 h-3" /> {roomOrders.length} order{roomOrders.length !== 1 ? 's' : ''}
-                      </span>
                     )}
                   </div>
                 </div>
