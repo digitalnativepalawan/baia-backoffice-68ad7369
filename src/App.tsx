@@ -24,6 +24,7 @@ import ServiceKitchenPage from "./pages/ServiceKitchenPage";
 import ServiceBarPage from "./pages/ServiceBarPage";
 import ServiceReceptionPage from "./pages/ServiceReceptionPage";
 import ServiceCashierPage from "./pages/ServiceCashierPage";
+import ServiceWaitstaffPage from "./pages/ServiceWaitstaffPage";
 
 const queryClient = new QueryClient();
 
