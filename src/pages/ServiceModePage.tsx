@@ -53,6 +53,17 @@ const departments = [
     statusField: null,
     permKeys: ['cashier'],
   },
+  {
+    key: 'waitstaff',
+    label: 'Waitstaff',
+    subtitle: 'Order tracking & delivery',
+    icon: <ConciergeBell className="w-7 h-7" />,
+    gradient: 'from-[hsl(150,60%,45%)] to-[hsl(160,55%,35%)]',
+    glow: 'shadow-[0_0_30px_-5px_hsl(150,60%,45%,0.2)]',
+    route: '/service/waitstaff',
+    statusField: null,
+    permKeys: ['waitstaff'],
+  },
 ];
 
 const ServiceModePage = () => {

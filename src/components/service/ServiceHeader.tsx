@@ -15,7 +15,7 @@ const DEPT_CONFIG: Record<string, { label: string; icon: React.ReactNode; gradie
 };
 
 interface ServiceHeaderProps {
-  department: 'kitchen' | 'bar' | 'reception' | 'cashier';
+  department: 'kitchen' | 'bar' | 'reception' | 'cashier' | 'waitstaff';
 }
 
 const ServiceHeader = ({ department }: ServiceHeaderProps) => {
