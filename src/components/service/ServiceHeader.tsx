@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Flame, GlassWater, BellRing, Banknote, ArrowLeft, Plus } from 'lucide-react';
+import { LogOut, Flame, GlassWater, BellRing, Banknote, ArrowLeft, Plus, Compass, ConciergeBell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useMemo } from 'react';
 import { getStaffSession, clearStaffSession } from '@/lib/session';
