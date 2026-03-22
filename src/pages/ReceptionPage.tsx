@@ -1499,27 +1499,41 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
                     {canDoEdit && ['New', 'Preparing', 'Ready'].includes(order.status) && (
                       <div className="flex flex-wrap gap-1.5 pt-1">
                         <Button size="sm" onClick={async () => {
-                          await supabase.from('orders').update({ status: 'Served', payment_type: 'Charge to Room' }).eq('id', order.id);
-                          if (order.room_id) {
-                            await (supabase.from('room_transactions') as any).insert({
-                              unit_id: order.room_id,
-                              unit_name: order.location_detail || '',
-                              guest_name: order.guest_name,
-                              booking_id: null,
-                              transaction_type: 'charge',
-                              order_id: order.id,
-                              amount: subtotal,
-                              tax_amount: 0,
-                              service_charge_amount: sc,
-                              total_amount: grandTotal,
-                              payment_method: 'Charge to Room',
-                              staff_name: staffName,
-                              notes: `F&B order charged to room`,
-                            });
-                          }
+                          // Resolve booking from location_detail
+                          const locName = (order.location_detail || '').trim().toLowerCase();
+                          const matchedResortUnit = resortUnits.find((ru: any) => ru.name.trim().toLowerCase() === locName);
+                          const activeBooking = matchedResortUnit
+                            ? bookings.find((b: any) => b.unit_id === matchedResortUnit.id && !b.checked_out_at && b.check_in <= today && b.check_out >= today)
+                            : null;
+                          const resolvedUnitId = matchedResortUnit?.id || order.room_id || null;
+                          const resolvedBookingId = activeBooking?.id || null;
+
+                          await supabase.from('orders').update({
+                            status: 'Served',
+                            payment_type: 'Charge to Room',
+                            ...(resolvedUnitId && !order.room_id ? { room_id: resolvedUnitId } : {}),
+                          }).eq('id', order.id);
+
+                          // Always create room_transaction
+                          await (supabase.from('room_transactions') as any).insert({
+                            unit_id: resolvedUnitId,
+                            unit_name: order.location_detail || '',
+                            guest_name: order.guest_name,
+                            booking_id: resolvedBookingId,
+                            transaction_type: 'charge',
+                            order_id: order.id,
+                            amount: subtotal,
+                            tax_amount: 0,
+                            service_charge_amount: sc,
+                            total_amount: grandTotal,
+                            payment_method: 'Charge to Room',
+                            staff_name: staffName,
+                            notes: `F&B order charged to room`,
+                          });
+
                           logAudit('updated', 'orders', order.id, `Served & charged to room from reception`);
                           qc.invalidateQueries({ queryKey: ['reception-recent-orders'] });
-                          qc.invalidateQueries({ queryKey: ['room-transactions', order.room_id] });
+                          qc.invalidateQueries({ queryKey: ['room-transactions', resolvedUnitId] });
                           toast.success('Served · Charged to Room');
                         }} className="font-display text-[10px] tracking-wider min-h-[30px] bg-emerald-600 hover:bg-emerald-700 text-white">
                           ✅ Served · Room Charge
@@ -1531,6 +1545,23 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
                           toast.success('Served · Sent to Cashier for payment');
                         }} className="font-display text-[10px] tracking-wider min-h-[30px]">
                           💳 Served · Pay Now
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Collect Now for room-charged orders */}
+                    {canDoEdit && isRoomCharge && order.status === 'Served' && (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        <Button size="sm" variant="outline" onClick={async () => {
+                          await supabase.from('orders').update({ status: 'Paid', payment_type: 'Cash', closed_at: new Date().toISOString() }).eq('id', order.id);
+                          // Remove the room_transaction since it's being paid directly
+                          await supabase.from('room_transactions').delete().eq('order_id', order.id);
+                          logAudit('updated', 'orders', order.id, `Collected room charge payment from reception`);
+                          qc.invalidateQueries({ queryKey: ['reception-recent-orders'] });
+                          qc.invalidateQueries({ queryKey: ['room-transactions'] });
+                          toast.success('Payment collected — removed from room folio');
+                        }} className="font-display text-[10px] tracking-wider min-h-[30px] border-green-500/40 text-green-400 hover:bg-green-500/10">
+                          💵 Collect Now
                         </Button>
                       </div>
                     )}

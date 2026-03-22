@@ -1195,6 +1195,7 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
         event: '*', schema: 'public', table: 'orders',
       }, () => {
         qc.invalidateQueries({ queryKey: ['guest-bill-unpaid-orders', session.room_id, session.room_name] });
+        qc.invalidateQueries({ queryKey: ['guest-bill-room-charged-orders', session.room_id, session.room_name] });
       })
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'guest_tours',
