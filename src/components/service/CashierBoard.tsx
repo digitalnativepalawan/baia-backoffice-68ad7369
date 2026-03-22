@@ -428,19 +428,19 @@ const BillOutPanel = ({
             <>
               {!chargeToRoom ? (
                 <button
-                  onClick={() => { onChargeToRoom(); onSelectBooking(inStayBooking.id); }}
+                  onClick={() => { onChargeToRoom(); if (inStayBooking) onSelectBooking(inStayBooking.id); }}
                   className="w-full min-h-[56px] rounded-xl border-2 border-blue-400 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 font-display text-sm tracking-wider transition-all flex items-center justify-center gap-2"
                 >
                   <BedDouble className="w-5 h-5" />
-                  Charge to Room — {inStayBooking.resort_ops_units?.name || 'Room'}
+                  Charge to Room — {inStayBooking?.resort_ops_units?.name || order?.location_detail || 'Room'}
                 </button>
               ) : (
                 <div className="rounded-xl border-2 border-gold bg-gold/10 p-3 space-y-1">
                   <div className="flex items-center gap-2">
                     <BedDouble className="w-4 h-4 text-gold" />
-                    <span className="font-display text-sm tracking-wider text-gold">Charging to {inStayBooking.resort_ops_units?.name || 'Room'}</span>
+                    <span className="font-display text-sm tracking-wider text-gold">Charging to {inStayBooking?.resort_ops_units?.name || order?.location_detail || 'Room'}</span>
                   </div>
-                  <p className="text-xs text-muted-foreground">{inStayBooking.resort_ops_guests?.full_name || 'Guest'}</p>
+                  <p className="text-xs text-muted-foreground">{inStayBooking?.resort_ops_guests?.full_name || order?.guest_name || 'Guest'}</p>
                   <button
                     onClick={() => { onSelectPayment(''); }}
                     className="text-xs text-muted-foreground underline mt-1"
