@@ -1398,6 +1398,7 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
             const subtotal = Number(order.total || 0);
             const sc = Number(order.service_charge || 0);
             const grandTotal = subtotal + sc;
+            const isRoomCharge = order.payment_type === 'Charge to Room';
             const statusMap: Record<string, { label: string; color: string }> = {
               'New': { label: '🔵 New', color: 'bg-blue-500/20 text-blue-400 border-blue-500/40' },
               'Preparing': { label: '🟡 Preparing', color: 'bg-amber-500/20 text-amber-400 border-amber-500/40' },
@@ -1406,7 +1407,9 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
               'Paid': { label: '💰 Paid', color: 'bg-green-500/20 text-green-400 border-green-500/40' },
               'Cancelled': { label: '❌ Cancelled', color: 'bg-destructive/20 text-destructive border-destructive/40' },
             };
-            const st = statusMap[order.status] || { label: order.status, color: 'bg-muted text-muted-foreground' };
+            const st = isRoomCharge && order.status !== 'Paid'
+              ? { label: '🏠 Room Charge', color: 'bg-blue-500/20 text-blue-400 border-blue-500/40' }
+              : statusMap[order.status] || { label: order.status, color: 'bg-muted text-muted-foreground' };
 
             const toggleExpand = () => {
               setExpandedOrderIds(prev => {
