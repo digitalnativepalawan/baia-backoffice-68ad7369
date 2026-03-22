@@ -109,33 +109,39 @@ const CashierBoard = () => {
       const grandTotal = subtotal + sc;
 
       const updateData: any = {
-        status: 'Paid',
+        status: chargeToRoom ? 'Served' : 'Paid',
         payment_type: paymentType,
         closed_at: new Date().toISOString(),
       };
 
-      if (chargeToRoom && selectedBooking) {
-        const booking = activeBookings.find(b => b.id === selectedBooking);
-        if (booking?.unit_id) {
-          updateData.room_id = booking.unit_id;
+      if (chargeToRoom) {
+        // Resolve booking: use explicitly selected booking, or fall back to auto-detected inStayBooking
+        const bookingId = selectedBooking || selectedOrderInStay?.id || null;
+        const booking = bookingId ? activeBookings.find(b => b.id === bookingId) : null;
+        const unitId = booking?.unit_id || selectedOrderInStay?.unit_id || null;
+        const unitName = booking?.resort_ops_units?.name || selectedOrderInStay?.resort_ops_units?.name || selectedOrder.location_detail || '';
+        const guestFullName = booking?.resort_ops_guests?.full_name || selectedOrderInStay?.resort_ops_guests?.full_name || selectedOrder.guest_name || '';
 
-          // Insert room_transaction for folio
-          await (supabase.from('room_transactions' as any) as any).insert({
-            unit_id: booking.unit_id,
-            unit_name: booking.resort_ops_units?.name || '',
-            guest_name: booking.resort_ops_guests?.full_name || selectedOrder.guest_name || '',
-            booking_id: booking.id,
-            transaction_type: 'room_charge',
-            order_id: selectedOrder.id,
-            amount: subtotal,
-            tax_amount: 0,
-            service_charge_amount: sc,
-            total_amount: grandTotal,
-            payment_method: 'Charge to Room',
-            staff_name: staffName,
-            notes: `Cashier settlement — ${selectedOrder.location_detail || selectedOrder.order_type}`,
-          });
+        if (unitId) {
+          updateData.room_id = unitId;
         }
+
+        // Always create room_transaction for room charges
+        await (supabase.from('room_transactions' as any) as any).insert({
+          unit_id: unitId,
+          unit_name: unitName,
+          guest_name: guestFullName,
+          booking_id: bookingId,
+          transaction_type: 'room_charge',
+          order_id: selectedOrder.id,
+          amount: subtotal,
+          tax_amount: 0,
+          service_charge_amount: sc,
+          total_amount: grandTotal,
+          payment_method: 'Charge to Room',
+          staff_name: staffName,
+          notes: `Cashier settlement — ${selectedOrder.location_detail || selectedOrder.order_type}`,
+        });
       }
 
       await supabase.from('orders').update(updateData).eq('id', selectedOrder.id);
@@ -148,7 +154,7 @@ const CashierBoard = () => {
 
       qc.invalidateQueries({ queryKey: ['cashier-orders'] });
       qc.invalidateQueries({ queryKey: ['room-transactions'] });
-      toast.success('Payment confirmed');
+      toast.success(chargeToRoom ? 'Charged to room' : 'Payment confirmed');
     } finally {
       setBusy(false);
     }
@@ -366,7 +372,7 @@ const BillOutPanel = ({
   const total = subtotal + sc;
 
   const isInStay = !!inStayBooking || /^(COT|SUI)/i.test(order?.location_detail || '') || !!order?.room_id;
-  const canConfirm = chargeToRoom ? !!selectedBooking : !!selectedPayment;
+  const canConfirm = chargeToRoom ? !!(selectedBooking || inStayBooking) : !!selectedPayment;
 
   return (
     <div className="flex flex-col h-full">

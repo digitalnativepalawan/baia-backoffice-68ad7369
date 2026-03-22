@@ -121,8 +121,7 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
   const [hkPickerOpen, setHkPickerOpen] = useState(false);
   const [hkTargetUnit, setHkTargetUnit] = useState<any>(null);
 
-  // Expanded order IDs for Recent Room Orders
-  const [expandedOrderIds, setExpandedOrderIds] = useState<Set<string>>(new Set());
+   // (removed expandedOrderIds — orders section removed)
 
   // Send to clean loading
   const [sendingClean, setSendingClean] = useState<string | null>(null);
@@ -224,17 +223,7 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
     }
   }, [allHkOrders, activeHkOrder]);
 
-  // Recent orders for all rooms
-  const { data: recentOrders = [] } = useQuery({
-    queryKey: ['reception-recent-orders'],
-    queryFn: async () => {
-      const { data } = await supabase.from('orders').select('*')
-        .eq('order_type', 'Room')
-        .order('created_at', { ascending: false })
-        .limit(20);
-      return data || [];
-    },
-  });
+   // (Recent room orders query removed — F&B orders handled by Cashier only)
 
   // Today's tours (guest_tours + tour_bookings)
   const { data: todayTours = [] } = useQuery({
@@ -1035,7 +1024,7 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
             const workflow = getUnitWorkflow(unit);
             const guest = (booking as any)?.resort_ops_guests;
             const nights = booking ? Math.max(1, Math.ceil((new Date(booking.check_out).getTime() - new Date(booking.check_in).getTime()) / 86400000)) : 0;
-            const roomOrders = recentOrders.filter((o: any) => o.location_detail === unit.name);
+            const roomOrders: any[] = [];
             const isDepartingToday = Boolean(workflow.pendingDeparture);
             const incomingArrival = workflow.pendingArrival;
 
@@ -1386,212 +1375,7 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
         </div>
       )}
 
-      {/* ── Recent Room Orders ── */}
-      {recentOrders.length > 0 && (
-        <div className="mb-6 space-y-2">
-          <h2 className="font-display text-xs tracking-wider text-muted-foreground uppercase">
-            🍽️ Recent Room Orders ({recentOrders.length})
-          </h2>
-          {recentOrders.map((order: any) => {
-            const isExpanded = expandedOrderIds.has(order.id);
-            const items: any[] = Array.isArray(order.items) ? order.items : [];
-            const subtotal = Number(order.total || 0);
-            const sc = Number(order.service_charge || 0);
-            const grandTotal = subtotal + sc;
-            const isRoomCharge = order.payment_type === 'Charge to Room';
-            const statusMap: Record<string, { label: string; color: string }> = {
-              'New': { label: '🔵 New', color: 'bg-blue-500/20 text-blue-400 border-blue-500/40' },
-              'Preparing': { label: '🟡 Preparing', color: 'bg-amber-500/20 text-amber-400 border-amber-500/40' },
-              'Ready': { label: '🟢 Ready', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' },
-              'Served': { label: '✅ Served', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' },
-              'Paid': { label: '💰 Paid', color: 'bg-green-500/20 text-green-400 border-green-500/40' },
-              'Cancelled': { label: '❌ Cancelled', color: 'bg-destructive/20 text-destructive border-destructive/40' },
-            };
-            const st = isRoomCharge && order.status !== 'Paid'
-              ? { label: '🏠 Room Charge', color: 'bg-blue-500/20 text-blue-400 border-blue-500/40' }
-              : statusMap[order.status] || { label: order.status, color: 'bg-muted text-muted-foreground' };
-
-            const toggleExpand = () => {
-              setExpandedOrderIds(prev => {
-                const next = new Set(prev);
-                if (next.has(order.id)) next.delete(order.id); else next.add(order.id);
-                return next;
-              });
-            };
-
-            const handleMarkPaid = async () => {
-              await supabase.from('orders').update({ status: 'Paid', payment_type: 'Cash' }).eq('id', order.id);
-              logAudit('updated', 'orders', order.id, `Marked order as Paid from reception`);
-              qc.invalidateQueries({ queryKey: ['reception-recent-orders'] });
-              toast.success('Order marked as Paid');
-            };
-
-            const handleComp = async () => {
-              await supabase.from('orders').update({ total: 0, service_charge: 0, status: 'Paid', payment_type: 'Complimentary' }).eq('id', order.id);
-              logAudit('updated', 'orders', order.id, `Comped order (set to ₱0) from reception`);
-              qc.invalidateQueries({ queryKey: ['reception-recent-orders'] });
-              toast.success('Order comped');
-            };
-
-            const handleDelete = async () => {
-              if (!confirm('Delete this order? This cannot be undone.')) return;
-              await supabase.from('room_transactions').delete().eq('order_id', order.id);
-              await supabase.from('inventory_logs').delete().eq('order_id', order.id);
-              const { error } = await supabase.from('orders').delete().eq('id', order.id);
-              if (error) { toast.error(`Delete failed: ${error.message}`); return; }
-              logAudit('deleted', 'orders', order.id, `Deleted order from reception`);
-              qc.invalidateQueries({ queryKey: ['reception-recent-orders'] });
-              toast.success('Order deleted');
-            };
-
-            return (
-              <div key={order.id} className="border border-border rounded-lg bg-card overflow-hidden">
-                <button onClick={toggleExpand} className="w-full p-3 text-left">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-display text-sm text-foreground tracking-wider">{order.location_detail}</p>
-                      <p className="font-body text-xs text-muted-foreground">{order.guest_name} · ₱{grandTotal.toLocaleString()}</p>
-                      <p className="font-body text-[10px] text-muted-foreground">{format(new Date(order.created_at), 'MMM d, h:mm a')}</p>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Badge className={`font-body text-xs ${st.color}`}>{st.label}</Badge>
-                      {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
-                    </div>
-                  </div>
-                </button>
-
-                {isExpanded && (
-                  <div className="border-t border-border px-3 pb-3 space-y-2">
-                    {/* Itemized contents */}
-                    {items.length > 0 && (
-                      <div className="pt-2 space-y-0.5">
-                        {items.map((item: any, idx: number) => (
-                          <div key={idx} className="flex justify-between font-body text-xs">
-                            <span className="text-foreground">{item.qty || 1}× {item.name}</span>
-                            <span className="text-muted-foreground">₱{(Number(item.price || 0) * Number(item.qty || 1)).toLocaleString()}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* SC breakdown */}
-                    <div className="border-t border-border pt-1.5 space-y-0.5">
-                      <div className="flex justify-between font-body text-xs text-muted-foreground">
-                        <span>Subtotal</span>
-                        <span>₱{subtotal.toLocaleString()}</span>
-                      </div>
-                      {sc > 0 && (
-                        <div className="flex justify-between font-body text-xs text-muted-foreground">
-                          <span>SC 10%</span>
-                          <span>₱{sc.toLocaleString()}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between font-display text-xs tracking-wider text-foreground">
-                        <span>Total</span>
-                        <span>₱{grandTotal.toLocaleString()}</span>
-                      </div>
-                    </div>
-
-                    {/* Staff info */}
-                    <p className="font-body text-[10px] text-muted-foreground">Staff: {order.staff_name || '—'} · Payment: {order.payment_type || 'Unpaid'}</p>
-
-                    {/* Serve & settle actions for Ready / New / Preparing orders */}
-                    {canDoEdit && ['New', 'Preparing', 'Ready'].includes(order.status) && (
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        <Button size="sm" onClick={async () => {
-                          // Resolve booking from location_detail
-                          const locName = (order.location_detail || '').trim().toLowerCase();
-                          const matchedResortUnit = resortUnits.find((ru: any) => ru.name.trim().toLowerCase() === locName);
-                          const activeBooking = matchedResortUnit
-                            ? bookings.find((b: any) => b.unit_id === matchedResortUnit.id && !b.checked_out_at && b.check_in <= today && b.check_out >= today)
-                            : null;
-                          const resolvedUnitId = matchedResortUnit?.id || order.room_id || null;
-                          const resolvedBookingId = activeBooking?.id || null;
-
-                          await supabase.from('orders').update({
-                            status: 'Served',
-                            payment_type: 'Charge to Room',
-                            ...(resolvedUnitId && !order.room_id ? { room_id: resolvedUnitId } : {}),
-                          }).eq('id', order.id);
-
-                          // Always create room_transaction
-                          await (supabase.from('room_transactions') as any).insert({
-                            unit_id: resolvedUnitId,
-                            unit_name: order.location_detail || '',
-                            guest_name: order.guest_name,
-                            booking_id: resolvedBookingId,
-                            transaction_type: 'charge',
-                            order_id: order.id,
-                            amount: subtotal,
-                            tax_amount: 0,
-                            service_charge_amount: sc,
-                            total_amount: grandTotal,
-                            payment_method: 'Charge to Room',
-                            staff_name: staffName,
-                            notes: `F&B order charged to room`,
-                          });
-
-                          logAudit('updated', 'orders', order.id, `Served & charged to room from reception`);
-                          qc.invalidateQueries({ queryKey: ['reception-recent-orders'] });
-                          qc.invalidateQueries({ queryKey: ['room-transactions', resolvedUnitId] });
-                          toast.success('Served · Charged to Room');
-                        }} className="font-display text-[10px] tracking-wider min-h-[30px] bg-emerald-600 hover:bg-emerald-700 text-white">
-                          ✅ Served · Room Charge
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={async () => {
-                          await supabase.from('orders').update({ status: 'Served' }).eq('id', order.id);
-                          logAudit('updated', 'orders', order.id, `Marked Served & sent to cashier from reception`);
-                          qc.invalidateQueries({ queryKey: ['reception-recent-orders'] });
-                          toast.success('Served · Sent to Cashier for payment');
-                        }} className="font-display text-[10px] tracking-wider min-h-[30px]">
-                          💳 Served · Pay Now
-                        </Button>
-                      </div>
-                    )}
-
-                    {/* Collect Now for room-charged orders */}
-                    {canDoEdit && isRoomCharge && order.status === 'Served' && (
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        <Button size="sm" variant="outline" onClick={async () => {
-                          await supabase.from('orders').update({ status: 'Paid', payment_type: 'Cash', closed_at: new Date().toISOString() }).eq('id', order.id);
-                          // Remove the room_transaction since it's being paid directly
-                          await supabase.from('room_transactions').delete().eq('order_id', order.id);
-                          logAudit('updated', 'orders', order.id, `Collected room charge payment from reception`);
-                          qc.invalidateQueries({ queryKey: ['reception-recent-orders'] });
-                          qc.invalidateQueries({ queryKey: ['room-transactions'] });
-                          toast.success('Payment collected — removed from room folio');
-                        }} className="font-display text-[10px] tracking-wider min-h-[30px] border-green-500/40 text-green-400 hover:bg-green-500/10">
-                          💵 Collect Now
-                        </Button>
-                      </div>
-                    )}
-
-                    {/* Corrective actions */}
-                    {canDoEdit && order.status !== 'Paid' && order.status !== 'Cancelled' && (
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        <Button size="sm" variant="outline" onClick={handleMarkPaid}
-                          className="font-display text-[10px] tracking-wider min-h-[30px]">
-                          <DollarSign className="w-3 h-3 mr-0.5" /> Mark Paid
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={handleComp}
-                          className="font-display text-[10px] tracking-wider min-h-[30px] border-amber-500/40 text-amber-400 hover:bg-amber-500/10">
-                          🎁 Comp
-                        </Button>
-                        <Button size="sm" variant="destructive" onClick={handleDelete}
-                          className="font-display text-[10px] tracking-wider min-h-[30px]">
-                          🗑️ Delete
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* ── Closed Checkouts (admin can reopen) ── */}
+      {/* (Recent Room Orders section removed — F&B orders handled by Cashier) */}
       <ClosedCheckoutsPanel isAdmin={isAdmin} />
 
       {/* ── 🧹 Needs Cleaning — Live Housekeeping Progress ── */}
