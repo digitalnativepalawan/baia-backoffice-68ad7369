@@ -345,10 +345,10 @@ const HousekeepingInspection = ({ order, onClose, mode }: HousekeepingInspection
             className="w-full font-display tracking-wider min-h-[52px] bg-emerald-600 hover:bg-emerald-700 text-lg"
           >
             <CheckCircle className="w-5 h-5 mr-2" />
-            {inspecting ? 'Submitting...' : '✅ Clear for Checkout'}
+            {inspecting ? 'Submitting...' : '✅ Checklist Done & Good'}
           </Button>
           <p className="font-body text-xs text-muted-foreground text-center">
-            This will notify reception that the room is cleared for final checkout.
+            This will notify Reception that the room is cleared for checkout.
           </p>
         </div>
       </div>

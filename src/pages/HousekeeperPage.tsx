@@ -7,7 +7,6 @@ import { ArrowLeft, CheckCircle, Clock, ClipboardCheck, BarChart3, UserCheck } f
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { format, startOfMonth } from 'date-fns';
-import PasswordConfirmModal from '@/components/housekeeping/PasswordConfirmModal';
 import HousekeepingInspection from '@/components/admin/HousekeepingInspection';
 import { getStaffSession } from '@/lib/session';
 import { hasAccess, canEdit } from '@/lib/permissions';
@@ -20,6 +19,7 @@ const HousekeeperPage = ({ embedded = false }: { embedded?: boolean }) => {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const [acceptingOrderId, setAcceptingOrderId] = useState<string | null>(null);
   const [activeOrder, setActiveOrder] = useState<any>(null);
+  const [acceptingDirectId, setAcceptingDirectId] = useState<string | null>(null);
 
   // Unlock AudioContext on first interaction (mobile)
   useEffect(() => {
@@ -96,7 +96,12 @@ const HousekeeperPage = ({ embedded = false }: { embedded?: boolean }) => {
 
   // Separate: assigned to me vs unassigned pending
   const allActive = Array.from(latestByUnit.values());
-  const pendingOrders = allActive.filter((o: any) => !o.accepted_by && (o.status === 'pre_inspection' || o.status === 'pending_inspection'));
+  // Pre-inspection tasks visible to ALL housekeepers (broadcast accept without PIN)
+  const pendingPreInspection = allActive.filter((o: any) => !o.accepted_by && o.status === 'pre_inspection');
+  // Other pending tasks (cleaning assignments) — managers only
+  const pendingOther = allActive.filter((o: any) => !o.accepted_by && o.status === 'pending_inspection');
+  const pendingOrders = isManager ? [...pendingPreInspection, ...pendingOther] : pendingPreInspection;
+  // In-progress: my accepted pre-inspections + my cleaning tasks (cleaning only appears after checkout)
   const myInProgress = allActive.filter((o: any) => o.accepted_by === empId && (o.status === 'cleaning' || o.status === 'pending_inspection'));
 
   // Sort: urgent first, then assigned-to-me first
@@ -131,36 +136,36 @@ const HousekeeperPage = ({ embedded = false }: { embedded?: boolean }) => {
     ? Math.round(myCompletedMonth.reduce((sum: number, o: any) => sum + (o.time_to_complete_minutes || 0), 0) / myCompletedMonth.length)
     : 0;
 
-  const handleAccept = async (employee: { id: string; name: string; display_name: string }) => {
-    if (!acceptingOrderId) return;
+  // Direct accept (no PIN) for pre_inspection tasks
+  const handleDirectAccept = async (orderId: string) => {
+    const myId = localStorage.getItem('emp_id');
+    const myName = localStorage.getItem('emp_name') || 'Housekeeper';
+    const myDisplay = localStorage.getItem('emp_display_name') || myName;
+    if (!myId) {
+      toast.error('Please log in first');
+      return;
+    }
     try {
-      // Race condition guard: re-check if already accepted
       const { data: current } = await from('housekeeping_orders')
         .select('accepted_by, accepted_by_name')
-        .eq('id', acceptingOrderId)
+        .eq('id', orderId)
         .single() as any;
-
       if (current?.accepted_by) {
         toast.error(`Already assigned to ${current.accepted_by_name || 'someone else'}`);
         qc.invalidateQueries({ queryKey: ['housekeeping-orders-all'] });
-        setAcceptingOrderId(null);
         return;
       }
-
       await from('housekeeping_orders').update({
-        accepted_by: employee.id,
-        accepted_by_name: employee.display_name || employee.name,
+        accepted_by: myId,
+        accepted_by_name: myDisplay,
         accepted_at: new Date().toISOString(),
         status: 'pending_inspection',
-      } as any).eq('id', acceptingOrderId);
-      localStorage.setItem('emp_id', employee.id);
-      localStorage.setItem('emp_name', employee.name);
+      } as any).eq('id', orderId);
       qc.invalidateQueries({ queryKey: ['housekeeping-orders-all'] });
-      toast.success(`Accepted — ${employee.display_name || employee.name}`);
+      toast.success(`Accepted — ${myDisplay}`);
     } catch (err: any) {
       toast.error(err.message || 'Failed to accept');
     }
-    setAcceptingOrderId(null);
   };
 
   const priorityColor = (p: string) => {
@@ -197,8 +202,7 @@ const HousekeeperPage = ({ embedded = false }: { embedded?: boolean }) => {
         </div>
       )}
 
-      {/* New Assignments — only visible to managers */}
-      {isManager && (
+      {/* Assignments — pre-inspection visible to all, others to managers */}
       <section className="mb-6">
         <h2 className="font-display text-sm tracking-wider text-muted-foreground uppercase mb-3 flex items-center gap-2">
           <ClipboardCheck className="w-4 h-4" /> Assignments ({pendingOrders.length})
@@ -236,13 +240,19 @@ const HousekeeperPage = ({ embedded = false }: { embedded?: boolean }) => {
                     Created: {format(new Date(order.created_at), 'h:mm a')}
                   </p>
                   <Button
-                    onClick={() => setAcceptingOrderId(order.id)}
+                    onClick={() => {
+                      if (order.status === 'pre_inspection') {
+                        handleDirectAccept(order.id);
+                      } else {
+                        setAcceptingOrderId(order.id);
+                      }
+                    }}
                     className={`w-full font-display tracking-wider text-sm min-h-[52px] ${
                       isAssignedToMe ? 'bg-primary hover:bg-primary/90 animate-pulse' : ''
                     }`}
                     size="lg"
                   >
-                    ✋ Accept with PIN
+                    {order.status === 'pre_inspection' ? '✋ Accept Inspection' : '✋ Accept with PIN'}
                   </Button>
                 </div>
               );
@@ -250,7 +260,6 @@ const HousekeeperPage = ({ embedded = false }: { embedded?: boolean }) => {
           </div>
         )}
       </section>
-      )}
 
       {/* In Progress */}
       <section className="mb-6">
@@ -329,14 +338,6 @@ const HousekeeperPage = ({ embedded = false }: { embedded?: boolean }) => {
         </div>
       </section>
 
-      {/* PIN Modal */}
-      <PasswordConfirmModal
-        open={!!acceptingOrderId}
-        onClose={() => setAcceptingOrderId(null)}
-        onConfirm={handleAccept}
-        title="Accept Assignment"
-        description="Enter your name and PIN to accept this housekeeping assignment."
-      />
     </div>
   );
 };
