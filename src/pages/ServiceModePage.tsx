@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Flame, GlassWater, BellRing, Banknote, ArrowLeft, LayoutGrid, UtensilsCrossed, ConciergeBell } from 'lucide-react';
+import { Flame, GlassWater, BellRing, Banknote, ArrowLeft, LayoutGrid, UtensilsCrossed, ConciergeBell, Compass } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -63,6 +63,17 @@ const departments = [
     route: '/service/waitstaff',
     statusField: null,
     permKeys: ['waitstaff'],
+  },
+  {
+    key: 'tours',
+    label: 'Tours',
+    subtitle: 'Tour bookings & pickups',
+    icon: <Compass className="w-7 h-7" />,
+    gradient: 'from-[hsl(180,55%,45%)] to-[hsl(190,50%,35%)]',
+    glow: 'shadow-[0_0_30px_-5px_hsl(180,55%,45%,0.25)]',
+    route: '/service/tours',
+    statusField: null,
+    permKeys: ['experiences', 'reception'],
   },
 ];
 
