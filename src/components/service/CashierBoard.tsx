@@ -365,7 +365,7 @@ const BillOutPanel = ({
   const sc = Number(order.service_charge || 0);
   const total = subtotal + sc;
 
-  const isInStay = !!inStayBooking || /^(COT|SUI)/i.test(selectedOrder?.location_detail || '') || !!selectedOrder?.room_id;
+  const isInStay = !!inStayBooking || /^(COT|SUI)/i.test(order?.location_detail || '') || !!order?.room_id;
   const canConfirm = chargeToRoom ? !!selectedBooking : !!selectedPayment;
 
   return (
