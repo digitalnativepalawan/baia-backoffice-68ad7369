@@ -88,8 +88,8 @@ const ServiceModePage = () => {
       start.setHours(0, 0, 0, 0);
       const { data } = await supabase
         .from('orders')
-        .select('id, status, kitchen_status, bar_status, items')
-        .in('status', ['New', 'Preparing', 'Served'])
+        .select('id, status, kitchen_status, bar_status, payment_type, items')
+        .in('status', ['New', 'Preparing', 'Ready', 'Served'])
         .gte('created_at', start.toISOString())
         .limit(300);
       return data || [];
@@ -150,7 +150,7 @@ const ServiceModePage = () => {
                     <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${dept.gradient} flex items-center justify-center text-white group-hover:scale-110 transition-transform duration-200`}>
                       {dept.icon}
                     </div>
-                    {count > 0 && (
+                    {dept.key !== 'reception' && count > 0 && (
                       <span className="font-body text-xs font-bold bg-gold/20 text-gold rounded-full px-2.5 py-1 min-w-[28px] text-center tabular-nums">
                         {count}
                       </span>
