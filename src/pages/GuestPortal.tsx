@@ -1059,7 +1059,7 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
     },
   });
 
-  // Unpaid F&B orders (not charged to room)
+  // Unpaid F&B orders (not charged to room — active orders awaiting payment)
   const { data: unpaidOrders = [] } = useQuery({
     queryKey: ['guest-bill-unpaid-orders', session.room_id, session.room_name],
     queryFn: async () => {
@@ -1068,13 +1068,37 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
         .select('id, total, service_charge, guest_name, status, payment_type, created_at, items')
         .eq('room_id', session.room_id)
         .in('status', ['New', 'Preparing', 'Ready', 'Served'])
-        .neq('payment_type', 'Charge to Room');
+        .is('payment_type', null);
       const { data: byLocation } = await supabase
         .from('orders')
         .select('id, total, service_charge, guest_name, status, payment_type, created_at, items')
         .is('room_id', null)
         .eq('location_detail', session.room_name)
-        .in('status', ['New', 'Preparing', 'Ready', 'Served']);
+        .in('status', ['New', 'Preparing', 'Ready', 'Served'])
+        .is('payment_type', null);
+      const map = new Map<string, any>();
+      for (const o of [...(byRoom || []), ...(byLocation || [])]) map.set(o.id, o);
+      return Array.from(map.values());
+    },
+  });
+
+  // Room-charged F&B orders (charged to folio, tracked via room_transactions)
+  const { data: roomChargedOrders = [] } = useQuery({
+    queryKey: ['guest-bill-room-charged-orders', session.room_id, session.room_name],
+    queryFn: async () => {
+      const { data: byRoom } = await supabase
+        .from('orders')
+        .select('id, total, service_charge, guest_name, status, payment_type, created_at, items')
+        .eq('room_id', session.room_id)
+        .eq('payment_type', 'Charge to Room')
+        .in('status', ['Served']);
+      const { data: byLocation } = await supabase
+        .from('orders')
+        .select('id, total, service_charge, guest_name, status, payment_type, created_at, items')
+        .is('room_id', null)
+        .eq('location_detail', session.room_name)
+        .eq('payment_type', 'Charge to Room')
+        .in('status', ['Served']);
       const map = new Map<string, any>();
       for (const o of [...(byRoom || []), ...(byLocation || [])]) map.set(o.id, o);
       return Array.from(map.values());
