@@ -145,9 +145,20 @@ const CashierBoard = () => {
   // Auto-detect in-stay guest for the selected order
   const selectedOrderInStay = useMemo(() => {
     if (!selectedOrder) return null;
+    // Match by room_id
     if (selectedOrder.room_id) {
       return activeBookings.find((b: any) => b.unit_id === selectedOrder.room_id) || null;
     }
+    // Match by location_detail against unit name (e.g. "COT(1)")
+    if (selectedOrder.location_detail) {
+      const loc = selectedOrder.location_detail.trim().toLowerCase();
+      const match = activeBookings.find((b: any) => {
+        const unitName = b.resort_ops_units?.name?.trim()?.toLowerCase();
+        return unitName && unitName === loc;
+      });
+      if (match) return match;
+    }
+    // Match by guest name
     if (selectedOrder.guest_name) {
       const name = selectedOrder.guest_name.toLowerCase().trim();
       return activeBookings.find((b: any) => {
