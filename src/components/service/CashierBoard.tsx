@@ -372,7 +372,7 @@ const BillOutPanel = ({
   const total = subtotal + sc;
 
   const isInStay = !!inStayBooking || /^(COT|SUI)/i.test(order?.location_detail || '') || !!order?.room_id;
-  const canConfirm = chargeToRoom ? !!selectedBooking : !!selectedPayment;
+  const canConfirm = chargeToRoom ? !!(selectedBooking || inStayBooking) : !!selectedPayment;
 
   return (
     <div className="flex flex-col h-full">
