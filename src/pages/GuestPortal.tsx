@@ -1059,7 +1059,7 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
     },
   });
 
-  // Unpaid F&B orders (not charged to room)
+  // Unpaid F&B orders (not charged to room — active orders awaiting payment)
   const { data: unpaidOrders = [] } = useQuery({
     queryKey: ['guest-bill-unpaid-orders', session.room_id, session.room_name],
     queryFn: async () => {
@@ -1068,13 +1068,37 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
         .select('id, total, service_charge, guest_name, status, payment_type, created_at, items')
         .eq('room_id', session.room_id)
         .in('status', ['New', 'Preparing', 'Ready', 'Served'])
-        .neq('payment_type', 'Charge to Room');
+        .is('payment_type', null);
       const { data: byLocation } = await supabase
         .from('orders')
         .select('id, total, service_charge, guest_name, status, payment_type, created_at, items')
         .is('room_id', null)
         .eq('location_detail', session.room_name)
-        .in('status', ['New', 'Preparing', 'Ready', 'Served']);
+        .in('status', ['New', 'Preparing', 'Ready', 'Served'])
+        .is('payment_type', null);
+      const map = new Map<string, any>();
+      for (const o of [...(byRoom || []), ...(byLocation || [])]) map.set(o.id, o);
+      return Array.from(map.values());
+    },
+  });
+
+  // Room-charged F&B orders (charged to folio, tracked via room_transactions)
+  const { data: roomChargedOrders = [] } = useQuery({
+    queryKey: ['guest-bill-room-charged-orders', session.room_id, session.room_name],
+    queryFn: async () => {
+      const { data: byRoom } = await supabase
+        .from('orders')
+        .select('id, total, service_charge, guest_name, status, payment_type, created_at, items')
+        .eq('room_id', session.room_id)
+        .eq('payment_type', 'Charge to Room')
+        .in('status', ['Served']);
+      const { data: byLocation } = await supabase
+        .from('orders')
+        .select('id, total, service_charge, guest_name, status, payment_type, created_at, items')
+        .is('room_id', null)
+        .eq('location_detail', session.room_name)
+        .eq('payment_type', 'Charge to Room')
+        .in('status', ['Served']);
       const map = new Map<string, any>();
       for (const o of [...(byRoom || []), ...(byLocation || [])]) map.set(o.id, o);
       return Array.from(map.values());
@@ -1171,6 +1195,7 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
         event: '*', schema: 'public', table: 'orders',
       }, () => {
         qc.invalidateQueries({ queryKey: ['guest-bill-unpaid-orders', session.room_id, session.room_name] });
+        qc.invalidateQueries({ queryKey: ['guest-bill-room-charged-orders', session.room_id, session.room_name] });
       })
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'guest_tours',
@@ -1351,7 +1376,49 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
         </div>
       )}
 
-      {/* Pending items */}
+      {/* Room-Charged F&B Orders */}
+      {roomChargedOrders.length > 0 && (
+        <div className="space-y-2">
+          <p className="font-display text-xs tracking-wider text-blue-400 uppercase flex items-center gap-1">
+            🏠 Room Charges
+          </p>
+          {roomChargedOrders.map((o: any) => {
+            const items = Array.isArray(o.items) ? o.items : [];
+            const orderTotal = Number(o.total || 0) + Number(o.service_charge || 0);
+            return (
+              <div key={o.id} className="bg-card border border-blue-500/20 p-3 rounded-lg space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Utensils className="w-4 h-4 text-blue-400" />
+                    <span className="font-body text-xs text-muted-foreground">
+                      {new Date(o.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                    </span>
+                  </div>
+                  <Badge variant="outline" className="text-[10px] border-blue-500/40 text-blue-400">Room Charge</Badge>
+                </div>
+                <div className="space-y-0.5 pl-6">
+                  {items.map((i: any, idx: number) => (
+                    <div key={idx} className="flex justify-between">
+                      <span className="font-body text-sm text-foreground">{i.qty || 1}× {i.name}</span>
+                      <span className="font-body text-xs text-muted-foreground">₱{((i.price || 0) * (i.qty || 1)).toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="pl-6 border-t border-border/50 pt-1">
+                  <div className="flex justify-between">
+                    <span className="font-body text-xs text-foreground font-medium">Total</span>
+                    <span className="font-body text-xs text-blue-400 font-medium">₱{orderTotal.toLocaleString()}</span>
+                  </div>
+                </div>
+                <div className="pl-6">
+                  <Badge variant="outline" className="text-[10px] border-blue-500/50 text-blue-400">Charged to Room</Badge>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {hasPending && (
         <div className="space-y-2">
           <p className="font-display text-xs tracking-wider text-muted-foreground uppercase flex items-center gap-1">

@@ -634,6 +634,18 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
                           <DollarSign className="w-3 h-3 mr-0.5" /> Paid
                         </Button>
                       )}
+                      {isChargedToRoom && (
+                        <Button size="sm" variant="ghost" onClick={async () => {
+                          await supabase.from('orders').update({ status: 'Paid', payment_type: 'Cash', closed_at: new Date().toISOString() }).eq('id', o.id);
+                          await supabase.from('room_transactions').delete().eq('order_id', o.id);
+                          await logAudit('updated', 'orders', o.id, `Collected room charge payment by ${staffName}`);
+                          qc.invalidateQueries({ queryKey: ['billing-room-orders'] });
+                          qc.invalidateQueries({ queryKey: ['room-transactions', unit.id] });
+                          toast.success('Payment collected — removed from room folio');
+                        }} className="h-7 px-2 text-xs text-green-400 hover:text-green-300">
+                          <DollarSign className="w-3 h-3 mr-0.5" /> Collect Now
+                        </Button>
+                      )}
                       {!isChargedToRoom && (
                         <Button size="sm" variant="ghost" onClick={() => handleCompOrder(o.id)}
                           className="h-7 px-2 text-xs text-amber-400 hover:text-amber-300">
