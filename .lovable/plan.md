@@ -1,68 +1,63 @@
 
 
-## Plan: Fix Room Charge Flow End-to-End
+## Waitstaff & Cashier — Grouped-by-Unit Display
 
-### Root Causes Identified
+### What Changes
 
-1. **Reception "Served · Room Charge" sets `status: 'Served'`** — but `booking_id` is never set on the `room_transactions` insert (hardcoded `null`), and `room_id` might be null, so no transaction is created at all.
-2. **Reception status badge** shows "Paid" for room-charged orders because `statusMap` doesn't have a dedicated entry for `payment_type === 'Charge to Room'`.
-3. **Guest Portal "My Bill"** queries unpaid orders with `.neq('payment_type', 'Charge to Room')` — this explicitly **excludes** room-charged orders from the bill. Room-charged orders also have `status: 'Served'` (not `'Paid'`), so they fall through both queries.
-4. **RoomBillingTab** similarly filters out `payment_type === 'Charge to Room'` from `unpaidOrdersTotal`, so room charges via orders don't show in the balance.
-5. **Cashier** already works correctly for room charges but the `handleConfirmPayment` needs the booking match to work without `selectedBooking` when `inStayBooking` is auto-detected.
+**WaitstaffBoard.tsx** — Full restructure of the display layer (no backend/payment changes):
 
-### Changes
+1. **Unit Tab Pills (top strip)**: Replace the summary strip with a horizontally scrollable row of unit pills. Each pill shows the unit key (e.g. `COT(3)`, `DLe`), a badge with item count or total, and highlights the active/selected unit. Tapping scrolls to or filters that unit's card. An "All" pill shows everything.
 
-#### 1. `src/pages/ReceptionPage.tsx` — Fix Room Charge transaction creation
+2. **Grouped Cards**: Instead of one card per order, group all orders sharing the same `location_detail` into a single consolidated card. Each grouped card shows:
+   - Unit name + guest name (from first order)
+   - All line items across all orders in that group, merged into one list
+   - Combined total across all grouped orders
+   - Status indicators (worst-case status: if any order is New → show New; if all Ready → show Ready)
 
-**Lines ~1496-1520**: The "Served · Room Charge" handler:
-- Look up the active booking by matching `order.location_detail` against `resort_ops_units.name` (already have `activeBookings` or query inline) when `order.room_id` is null
-- Set `booking_id` on the `room_transactions` insert (currently hardcoded `null`)
-- Set `room_id` on the order update so downstream queries can find it
-- Always create the `room_transaction` record (currently skipped if `room_id` is null)
+3. **One "Send to Cashier" button per group**: When tapped, sets `status = 'Served'` on ALL orders in that unit group in one batch update. All orders move to cashier together.
 
-**Lines ~1401-1409**: Add a dedicated status for room-charged orders in `statusMap`:
-- When `order.payment_type === 'Charge to Room'` and status is `'Served'`, show a blue "🏠 Room Charge" badge instead of "✅ Served"
-- Add a "Collect Now" button for room-charged orders so staff can mark them paid on the spot
+4. **Kanban columns remain** (New / Preparing / Ready) but each column shows grouped cards instead of individual order cards. A group appears in the column matching its worst-case status.
 
-#### 2. `src/pages/GuestPortal.tsx` — Show room charges in "My Bill"
+5. **Mobile view**: Same grouping logic, just stacked vertically with the tab pills at top.
 
-**Lines ~1062-1081**: The `unpaidOrders` query currently excludes `Charge to Room` orders. Fix:
-- Add a **separate query** for room-charged orders: orders with `payment_type = 'Charge to Room'` and `status` in `['Served']` (not yet settled)
-- Show them in the bill as "Room Charge" line items with amounts
-- Include their total in the balance calculation (~line 1213)
+**CashierBoard.tsx** — Display-only grouping (payment logic untouched):
 
-**Lines ~1288-1351**: Render room-charged orders in a dedicated section with a blue "Room Charge" badge and full amount display (instead of ₱0).
+1. **Group the order list** by `location_detail` so multiple orders from the same unit appear as one consolidated row showing combined total and item count.
+2. **When a grouped row is tapped**, the BillOutPanel shows all items from all orders in that group, with combined subtotal/service charge/total.
+3. **On confirm payment**, the existing `handleConfirmPayment` runs for each order in the group (loop), applying the same payment type. Room charge logic stays exactly as-is — it already resolves booking by location_detail.
 
-#### 3. `src/components/rooms/RoomBillingTab.tsx` — Show room charges in folio
+### Technical Approach
 
-**Lines ~86-87 and ~131-140**: Currently `unpaidOrders` is `roomOrders.filter(o => o.status !== 'Paid')`, but room-charged orders have `status: 'Served'`. The balance calculation at line 132 explicitly excludes `Charge to Room` from `unpaidOrdersTotal`. Fix:
-- Room-charged orders are already tracked via `room_transactions`, so they're counted in `totalCharges`. The current exclusion from `unpaidOrdersTotal` is correct to avoid double-counting.
-- BUT: if the transaction was never created (bug #1), they show as ₱0. Fixing bug #1 above will fix this.
-- Add a visual section showing room-charged orders with "Room Charge" badge and "Collect Now" button.
-
-#### 4. `src/pages/ReceptionPage.tsx` — Add active bookings query for room matching
-
-Need to fetch active bookings in ReceptionPage to resolve `booking_id` and `unit_id` when creating room transactions. Add a query similar to what CashierBoard uses.
-
-### Files Changed
-- `src/pages/ReceptionPage.tsx` (~40 lines changed — fix transaction creation, add badge, add Collect Now button, add bookings query)
-- `src/pages/GuestPortal.tsx` (~30 lines changed — add room-charge orders query, display section, include in balance)
-- `src/components/rooms/RoomBillingTab.tsx` (~10 lines changed — add visual display for room-charged orders with Collect Now)
-
-### Technical Details
-
-**Order lifecycle for room charges:**
-```text
-Order placed → Kitchen/Bar prepares → Ready → 
-  Reception clicks "Served · Room Charge" →
-    order.status = 'Served'
-    order.payment_type = 'Charge to Room'  
-    order.room_id = unit_id (resolved from location_detail)
-    room_transactions record created with booking_id
-  → Appears in Guest Portal "My Bill" as room charge line
-  → Appears in Room Billing folio via room_transactions
-  → At checkout, balance includes these charges
+**Grouping utility** (shared logic in both files):
+```typescript
+// Group orders by location_detail (or order id if no location)
+const groupOrdersByUnit = (orders) => {
+  const groups = {};
+  orders.forEach(order => {
+    const key = order.location_detail || order.id;
+    if (!groups[key]) groups[key] = { key, orders: [], items: [], total: 0, ... };
+    groups[key].orders.push(order);
+    // merge items, sum totals
+  });
+  return Object.values(groups);
+};
 ```
 
-**Key fix**: The `room_transactions` insert must always happen (not gated on `order.room_id` which is null before the update). Resolve the unit/booking by matching `order.location_detail` against active bookings.
+**Waitstaff "Send to Cashier"**: Batch update all order IDs in group:
+```typescript
+await supabase.from('orders').update({ status: 'Served' })
+  .in('id', group.orders.map(o => o.id));
+```
+
+**Cashier confirm payment**: Loop through each order in group, running existing settlement logic per order (preserves room_transaction creation per order).
+
+### Files Modified
+- `src/components/service/WaitstaffBoard.tsx` — major rewrite of display
+- `src/components/service/CashierBoard.tsx` — grouping wrapper around existing order list + payment loop
+
+### What Does NOT Change
+- Payment flow, room charge logic, booking resolution
+- Order database schema
+- ServiceModePage counts
+- Any other pages
 
