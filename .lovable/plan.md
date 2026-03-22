@@ -1,63 +1,45 @@
 
 
-## Waitstaff & Cashier — Grouped-by-Unit Display
+## Add Tours Board to Service Mode
 
-### What Changes
+### Overview
+Add a "Tours" card to the `/service` selection screen and a new `/service/tours` board page that displays tour bookings from the existing `tour_bookings` table as cards.
 
-**WaitstaffBoard.tsx** — Full restructure of the display layer (no backend/payment changes):
+### Changes
 
-1. **Unit Tab Pills (top strip)**: Replace the summary strip with a horizontally scrollable row of unit pills. Each pill shows the unit key (e.g. `COT(3)`, `DLe`), a badge with item count or total, and highlights the active/selected unit. Tapping scrolls to or filters that unit's card. An "All" pill shows everything.
+**1. ServiceModePage.tsx — Add Tours department card**
+- Add a `Compass` icon import from lucide-react
+- Add a new entry to the `departments` array with key `tours`, route `/service/tours`, warm teal gradient, and permKeys `['experiences', 'reception']`
+- Add a `tours` count to the counts memo that queries today's confirmed tour bookings
 
-2. **Grouped Cards**: Instead of one card per order, group all orders sharing the same `location_detail` into a single consolidated card. Each grouped card shows:
-   - Unit name + guest name (from first order)
-   - All line items across all orders in that group, merged into one list
-   - Combined total across all grouped orders
-   - Status indicators (worst-case status: if any order is New → show New; if all Ready → show Ready)
+**2. New file: `src/pages/ServiceToursPage.tsx`**
+- Simple page wrapper following the exact pattern of `ServiceKitchenPage.tsx`
+- Uses `ServiceHeader` with department="tours" and renders a new `ToursBoard` component
 
-3. **One "Send to Cashier" button per group**: When tapped, sets `status = 'Served'` on ALL orders in that unit group in one batch update. All orders move to cashier together.
+**3. New file: `src/components/service/ToursBoard.tsx`**
+- Fetches from `tour_bookings` table (upcoming + today, ordered by tour_date, pickup_time)
+- Displays each booking as a card showing:
+  - Guest name + unit (from `guest_name` field)
+  - Tour name
+  - Date + pickup time
+  - Pax count badge
+  - Notes (special requests)
+  - Status badge: color-coded pill (confirmed = green, pending = amber, completed = muted)
+- Auto-refreshes every 15 seconds
+- Filter pills at top: All / Today / Upcoming
+- Status filter: All / Confirmed / Pending / Completed
 
-4. **Kanban columns remain** (New / Preparing / Ready) but each column shows grouped cards instead of individual order cards. A group appears in the column matching its worst-case status.
+**4. App.tsx — Add route**
+- Import `ServiceToursPage`
+- Add route: `/service/tours` with `requiredPermission={['experiences', 'reception']}`
 
-5. **Mobile view**: Same grouping logic, just stacked vertically with the tab pills at top.
+**5. ServiceHeader.tsx — Add tours label**
+- Add `tours` to the department label map so the header shows "Tours" with appropriate icon
 
-**CashierBoard.tsx** — Display-only grouping (payment logic untouched):
-
-1. **Group the order list** by `location_detail` so multiple orders from the same unit appear as one consolidated row showing combined total and item count.
-2. **When a grouped row is tapped**, the BillOutPanel shows all items from all orders in that group, with combined subtotal/service charge/total.
-3. **On confirm payment**, the existing `handleConfirmPayment` runs for each order in the group (loop), applying the same payment type. Room charge logic stays exactly as-is — it already resolves booking by location_detail.
-
-### Technical Approach
-
-**Grouping utility** (shared logic in both files):
-```typescript
-// Group orders by location_detail (or order id if no location)
-const groupOrdersByUnit = (orders) => {
-  const groups = {};
-  orders.forEach(order => {
-    const key = order.location_detail || order.id;
-    if (!groups[key]) groups[key] = { key, orders: [], items: [], total: 0, ... };
-    groups[key].orders.push(order);
-    // merge items, sum totals
-  });
-  return Object.values(groups);
-};
-```
-
-**Waitstaff "Send to Cashier"**: Batch update all order IDs in group:
-```typescript
-await supabase.from('orders').update({ status: 'Served' })
-  .in('id', group.orders.map(o => o.id));
-```
-
-**Cashier confirm payment**: Loop through each order in group, running existing settlement logic per order (preserves room_transaction creation per order).
-
-### Files Modified
-- `src/components/service/WaitstaffBoard.tsx` — major rewrite of display
-- `src/components/service/CashierBoard.tsx` — grouping wrapper around existing order list + payment loop
-
-### What Does NOT Change
-- Payment flow, room charge logic, booking resolution
-- Order database schema
-- ServiceModePage counts
-- Any other pages
+### Files to create/edit
+- `src/pages/ServiceModePage.tsx` (edit — add tours card + count)
+- `src/pages/ServiceToursPage.tsx` (new)
+- `src/components/service/ToursBoard.tsx` (new)
+- `src/App.tsx` (edit — add route)
+- `src/components/service/ServiceHeader.tsx` (edit — add tours label)
 
