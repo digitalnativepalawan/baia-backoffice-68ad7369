@@ -5,13 +5,14 @@ import { useInvoiceSettings } from '@/hooks/useInvoiceSettings';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, X, Plus, Minus, ShoppingCart, Download, MessageCircle, Trash2 } from 'lucide-react';
+import { ArrowLeft, X, Plus, Minus, ShoppingCart, Download, MessageCircle, Trash2, BedDouble } from 'lucide-react';
 import { toast } from 'sonner';
 import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import { generateInvoicePdf, buildInvoiceWhatsAppText } from '@/lib/generateInvoicePdf';
 import { useBillingConfig } from '@/hooks/useBillingConfig';
 import { usePaymentMethods } from '@/hooks/usePaymentMethods';
+import { getStaffSession } from '@/lib/session';
 
 interface TabInvoiceProps {
   tabId: string;
