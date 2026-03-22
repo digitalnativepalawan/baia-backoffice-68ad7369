@@ -14,6 +14,8 @@ import { Separator } from '@/components/ui/separator';
 import { formatDistanceToNow, format } from 'date-fns';
 import CashierReceipt from './CashierReceipt';
 
+const normalizeMatchKey = (value?: string | null) => (value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
 const CashierBoard = () => {
   const qc = useQueryClient();
   const { data: resortProfile } = useResortProfile();
@@ -52,7 +54,7 @@ const CashierBoard = () => {
         .gte('created_at', start.toISOString())
         .order('created_at', { ascending: true })
         .limit(300);
-      return data || [];
+      return (data || []).filter(order => !(order.status === 'Served' && order.payment_type === 'Charge to Room'));
     },
     refetchInterval: 5000,
   });
@@ -85,13 +87,58 @@ const CashierBoard = () => {
       const today = new Date().toISOString().slice(0, 10);
       const { data } = await supabase
         .from('resort_ops_bookings')
-        .select('id, check_in, check_out, unit_id, guest_id, resort_ops_guests(full_name), resort_ops_units:unit_id(name)')
+        .select('id, check_in, check_out, checked_out_at, unit_id, guest_id, resort_ops_guests(full_name), resort_ops_units:unit_id(name)')
         .lte('check_in', today)
         .gte('check_out', today)
-        .limit(50);
+        .is('checked_out_at', null)
+        .order('check_in', { ascending: false })
+        .limit(100);
       return (data || []) as any[];
     },
   });
+
+  const { data: roomUnits = [] } = useQuery({
+    queryKey: ['cashier-room-units'],
+    queryFn: async () => {
+      const { data } = await (supabase.from('units' as any) as any)
+        .select('id, unit_name')
+        .eq('active', true)
+        .order('unit_name');
+      return (data || []) as Array<{ id: string; unit_name: string }>;
+    },
+  });
+
+  const resolveRoomUnit = useCallback((booking: any) => {
+    const resortUnitName = booking?.resort_ops_units?.name;
+    if (!resortUnitName) return null;
+    return roomUnits.find(unit => normalizeMatchKey(unit.unit_name) === normalizeMatchKey(resortUnitName)) || null;
+  }, [roomUnits]);
+
+  const resolveBookingForOrder = useCallback((order: any) => {
+    if (!order) return null;
+
+    if (order.room_id) {
+      const byUnitRecord = activeBookings.find((booking: any) => resolveRoomUnit(booking)?.id === order.room_id);
+      if (byUnitRecord) return byUnitRecord;
+
+      const byResortUnitRecord = activeBookings.find((booking: any) => booking.unit_id === order.room_id);
+      if (byResortUnitRecord) return byResortUnitRecord;
+    }
+
+    const locationKey = normalizeMatchKey(order.location_detail);
+    if (locationKey) {
+      const byLocation = activeBookings.find((booking: any) => normalizeMatchKey(booking.resort_ops_units?.name) === locationKey);
+      if (byLocation) return byLocation;
+    }
+
+    const guestKey = normalizeMatchKey(order.guest_name);
+    if (guestKey) {
+      const byGuest = activeBookings.find((booking: any) => normalizeMatchKey(booking.resort_ops_guests?.full_name) === guestKey);
+      if (byGuest) return byGuest;
+    }
+
+    return null;
+  }, [activeBookings, resolveRoomUnit]);
 
   // Handle payment confirmation
   const handleConfirmPayment = async () => {
@@ -115,23 +162,26 @@ const CashierBoard = () => {
       };
 
       if (chargeToRoom) {
-        // Resolve booking: use explicitly selected booking, or fall back to auto-detected inStayBooking
-        const bookingId = selectedBooking || selectedOrderInStay?.id || null;
-        const booking = bookingId ? activeBookings.find(b => b.id === bookingId) : null;
-        const unitId = booking?.unit_id || selectedOrderInStay?.unit_id || null;
-        const unitName = booking?.resort_ops_units?.name || selectedOrderInStay?.resort_ops_units?.name || selectedOrder.location_detail || '';
-        const guestFullName = booking?.resort_ops_guests?.full_name || selectedOrderInStay?.resort_ops_guests?.full_name || selectedOrder.guest_name || '';
+        const booking = (selectedBooking
+          ? activeBookings.find((candidate: any) => candidate.id === selectedBooking)
+          : selectedOrderInStay) || null;
+        const roomUnit =
+          (selectedOrder.room_id
+            ? roomUnits.find(unit => unit.id === selectedOrder.room_id)
+            : null) ||
+          resolveRoomUnit(booking);
 
-        if (unitId) {
-          updateData.room_id = unitId;
+        if (!booking?.id || !roomUnit?.id) {
+          throw new Error('Could not match this order to an active in-house guest.');
         }
 
-        // Always create room_transaction for room charges
-        await (supabase.from('room_transactions' as any) as any).insert({
-          unit_id: unitId,
-          unit_name: unitName,
-          guest_name: guestFullName,
-          booking_id: bookingId,
+        updateData.room_id = roomUnit.id;
+
+        const { error: roomTransactionError } = await (supabase.from('room_transactions' as any) as any).insert({
+          unit_id: roomUnit.id,
+          unit_name: roomUnit.unit_name,
+          guest_name: booking.resort_ops_guests?.full_name || selectedOrder.guest_name || '',
+          booking_id: booking.id,
           transaction_type: 'room_charge',
           order_id: selectedOrder.id,
           amount: subtotal,
@@ -142,9 +192,12 @@ const CashierBoard = () => {
           staff_name: staffName,
           notes: `Cashier settlement — ${selectedOrder.location_detail || selectedOrder.order_type}`,
         });
+
+        if (roomTransactionError) throw roomTransactionError;
       }
 
-      await supabase.from('orders').update(updateData).eq('id', selectedOrder.id);
+      const { error: orderError } = await supabase.from('orders').update(updateData).eq('id', selectedOrder.id);
+      if (orderError) throw orderError;
 
       setReceiptOrder({ ...selectedOrder, payment_type: paymentType });
       setSelectedOrder(null);
@@ -154,7 +207,10 @@ const CashierBoard = () => {
 
       qc.invalidateQueries({ queryKey: ['cashier-orders'] });
       qc.invalidateQueries({ queryKey: ['room-transactions'] });
+      qc.invalidateQueries({ queryKey: ['cashier-completed'] });
       toast.success(chargeToRoom ? 'Charged to room' : 'Payment confirmed');
+    } catch (error: any) {
+      toast.error(error?.message || 'Unable to complete payment');
     } finally {
       setBusy(false);
     }
@@ -175,30 +231,8 @@ const CashierBoard = () => {
 
   // Auto-detect in-stay guest for the selected order
   const selectedOrderInStay = useMemo(() => {
-    if (!selectedOrder) return null;
-    // Match by room_id
-    if (selectedOrder.room_id) {
-      return activeBookings.find((b: any) => b.unit_id === selectedOrder.room_id) || null;
-    }
-    // Match by location_detail against unit name (e.g. "COT(1)")
-    if (selectedOrder.location_detail) {
-      const loc = selectedOrder.location_detail.trim().toLowerCase();
-      const match = activeBookings.find((b: any) => {
-        const unitName = b.resort_ops_units?.name?.trim()?.toLowerCase();
-        return unitName && unitName === loc;
-      });
-      if (match) return match;
-    }
-    // Match by guest name
-    if (selectedOrder.guest_name) {
-      const name = selectedOrder.guest_name.toLowerCase().trim();
-      return activeBookings.find((b: any) => {
-        const guestName = b.resort_ops_guests?.full_name?.toLowerCase()?.trim();
-        return guestName && guestName === name;
-      }) || null;
-    }
-    return null;
-  }, [selectedOrder, activeBookings]);
+    return resolveBookingForOrder(selectedOrder);
+  }, [selectedOrder, resolveBookingForOrder]);
 
   // Receipt view
   if (receiptOrder) {
