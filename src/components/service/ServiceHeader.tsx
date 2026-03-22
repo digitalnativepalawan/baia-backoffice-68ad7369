@@ -11,10 +11,11 @@ const DEPT_CONFIG: Record<string, { label: string; icon: React.ReactNode; gradie
   bar: { label: 'Bar', icon: <GlassWater className="w-4 h-4" />, gradient: 'from-[hsl(270,60%,55%)] to-[hsl(280,55%,42%)]' },
   reception: { label: 'Reception', icon: <BellRing className="w-4 h-4" />, gradient: 'from-[hsl(210,70%,50%)] to-[hsl(220,65%,40%)]' },
   cashier: { label: 'Cashier', icon: <Banknote className="w-4 h-4" />, gradient: 'from-[hsl(45,90%,50%)] to-[hsl(35,85%,42%)]' },
+  waitstaff: { label: 'Waitstaff', icon: <Flame className="w-4 h-4" />, gradient: 'from-[hsl(150,60%,45%)] to-[hsl(160,55%,35%)]' },
 };
 
 interface ServiceHeaderProps {
-  department: 'kitchen' | 'bar' | 'reception' | 'cashier';
+  department: 'kitchen' | 'bar' | 'reception' | 'cashier' | 'waitstaff';
 }
 
 const ServiceHeader = ({ department }: ServiceHeaderProps) => {

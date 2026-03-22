@@ -101,6 +101,13 @@ const CashierBoard = () => {
 
     setBusy(true);
     try {
+      const staffSession = getStaffSession();
+      const staffName = staffSession?.name || 'Cashier';
+      const items = (selectedOrder.items as any[]) || [];
+      const subtotal = items.reduce((s: number, i: any) => s + i.price * (i.qty || i.quantity || 1), 0);
+      const sc = Number(selectedOrder.service_charge || 0);
+      const grandTotal = subtotal + sc;
+
       const updateData: any = {
         status: 'Paid',
         payment_type: paymentType,
@@ -111,6 +118,23 @@ const CashierBoard = () => {
         const booking = activeBookings.find(b => b.id === selectedBooking);
         if (booking?.unit_id) {
           updateData.room_id = booking.unit_id;
+
+          // Insert room_transaction for folio
+          await (supabase.from('room_transactions' as any) as any).insert({
+            unit_id: booking.unit_id,
+            unit_name: booking.resort_ops_units?.name || '',
+            guest_name: booking.resort_ops_guests?.full_name || selectedOrder.guest_name || '',
+            booking_id: booking.id,
+            transaction_type: 'room_charge',
+            order_id: selectedOrder.id,
+            amount: subtotal,
+            tax_amount: 0,
+            service_charge_amount: sc,
+            total_amount: grandTotal,
+            payment_method: 'Charge to Room',
+            staff_name: staffName,
+            notes: `Cashier settlement — ${selectedOrder.location_detail || selectedOrder.order_type}`,
+          });
         }
       }
 
@@ -123,6 +147,7 @@ const CashierBoard = () => {
       setSelectedBooking(null);
 
       qc.invalidateQueries({ queryKey: ['cashier-orders'] });
+      qc.invalidateQueries({ queryKey: ['room-transactions'] });
       toast.success('Payment confirmed');
     } finally {
       setBusy(false);
@@ -145,9 +170,20 @@ const CashierBoard = () => {
   // Auto-detect in-stay guest for the selected order
   const selectedOrderInStay = useMemo(() => {
     if (!selectedOrder) return null;
+    // Match by room_id
     if (selectedOrder.room_id) {
       return activeBookings.find((b: any) => b.unit_id === selectedOrder.room_id) || null;
     }
+    // Match by location_detail against unit name (e.g. "COT(1)")
+    if (selectedOrder.location_detail) {
+      const loc = selectedOrder.location_detail.trim().toLowerCase();
+      const match = activeBookings.find((b: any) => {
+        const unitName = b.resort_ops_units?.name?.trim()?.toLowerCase();
+        return unitName && unitName === loc;
+      });
+      if (match) return match;
+    }
+    // Match by guest name
     if (selectedOrder.guest_name) {
       const name = selectedOrder.guest_name.toLowerCase().trim();
       return activeBookings.find((b: any) => {
