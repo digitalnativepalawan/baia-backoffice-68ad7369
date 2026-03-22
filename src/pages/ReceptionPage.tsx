@@ -1024,7 +1024,7 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
             const workflow = getUnitWorkflow(unit);
             const guest = (booking as any)?.resort_ops_guests;
             const nights = booking ? Math.max(1, Math.ceil((new Date(booking.check_out).getTime() - new Date(booking.check_in).getTime()) / 86400000)) : 0;
-            const roomOrders = recentOrders.filter((o: any) => o.location_detail === unit.name);
+            const roomOrders: any[] = [];
             const isDepartingToday = Boolean(workflow.pendingDeparture);
             const incomingArrival = workflow.pendingArrival;
 
