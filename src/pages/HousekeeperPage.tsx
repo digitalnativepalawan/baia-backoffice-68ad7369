@@ -20,7 +20,6 @@ const HousekeeperPage = ({ embedded = false }: { embedded?: boolean }) => {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const [acceptingOrderId, setAcceptingOrderId] = useState<string | null>(null);
   const [activeOrder, setActiveOrder] = useState<any>(null);
-  const [acceptingDirectId, setAcceptingDirectId] = useState<string | null>(null);
 
   // PIN-based accept for cleaning tasks (non pre_inspection)
   const handlePinAccept = async (employee: { id: string; name: string; display_name: string }) => {
