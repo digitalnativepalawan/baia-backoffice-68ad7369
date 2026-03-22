@@ -64,6 +64,17 @@ const departments = [
     statusField: null,
     permKeys: ['waitstaff'],
   },
+  {
+    key: 'tours',
+    label: 'Tours',
+    subtitle: 'Tour bookings & pickups',
+    icon: <Compass className="w-7 h-7" />,
+    gradient: 'from-[hsl(180,55%,45%)] to-[hsl(190,50%,35%)]',
+    glow: 'shadow-[0_0_30px_-5px_hsl(180,55%,45%,0.25)]',
+    route: '/service/tours',
+    statusField: null,
+    permKeys: ['experiences', 'reception'],
+  },
 ];
 
 const ServiceModePage = () => {
