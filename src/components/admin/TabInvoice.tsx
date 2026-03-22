@@ -548,24 +548,116 @@ const TabInvoice = ({ tabId, onClose, isAdmin }: TabInvoiceProps) => {
       )}
 
       {/* Close tab (only if open) */}
-      {tab.status === 'Open' && (
-        <div className="space-y-3 pt-2">
-          <Select onValueChange={setPaymentMethod} value={paymentMethod}>
-            <SelectTrigger className="bg-secondary border-border text-foreground font-body">
-              <SelectValue placeholder="Select payment method" />
-            </SelectTrigger>
-            <SelectContent className="bg-card border-border">
-              {activePaymentMethods.map(m => (
-                <SelectItem key={m.id} value={m.name} className="text-foreground font-body">{m.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button onClick={handleCloseTab} disabled={closing} className="font-display tracking-wider w-full py-5" variant="default">
-            <X className="w-4 h-4 mr-2" />
-            {closing ? 'Closing...' : 'Close Tab & Settle'}
-          </Button>
-        </div>
-      )}
+      {tab.status === 'Open' && (() => {
+        const isRoomTab = /^(COT|SUI)/i.test(tab.location_detail || '');
+
+        const handleRoomFolio = async () => {
+          setClosing(true);
+          try {
+            const staffSession = getStaffSession();
+            const staffName = staffSession?.name || 'Staff';
+            const today = new Date().toISOString().slice(0, 10);
+
+            const { data: bookings } = await supabase
+              .from('resort_ops_bookings')
+              .select('id, unit_id, guest_id, resort_ops_guests(full_name), resort_ops_units:unit_id(name)')
+              .lte('check_in', today)
+              .gte('check_out', today)
+              .limit(50);
+
+            const loc = (tab.location_detail || '').trim().toLowerCase();
+            const booking = (bookings || []).find((b: any) => {
+              const unitName = b.resort_ops_units?.name?.trim()?.toLowerCase();
+              return unitName && unitName === loc;
+            }) as any;
+
+            await supabase.from('tabs').update({
+              status: 'Closed',
+              payment_method: 'Charge to Room',
+              closed_at: new Date().toISOString(),
+            }).eq('id', tabId);
+
+            const orderIds = orders.map(o => o.id);
+            if (orderIds.length > 0) {
+              await supabase.from('orders').update({
+                status: 'Paid',
+                payment_type: 'Charge to Room',
+                closed_at: new Date().toISOString(),
+                ...(booking?.unit_id ? { room_id: booking.unit_id } : {}),
+              }).in('id', orderIds);
+            }
+
+            for (const order of orders) {
+              const orderItems = (Array.isArray(order.items) ? order.items : []) as unknown as OrderItem[];
+              const orderSubtotal = orderItems.reduce((s, i) => s + i.price * i.qty, 0);
+              const orderSc = Number(order.service_charge || 0);
+              const orderTotal = orderSubtotal + orderSc;
+
+              await (supabase.from('room_transactions' as any) as any).insert({
+                unit_id: booking?.unit_id || null,
+                unit_name: booking?.resort_ops_units?.name || tab.location_detail || '',
+                guest_name: booking?.resort_ops_guests?.full_name || tab.guest_name || '',
+                booking_id: booking?.id || null,
+                transaction_type: 'room_charge',
+                order_id: order.id,
+                amount: orderSubtotal,
+                tax_amount: 0,
+                service_charge_amount: orderSc,
+                total_amount: orderTotal,
+                payment_method: 'Charge to Room',
+                staff_name: staffName,
+                notes: `Tab settlement — ${tab.location_detail || tab.location_type}`,
+              });
+            }
+
+            qc.invalidateQueries({ queryKey: ['tabs-admin'] });
+            qc.invalidateQueries({ queryKey: ['orders-admin'] });
+            qc.invalidateQueries({ queryKey: ['room-transactions'] });
+            toast.success('Tab settled — charged to room folio');
+            onClose();
+          } catch {
+            toast.error('Failed to settle tab');
+          } finally {
+            setClosing(false);
+          }
+        };
+
+        return (
+          <div className="space-y-3 pt-2">
+            {isRoomTab && (
+              <>
+                <Button
+                  onClick={handleRoomFolio}
+                  disabled={closing}
+                  className="w-full font-display tracking-wider py-5 gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <BedDouble className="w-4 h-4" />
+                  {closing ? 'Settling...' : `Room Folio — ${tab.location_detail}`}
+                </Button>
+                <div className="flex items-center gap-2">
+                  <Separator className="flex-1" />
+                  <span className="text-xs text-muted-foreground font-display tracking-wider">OR PAY NOW</span>
+                  <Separator className="flex-1" />
+                </div>
+              </>
+            )}
+            <Select onValueChange={setPaymentMethod} value={paymentMethod}>
+              <SelectTrigger className="bg-secondary border-border text-foreground font-body">
+                <SelectValue placeholder="Select payment method" />
+              </SelectTrigger>
+              <SelectContent className="bg-card border-border">
+                {activePaymentMethods.map(m => (
+                  <SelectItem key={m.id} value={m.name} className="text-foreground font-body">{m.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button onClick={handleCloseTab} disabled={closing} className="font-display tracking-wider w-full py-5" variant="default">
+              <X className="w-4 h-4 mr-2" />
+              {closing ? 'Closing...' : 'Close Tab & Settle'}
+            </Button>
+          </div>
+        );
+      })()}
 
       {tab.status === 'Closed' && tab.payment_method && (
         <div className="text-center py-2">
