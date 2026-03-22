@@ -223,17 +223,7 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
     }
   }, [allHkOrders, activeHkOrder]);
 
-  // Recent orders for all rooms
-  const { data: recentOrders = [] } = useQuery({
-    queryKey: ['reception-recent-orders'],
-    queryFn: async () => {
-      const { data } = await supabase.from('orders').select('*')
-        .eq('order_type', 'Room')
-        .order('created_at', { ascending: false })
-        .limit(20);
-      return data || [];
-    },
-  });
+   // (Recent room orders query removed — F&B orders handled by Cashier only)
 
   // Today's tours (guest_tours + tour_bookings)
   const { data: todayTours = [] } = useQuery({
