@@ -1376,7 +1376,49 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
         </div>
       )}
 
-      {/* Pending items */}
+      {/* Room-Charged F&B Orders */}
+      {roomChargedOrders.length > 0 && (
+        <div className="space-y-2">
+          <p className="font-display text-xs tracking-wider text-blue-400 uppercase flex items-center gap-1">
+            🏠 Room Charges
+          </p>
+          {roomChargedOrders.map((o: any) => {
+            const items = Array.isArray(o.items) ? o.items : [];
+            const orderTotal = Number(o.total || 0) + Number(o.service_charge || 0);
+            return (
+              <div key={o.id} className="bg-card border border-blue-500/20 p-3 rounded-lg space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Utensils className="w-4 h-4 text-blue-400" />
+                    <span className="font-body text-xs text-muted-foreground">
+                      {new Date(o.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                    </span>
+                  </div>
+                  <Badge variant="outline" className="text-[10px] border-blue-500/40 text-blue-400">Room Charge</Badge>
+                </div>
+                <div className="space-y-0.5 pl-6">
+                  {items.map((i: any, idx: number) => (
+                    <div key={idx} className="flex justify-between">
+                      <span className="font-body text-sm text-foreground">{i.qty || 1}× {i.name}</span>
+                      <span className="font-body text-xs text-muted-foreground">₱{((i.price || 0) * (i.qty || 1)).toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="pl-6 border-t border-border/50 pt-1">
+                  <div className="flex justify-between">
+                    <span className="font-body text-xs text-foreground font-medium">Total</span>
+                    <span className="font-body text-xs text-blue-400 font-medium">₱{orderTotal.toLocaleString()}</span>
+                  </div>
+                </div>
+                <div className="pl-6">
+                  <Badge variant="outline" className="text-[10px] border-blue-500/50 text-blue-400">Charged to Room</Badge>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {hasPending && (
         <div className="space-y-2">
           <p className="font-display text-xs tracking-wider text-muted-foreground uppercase flex items-center gap-1">
