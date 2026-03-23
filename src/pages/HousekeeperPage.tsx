@@ -238,19 +238,13 @@ const HousekeeperPage = ({ embedded = false }: { embedded?: boolean }) => {
                     Created: {format(new Date(order.created_at), 'h:mm a')}
                   </p>
                   <Button
-                    onClick={() => {
-                      if (order.status === 'pre_inspection') {
-                        handleDirectAccept(order.id);
-                      } else {
-                        setAcceptingOrderId(order.id);
-                      }
-                    }}
+                    onClick={() => handleDirectAccept(order.id)}
                     className={`w-full font-display tracking-wider text-sm min-h-[52px] ${
                       isAssignedToMe ? 'bg-primary hover:bg-primary/90 animate-pulse' : ''
                     }`}
                     size="lg"
                   >
-                    {order.status === 'pre_inspection' ? '✋ Accept Inspection' : '✋ Accept with PIN'}
+                    {order.status === 'pre_inspection' ? '✋ Accept Inspection' : '✋ Accept Assignment'}
                   </Button>
                 </div>
               );
