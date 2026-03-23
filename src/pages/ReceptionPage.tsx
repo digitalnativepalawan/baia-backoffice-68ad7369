@@ -1448,12 +1448,22 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
                       </Button>
                     )}
                     {hasHousekeepingAccess && !order.accepted_by && (
-                      <Button size="sm" onClick={() => {
+                      <Button size="sm" onClick={async () => {
                         const empId = localStorage.getItem('emp_id') || '';
                         const empName = localStorage.getItem('emp_name') || 'Staff';
                         const empDisplay = localStorage.getItem('emp_display_name') || empName;
-                        handleHkAccept({ id: empId, name: empName, display_name: empDisplay });
-                        setAcceptingHkOrderId(order.id);
+                        try {
+                          await from('housekeeping_orders').update({
+                            accepted_by: empId,
+                            accepted_by_name: empDisplay,
+                            accepted_at: new Date().toISOString(),
+                            status: 'pending_inspection',
+                          } as any).eq('id', order.id);
+                          qc.invalidateQueries({ queryKey: ['housekeeping-orders-all'] });
+                          toast.success(`Accepted — ${empDisplay}`);
+                        } catch (err: any) {
+                          toast.error(err.message || 'Failed to accept');
+                        }
                       }}
                         className="font-display text-[10px] tracking-wider min-h-[32px]">
                         ✋ Accept
