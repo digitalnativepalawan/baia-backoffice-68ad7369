@@ -264,10 +264,6 @@ const HousekeepingInspection = ({ order, onClose, mode }: HousekeepingInspection
     }
   };
 
-  const handlePinConfirm = (employee: { id: string; name: string; display_name: string }) => {
-    completeCleaning(employee);
-    setPinAction(null);
-  };
 
   // ═══ PRE-INSPECTION MODE (simplified damage check) ═══
   if (isPreInspection) {
