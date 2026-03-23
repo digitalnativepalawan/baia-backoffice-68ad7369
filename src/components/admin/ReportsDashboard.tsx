@@ -572,6 +572,12 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
           <h3 className="font-display text-sm tracking-wider text-foreground">F&B Revenue (Historical)</h3>
         </div>
 
+        {histLoading ? (
+          <p className="font-body text-xs text-muted-foreground text-center py-4">Loading historical data…</p>
+        ) : histRevenue.length === 0 ? (
+          <p className="font-body text-xs text-muted-foreground text-center py-4">No historical revenue data found.</p>
+        ) : (
+        <>
         {/* Total historical revenue */}
         <div className="grid grid-cols-2 gap-3">
           <Card className="bg-card/50 border-border">
