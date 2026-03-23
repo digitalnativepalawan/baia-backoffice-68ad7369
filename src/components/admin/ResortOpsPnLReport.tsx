@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import jsPDF from 'jspdf';
 import { Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -130,11 +129,11 @@ const ResortOpsPnLReport = ({ monthBookings, orders, monthExpenses, menuItems }:
     { label: 'Hotel Services',      value: hotelServices },
   ];
 
-  // ── PDF export ─────────────────────────────────────────────────────────
-  const downloadPDF = () => {
-    const PDF_TOP_MARGIN = 18;
-    const PDF_PAGE_THRESHOLD = 275;
+  // ── PDF export (print-to-PDF) ──────────────────────────────────────────
+  const escapeHtml = (s: string) =>
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
+  const downloadPDF = () => {
     const monthDate = (() => {
       const raw = monthExpenses[0]?.expense_date || monthBookings[0]?.check_in;
       if (raw) {
@@ -144,129 +143,141 @@ const ResortOpsPnLReport = ({ monthBookings, orders, monthExpenses, menuItems }:
       }
       return new Date();
     })();
-    const monthName = monthDate.toLocaleString('en-US', { month: 'long' });
-    const yearStr = String(monthDate.getFullYear());
-    const monthYearLabel = `${monthName} ${yearStr}`;
-    const filename = `BAIA-PnL-${monthName}-${yearStr}.pdf`;
-
-    const doc = new jsPDF();
-    const pageW = doc.internal.pageSize.getWidth();
-    let y = PDF_TOP_MARGIN;
-
-    const checkPage = (needed = 8) => {
-      if (y + needed > PDF_PAGE_THRESHOLD) { doc.addPage(); y = PDF_TOP_MARGIN; }
-    };
-
-    // ── HEADER ─────────────────────────────────────────────────────────
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text('BAIA Boutique Resort', pageW / 2, y, { align: 'center' });
-    y += 7;
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'normal');
-    doc.text('San Vicente, Palawan', pageW / 2, y, { align: 'center' });
-    y += 7;
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`Monthly P&L Report \u2014 ${monthYearLabel}`, pageW / 2, y, { align: 'center' });
-    y += 10;
-    doc.setLineWidth(0.4);
-    doc.line(14, y, pageW - 14, y);
-    y += 8;
-
-    // ── SECTION 1 — Summary ────────────────────────────────────────────
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Section 1 \u2014 Summary', 14, y);
-    y += 7;
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    const summaryRows: [string, string][] = [
-      ['Total Revenue',    `PHP ${fmt(totalRevenue)}`],
-      ['Total Expenses',   `PHP ${fmt(totalExpenses)}`],
-      ['Net Profit',       `PHP ${fmt(netProfit)}`],
-      ['Profit Margin',    `${profitMargin.toFixed(1)}%`],
-    ];
-    summaryRows.forEach(([label, value]) => {
-      checkPage();
-      doc.text(label, 18, y);
-      doc.text(value, pageW - 14, y, { align: 'right' });
-      y += 6;
-    });
-    y += 4;
-
-    // ── SECTION 2 — Revenue Breakdown ─────────────────────────────────
-    checkPage(12);
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Section 2 \u2014 Revenue Breakdown', 14, y);
-    y += 7;
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Source', 18, y);
-    doc.text('Amount', pageW - 14, y, { align: 'right' });
-    y += 5;
-    doc.setLineWidth(0.2);
-    doc.line(14, y, pageW - 14, y);
-    y += 4;
-    doc.setFont('helvetica', 'normal');
-    revenueRows.forEach(row => {
-      checkPage();
-      doc.text(row.label, 18, y);
-      doc.text(`PHP ${fmt(row.value)}`, pageW - 14, y, { align: 'right' });
-      y += 5;
-    });
-    doc.setLineWidth(0.2);
-    doc.line(14, y, pageW - 14, y);
-    y += 4;
-    doc.setFont('helvetica', 'bold');
-    doc.text('Total Revenue', 18, y);
-    doc.text(`PHP ${fmt(totalRevenue)}`, pageW - 14, y, { align: 'right' });
-    y += 8;
-
-    // ── SECTION 3 — Expenses Breakdown ────────────────────────────────
-    checkPage(12);
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Section 3 \u2014 Expenses Breakdown', 14, y);
-    y += 7;
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Category', 18, y);
-    doc.text('Amount', pageW - 14, y, { align: 'right' });
-    y += 5;
-    doc.setLineWidth(0.2);
-    doc.line(14, y, pageW - 14, y);
-    y += 4;
-    doc.setFont('helvetica', 'normal');
-    expenseRows.forEach(row => {
-      checkPage();
-      doc.text(row.label, 18, y);
-      doc.text(`PHP ${fmt(row.amount)}`, pageW - 14, y, { align: 'right' });
-      y += 5;
-    });
-    doc.setLineWidth(0.2);
-    doc.line(14, y, pageW - 14, y);
-    y += 4;
-    doc.setFont('helvetica', 'bold');
-    doc.text('Total Expenses', 18, y);
-    doc.text(`PHP ${fmt(totalExpenses)}`, pageW - 14, y, { align: 'right' });
-    y += 10;
-
-    // ── SECTION 4 — Footer ────────────────────────────────────────────
-    checkPage(14);
-    doc.setLineWidth(0.4);
-    doc.line(14, y, pageW - 14, y);
-    y += 6;
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'normal');
+    const monthYearLabel = monthDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
     const generatedDate = new Date().toLocaleDateString('en-PH', {
       year: 'numeric', month: 'long', day: 'numeric',
     });
-    doc.text(`Generated: ${generatedDate}`, 14, y);
-    doc.text('Powered by BAIA ROS', pageW - 14, y, { align: 'right' });
 
-    doc.save(filename);
+    const revenueRowsHTML = revenueRows
+      .map((row, i) => `
+        <tr style="background:${i % 2 === 0 ? '#ffffff' : '#f8f9fa'}">
+          <td style="padding:8px 12px;border:1px solid #dee2e6">${escapeHtml(row.label)}</td>
+          <td style="padding:8px 12px;border:1px solid #dee2e6;text-align:right">&#8369;${fmt(row.value)}</td>
+        </tr>`)
+      .join('');
+
+    const expenseRowsHTML = expenseRows
+      .map((row, i) => `
+        <tr style="background:${i % 2 === 0 ? '#ffffff' : '#f8f9fa'}">
+          <td style="padding:8px 12px;border:1px solid #dee2e6">${escapeHtml(row.label)}</td>
+          <td style="padding:8px 12px;border:1px solid #dee2e6;text-align:right">&#8369;${fmt(row.amount)}</td>
+        </tr>`)
+      .join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>BAIA P&amp;L Report &mdash; ${monthYearLabel}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; font-size: 13px; color: #1a1a2e; background: #fff; }
+    .header { background: #1a1a2e; color: #fff; text-align: center; padding: 24px 16px 20px; }
+    .header h1 { font-size: 22px; font-weight: 700; letter-spacing: 1px; margin-bottom: 4px; }
+    .header .subtitle { font-size: 13px; opacity: 0.8; margin-bottom: 6px; }
+    .header .report-title { font-size: 15px; font-weight: 600; letter-spacing: 0.5px; }
+    .content { padding: 24px 32px; }
+    .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 28px; }
+    .summary-box { border: 1px solid #dee2e6; border-radius: 6px; padding: 14px 16px; text-align: center; }
+    .summary-box .box-label { font-size: 11px; color: #6c757d; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .summary-box .box-value { font-size: 16px; font-weight: 700; }
+    .box-green { color: #198754; }
+    .box-red { color: #dc3545; }
+    .box-blue { color: #0d6efd; }
+    .section-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #1a1a2e; margin-bottom: 10px; margin-top: 24px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
+    thead tr { background: #e9ecef; }
+    thead th { padding: 9px 12px; border: 1px solid #dee2e6; text-align: left; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: #495057; }
+    thead th:last-child { text-align: right; }
+    .total-row td { padding: 9px 12px; border: 1px solid #dee2e6; font-weight: 700; background: #f1f3f5; }
+    .total-row td:last-child { text-align: right; }
+    .total-green { color: #198754; }
+    .total-red { color: #dc3545; }
+    .footer { margin-top: 32px; border-top: 1px solid #dee2e6; padding-top: 12px; display: flex; justify-content: space-between; font-size: 11px; color: #6c757d; }
+    @media print {
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .header { background: #1a1a2e !important; color: #fff !important; }
+      thead tr { background: #e9ecef !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>BAIA Boutique Resort</h1>
+    <div class="subtitle">San Vicente, Palawan</div>
+    <div class="report-title">Monthly P&amp;L Report &mdash; ${monthYearLabel}</div>
+  </div>
+  <div class="content">
+    <div class="section-title">Summary</div>
+    <div class="summary-grid">
+      <div class="summary-box">
+        <div class="box-label">Total Revenue</div>
+        <div class="box-value box-green">&#8369;${fmt(totalRevenue)}</div>
+      </div>
+      <div class="summary-box">
+        <div class="box-label">Total Expenses</div>
+        <div class="box-value box-red">&#8369;${fmt(totalExpenses)}</div>
+      </div>
+      <div class="summary-box">
+        <div class="box-label">Net Profit</div>
+        <div class="box-value ${netProfit >= 0 ? 'box-green' : 'box-red'}">&#8369;${fmt(netProfit)}</div>
+      </div>
+      <div class="summary-box">
+        <div class="box-label">Profit Margin</div>
+        <div class="box-value ${profitMargin >= 0 ? 'box-blue' : 'box-red'}">${profitMargin.toFixed(1)}%</div>
+      </div>
+    </div>
+
+    <div class="section-title">Revenue Breakdown</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Source</th>
+          <th style="text-align:right">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${revenueRowsHTML}
+        <tr class="total-row">
+          <td>Total Revenue</td>
+          <td class="total-green">&#8369;${fmt(totalRevenue)}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="section-title">Expenses Breakdown</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th style="text-align:right">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${expenseRowsHTML}
+        <tr class="total-row">
+          <td>Total Expenses</td>
+          <td class="total-red">&#8369;${fmt(totalExpenses)}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="footer">
+      <span>Generated: ${generatedDate}</span>
+      <span>Powered by BAIA ROS</span>
+    </div>
+  </div>
+  <script>window.onload = function(){ window.print(); };<\/script>
+</body>
+</html>`;
+
+    const win = window.open('', '_blank');
+    if (win) {
+      win.document.write(html);
+      win.document.close();
+    } else {
+      alert('Popup blocked. Please allow popups for this site to view the PDF report.');
+    }
   };
 
   return (
