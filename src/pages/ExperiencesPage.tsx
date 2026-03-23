@@ -153,14 +153,13 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
     };
   }, [qc]);
 
-  const todayTours = tours.filter((t: any) => t.tour_date === todayStr);
-  const completedToday = todayTours.filter((t: any) => t.status === 'completed');
-  const upcomingTours = tours.filter((t: any) => t.tour_date > todayStr);
+  const completedToday = tourBookings.filter((t: any) => t.tour_date === todayStr && t.status === 'completed');
+  const upcomingTours = tourBookings.filter((t: any) => t.tour_date > todayStr);
 
-  // Guest portal bookings split
+  // Bookings split
   const pendingBookings = tourBookings.filter((b: any) => b.status === 'pending');
   const confirmedBookings = tourBookings.filter((b: any) => b.status === 'confirmed');
-  const todayBookings = tourBookings.filter((b: any) => b.tour_date === todayStr && b.status !== 'cancelled');
+  const todayBookings = tourBookings.filter((b: any) => b.tour_date === todayStr && !['cancelled', 'completed'].includes(b.status));
 
   const pendingRequests = requests.filter((r: any) => r.status === 'pending');
   const hasPendingItems = pendingBookings.length > 0 || pendingRequests.length > 0;
