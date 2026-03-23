@@ -8,9 +8,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { startOfDay, startOfWeek, startOfMonth, startOfYear, subDays, endOfDay, format } from 'date-fns';
-import { DollarSign, ShoppingCart, TrendingUp, Lock, Download, CalendarIcon, Percent, PiggyBank, Receipt, ChevronDown, ChevronUp } from 'lucide-react';
+import { DollarSign, ShoppingCart, TrendingUp, Lock, Download, CalendarIcon, Percent, PiggyBank, Receipt, ChevronDown, ChevronUp, BarChart3 } from 'lucide-react';
 import AccountingExport from './AccountingExport';
 import { cn } from '@/lib/utils';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 
 const TYPE_LABELS: Record<string, string> = {
   Room: 'Room Delivery',
@@ -127,6 +129,59 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
       return data || [];
     },
   });
+
+  // Fetch historical F&B revenue data
+  const { data: histRevenue = [] } = useQuery({
+    queryKey: ['historical-revenue'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('historical_revenue')
+        .select('*')
+        .order('date', { ascending: true });
+      return data || [];
+    },
+  });
+
+  const histStats = useMemo(() => {
+    const totalRevenue = histRevenue.reduce((s, r) => s + (r.revenue || 0), 0);
+    const totalQty = histRevenue.reduce((s, r) => s + (r.qty || 0), 0);
+
+    // Monthly aggregation
+    const monthMap: Record<string, number> = {};
+    histRevenue.forEach(r => {
+      const key = `${r.year}-${String(r.month).padStart(2, '0')}`;
+      monthMap[key] = (monthMap[key] || 0) + (r.revenue || 0);
+    });
+    const monthlyData = Object.entries(monthMap)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, revenue]) => {
+        const [y, m] = month.split('-');
+        const label = format(new Date(Number(y), Number(m) - 1), 'MMM yyyy');
+        return { month: label, revenue };
+      });
+
+    // Category breakdown
+    const catMap: Record<string, number> = {};
+    histRevenue.forEach(r => {
+      const cat = r.category || 'Other';
+      catMap[cat] = (catMap[cat] || 0) + (r.revenue || 0);
+    });
+    const categoryData = Object.entries(catMap)
+      .sort((a, b) => b[1] - a[1])
+      .map(([category, revenue]) => ({ category, revenue }));
+
+    // Payment method breakdown
+    const payMap: Record<string, number> = {};
+    histRevenue.forEach(r => {
+      const pm = r.payment_method || 'Unknown';
+      payMap[pm] = (payMap[pm] || 0) + (r.revenue || 0);
+    });
+    const paymentData = Object.entries(payMap)
+      .sort((a, b) => b[1] - a[1])
+      .map(([method, revenue]) => ({ method, revenue }));
+
+    return { totalRevenue, totalQty, monthlyData, categoryData, paymentData };
+  }, [histRevenue]);
 
   const costMap = useMemo(() => {
     const map: Record<string, number> = {};
@@ -505,15 +560,92 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
       {/* Accounting Export */}
       <AccountingExport />
 
-      {/* Coming Soon - Tours */}
-      <section className="p-4 border border-dashed border-border rounded-lg opacity-60">
-        <div className="flex items-center gap-2 mb-2">
-          <Lock className="w-4 h-4 text-cream-dim" />
-          <h3 className="font-display text-sm tracking-wider text-foreground">Tours Revenue</h3>
+      {/* Historical F&B Revenue */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-2">
+          <BarChart3 className="w-4 h-4 text-gold" />
+          <h3 className="font-display text-sm tracking-wider text-foreground">F&B Revenue (Historical)</h3>
         </div>
-        <p className="font-body text-xs text-cream-dim">
-          Coming soon — track revenue from tours and activities.
-        </p>
+
+        {/* Total historical revenue */}
+        <div className="grid grid-cols-2 gap-3">
+          <Card className="bg-card/50 border-border">
+            <CardContent className="p-3 text-center">
+              <DollarSign className="w-4 h-4 text-gold mx-auto mb-1" />
+              <p className="font-display text-lg text-foreground">₱{histStats.totalRevenue.toLocaleString()}</p>
+              <p className="font-body text-xs text-muted-foreground">Total F&B Revenue</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-card/50 border-border">
+            <CardContent className="p-3 text-center">
+              <ShoppingCart className="w-4 h-4 text-gold mx-auto mb-1" />
+              <p className="font-display text-lg text-foreground">{histStats.totalQty.toLocaleString()}</p>
+              <p className="font-body text-xs text-muted-foreground">Items Sold</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Monthly Revenue Chart */}
+        {histStats.monthlyData.length > 0 && (
+          <Card className="bg-card/50 border-border">
+            <CardContent className="p-3">
+              <p className="font-display text-xs tracking-wider text-foreground mb-3">Monthly Revenue</p>
+              <ChartContainer
+                config={{
+                  revenue: { label: 'Revenue', color: 'hsl(var(--primary))' },
+                }}
+                className="h-[220px] w-full"
+              >
+                <BarChart data={histStats.monthlyData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border/30" />
+                  <XAxis dataKey="month" tick={{ fontSize: 10 }} className="fill-muted-foreground" angle={-45} textAnchor="end" height={60} />
+                  <YAxis tick={{ fontSize: 10 }} className="fill-muted-foreground" tickFormatter={(v) => `₱${(v / 1000).toFixed(0)}k`} />
+                  <ChartTooltip content={<ChartTooltipContent formatter={(value) => `₱${Number(value).toLocaleString()}`} />} />
+                  <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Category Breakdown */}
+        {histStats.categoryData.length > 0 && (
+          <div>
+            <p className="font-display text-xs tracking-wider text-foreground mb-3">Revenue by Category</p>
+            <div className="space-y-2">
+              {histStats.categoryData.map(c => {
+                const pct = histStats.totalRevenue > 0 ? ((c.revenue / histStats.totalRevenue) * 100).toFixed(1) : '0';
+                return (
+                  <div key={c.category} className="border border-border rounded-lg p-3">
+                    <div className="flex justify-between items-center">
+                      <span className="font-body text-sm text-foreground">{c.category}</span>
+                      <span className="font-display text-sm text-primary">₱{c.revenue.toLocaleString()}</span>
+                    </div>
+                    <div className="mt-1.5 h-1.5 bg-secondary rounded-full overflow-hidden">
+                      <div className="h-full bg-primary rounded-full" style={{ width: `${pct}%` }} />
+                    </div>
+                    <p className="font-body text-[10px] text-muted-foreground mt-1">{pct}% of total</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Payment Method Breakdown */}
+        {histStats.paymentData.length > 0 && (
+          <div>
+            <p className="font-display text-xs tracking-wider text-foreground mb-3">Revenue by Payment Method</p>
+            <div className="space-y-2">
+              {histStats.paymentData.map(p => (
+                <div key={p.method} className="flex justify-between items-center p-2 border border-border rounded">
+                  <span className="font-body text-sm text-foreground">{p.method}</span>
+                  <span className="font-display text-sm text-primary">₱{p.revenue.toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
     </div>
   );

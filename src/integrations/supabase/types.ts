@@ -978,6 +978,45 @@ export type Database = {
         }
         Relationships: []
       }
+      historical_revenue: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          date: string
+          id: string
+          month: number | null
+          payment_method: string | null
+          product: string | null
+          qty: number | null
+          revenue: number | null
+          year: number | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          date: string
+          id?: string
+          month?: number | null
+          payment_method?: string | null
+          product?: string | null
+          qty?: number | null
+          revenue?: number | null
+          year?: number | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          date?: string
+          id?: string
+          month?: number | null
+          payment_method?: string | null
+          product?: string | null
+          qty?: number | null
+          revenue?: number | null
+          year?: number | null
+        }
+        Relationships: []
+      }
       housekeeping_checklists: {
         Row: {
           count_expected: number | null
@@ -1727,6 +1766,7 @@ export type Database = {
           notes: string | null
           paid_amount: number
           password_expires_at: string | null
+          payment_status: string | null
           platform: string
           room_password: string | null
           room_rate: number
@@ -1756,6 +1796,7 @@ export type Database = {
           notes?: string | null
           paid_amount?: number
           password_expires_at?: string | null
+          payment_status?: string | null
           platform?: string
           room_password?: string | null
           room_rate?: number
@@ -1785,6 +1826,7 @@ export type Database = {
           notes?: string | null
           paid_amount?: number
           password_expires_at?: string | null
+          payment_status?: string | null
           platform?: string
           room_password?: string | null
           room_rate?: number
