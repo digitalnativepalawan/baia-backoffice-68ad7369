@@ -1105,14 +1105,14 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
     },
   });
 
-  // Pending tours
+  // Pending tours (includes confirmed — show immediately on bill)
   const { data: pendingTours = [] } = useQuery({
     queryKey: ['guest-bill-pending-tours', session.booking_id],
     queryFn: async () => {
-      const { data } = await (supabase.from('guest_tours') as any)
+      const { data } = await (supabase.from('tour_bookings') as any)
         .select('*')
         .eq('booking_id', session.booking_id)
-        .in('status', ['booked', 'pending']);
+        .in('status', ['booked', 'pending', 'confirmed']);
       return data || [];
     },
   });
@@ -1121,10 +1121,10 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
   const { data: completedTours = [] } = useQuery({
     queryKey: ['guest-bill-completed-tours', session.booking_id],
     queryFn: async () => {
-      const { data } = await (supabase.from('guest_tours') as any)
+      const { data } = await (supabase.from('tour_bookings') as any)
         .select('*')
         .eq('booking_id', session.booking_id)
-        .in('status', ['completed', 'confirmed']);
+        .in('status', ['completed']);
       return data || [];
     },
   });
@@ -1198,7 +1198,7 @@ const BillView = ({ session }: { session: GuestPortalSession }) => {
         qc.invalidateQueries({ queryKey: ['guest-bill-room-charged-orders', session.room_id, session.room_name] });
       })
       .on('postgres_changes', {
-        event: '*', schema: 'public', table: 'guest_tours',
+        event: '*', schema: 'public', table: 'tour_bookings',
         filter: `booking_id=eq.${session.booking_id}`,
       }, () => {
         qc.invalidateQueries({ queryKey: ['guest-bill-pending-tours', session.booking_id] });

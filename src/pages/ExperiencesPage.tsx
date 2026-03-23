@@ -37,7 +37,7 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
 
   const [historyOpen, setHistoryOpen] = useState(false);
   const [editTour, setEditTour] = useState<any>(null);
-  const [editTourSource, setEditTourSource] = useState<'guest_tours' | 'tour_bookings'>('guest_tours');
+  const [editTourSource, setEditTourSource] = useState<'guest_tours' | 'tour_bookings'>('tour_bookings');
   const [editRequest, setEditRequest] = useState<any>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -70,31 +70,19 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
   const sevenDaysAgo = subDays(today, 7).toISOString();
   const oneDayAgo = subDays(today, 1).toISOString();
 
-  // Admin-created tours (guest_tours) — only actionable (booked/confirmed)
-  const { data: tours = [] } = useQuery({
-    queryKey: ['all-tours-experiences'],
-    queryFn: async () => {
-      const { data } = await from('guest_tours').select('*')
-        .gte('tour_date', todayStr)
-        .in('status', ['booked', 'confirmed', 'completed'])
-        .order('tour_date').order('pickup_time');
-      return (data || []) as any[];
-    },
-  });
-
-  // Guest portal tour bookings (tour_bookings) — only pending/confirmed
+  // All tours from tour_bookings (single source of truth)
   const { data: tourBookings = [] } = useQuery({
     queryKey: ['tour-bookings-experiences'],
     queryFn: async () => {
       const { data } = await (supabase.from('tour_bookings') as any)
         .select('*')
-        .in('status', ['pending', 'confirmed'])
-        .gte('created_at', sevenDaysAgo)
-        .order('created_at', { ascending: false })
-        .limit(50);
+        .in('status', ['pending', 'confirmed', 'booked', 'completed'])
+        .gte('tour_date', todayStr)
+        .order('tour_date').order('pickup_time');
       return (data || []) as any[];
     },
   });
+
 
   // Guest requests (transport, rentals) — only pending/confirmed
   const { data: requests = [] } = useQuery({
@@ -123,7 +111,8 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
   const { data: recentTours = [] } = useQuery({
     queryKey: ['recent-tours-history'],
     queryFn: async () => {
-      const { data } = await from('guest_tours').select('*')
+      const { data } = await (supabase.from('tour_bookings') as any)
+        .select('*')
         .in('status', ['completed', 'cancelled'])
         .gte('tour_date', subDays(new Date(), 1).toISOString().split('T')[0])
         .order('tour_date', { ascending: false }).limit(20);
@@ -152,14 +141,13 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
     };
   }, [qc]);
 
-  const todayTours = tours.filter((t: any) => t.tour_date === todayStr);
-  const completedToday = todayTours.filter((t: any) => t.status === 'completed');
-  const upcomingTours = tours.filter((t: any) => t.tour_date > todayStr);
+  const completedToday = tourBookings.filter((t: any) => t.tour_date === todayStr && t.status === 'completed');
+  const upcomingTours = tourBookings.filter((t: any) => t.tour_date > todayStr);
 
-  // Guest portal bookings split
+  // Bookings split
   const pendingBookings = tourBookings.filter((b: any) => b.status === 'pending');
   const confirmedBookings = tourBookings.filter((b: any) => b.status === 'confirmed');
-  const todayBookings = tourBookings.filter((b: any) => b.tour_date === todayStr && b.status !== 'cancelled');
+  const todayBookings = tourBookings.filter((b: any) => b.tour_date === todayStr && !['cancelled', 'completed'].includes(b.status));
 
   const pendingRequests = requests.filter((r: any) => r.status === 'pending');
   const hasPendingItems = pendingBookings.length > 0 || pendingRequests.length > 0;
@@ -209,11 +197,11 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
 
   const updateTourStatus = async (id: string, status: string, tour?: any) => {
     if (!canDoEdit) { toast.error('View-only access'); return; }
-    await from('guest_tours').update({ status }).eq('id', id);
+    await (supabase.from('tour_bookings') as any).update({ status, confirmed_by: staffName }).eq('id', id);
 
     // Room charge is handled solely by RoomBillingTab to avoid duplicate transactions
 
-    qc.invalidateQueries({ queryKey: ['all-tours-experiences'] });
+    qc.invalidateQueries({ queryKey: ['tour-bookings-experiences'] });
     toast.success(`Tour ${status}`);
   };
 
@@ -390,56 +378,13 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
         </div>
       )}
 
-      {/* ── Today's Tours (admin-created) ── */}
+      {/* ── Today's Tours & Activities ── */}
       <div className="mb-6 space-y-2">
-        <h2 className="font-display text-xs tracking-wider text-foreground uppercase">🏝️ Today's Tours & Activities ({todayTours.length + todayBookings.length})</h2>
-        {todayTours.length === 0 && todayBookings.length === 0 ? (
+        <h2 className="font-display text-xs tracking-wider text-foreground uppercase">🏝️ Today's Tours & Activities ({todayBookings.length})</h2>
+        {todayBookings.length === 0 ? (
           <p className="font-body text-sm text-muted-foreground text-center py-4">No tours scheduled today</p>
         ) : (
           <>
-            {todayTours.map((tour: any) => (
-              <div key={tour.id} className="border border-border rounded-lg p-3 space-y-2">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1 min-w-0 cursor-pointer" onClick={() => canDoEdit && setEditTour(tour)}>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-3.5 h-3.5 text-primary" />
-                      <p className="font-display text-sm text-foreground tracking-wider">{tour.tour_name}</p>
-                      {canDoEdit && <Pencil className="w-3 h-3 text-muted-foreground" />}
-                    </div>
-                    <p className="font-body text-xs text-muted-foreground mt-1">
-                      {tour.pickup_time && `${tour.pickup_time} · `}{tour.unit_name} · {tour.pax} pax
-                    </p>
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <CalendarDays className="w-3 h-3 text-muted-foreground" />
-                      <p className="font-body text-xs text-muted-foreground">
-                        {format(new Date(tour.tour_date + 'T00:00:00'), 'EEE, MMM d, yyyy')}
-                      </p>
-                    </div>
-                    {tour.provider && <p className="font-body text-xs text-muted-foreground">Provider: {tour.provider}</p>}
-                    {Number(tour.price) > 0 && <p className="font-body text-xs text-foreground">₱{Number(tour.price).toLocaleString()}</p>}
-                    {tour.notes && (
-                      <div className="flex items-start gap-1 mt-1">
-                        <StickyNote className="w-3 h-3 text-amber-400 mt-0.5 flex-shrink-0" />
-                        <p className="font-body text-[11px] text-amber-400/80 italic">{tour.notes}</p>
-                      </div>
-                    )}
-                  </div>
-                  <Badge className={`font-body text-xs ${statusColor(tour.status)}`}>{tour.status}</Badge>
-                </div>
-                {canDoEdit && tour.status !== 'completed' && tour.status !== 'cancelled' && (
-                  <div className="flex gap-2">
-                    {tour.status === 'booked' && (
-                      <Button size="sm" variant="outline" onClick={() => updateTourStatus(tour.id, 'confirmed', tour)}
-                        className="font-display text-xs tracking-wider min-h-[36px]">Confirm</Button>
-                    )}
-                    <Button size="sm" onClick={() => updateTourStatus(tour.id, 'completed')}
-                      className="font-display text-xs tracking-wider min-h-[36px]">
-                      <CheckCircle className="w-3.5 h-3.5 mr-1" /> Complete
-                    </Button>
-                  </div>
-                )}
-              </div>
-            ))}
             {todayBookings.map((b: any) => (
               <div key={b.id} className="border border-border rounded-lg p-3 space-y-2">
                 <div className="flex justify-between items-start">
@@ -468,11 +413,17 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
                   </div>
                   <Badge className={`font-body text-xs ${statusColor(b.status)}`}>{b.status}</Badge>
                 </div>
-                {canDoEdit && b.status === 'confirmed' && (
-                  <Button size="sm" onClick={() => completeTourBooking(b.id)}
-                    className="font-display text-xs tracking-wider min-h-[36px]">
-                    <CheckCircle className="w-3.5 h-3.5 mr-1" /> Complete
-                  </Button>
+                {canDoEdit && b.status !== 'completed' && b.status !== 'cancelled' && (
+                  <div className="flex gap-2">
+                    {b.status === 'booked' && (
+                      <Button size="sm" variant="outline" onClick={() => updateTourStatus(b.id, 'confirmed', b)}
+                        className="font-display text-xs tracking-wider min-h-[36px]">Confirm</Button>
+                    )}
+                    <Button size="sm" onClick={() => completeTourBooking(b.id)}
+                      className="font-display text-xs tracking-wider min-h-[36px]">
+                      <CheckCircle className="w-3.5 h-3.5 mr-1" /> Complete
+                    </Button>
+                  </div>
                 )}
               </div>
             ))}
@@ -485,14 +436,14 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
         <div className="mb-6 space-y-2">
           <h2 className="font-display text-xs tracking-wider text-muted-foreground uppercase">Upcoming Tours</h2>
           {upcomingTours.slice(0, 10).map((tour: any) => (
-            <div key={tour.id} className="border border-border rounded-lg p-3 flex justify-between items-start cursor-pointer" onClick={() => canDoEdit && setEditTour(tour)}>
+            <div key={tour.id} className="border border-border rounded-lg p-3 flex justify-between items-start cursor-pointer" onClick={() => { if (canDoEdit) { setEditTourSource('tour_bookings'); setEditTour(tour); } }}>
               <div>
                 <div className="flex items-center gap-2">
                   <p className="font-display text-sm text-foreground tracking-wider">{tour.tour_name}</p>
                   {canDoEdit && <Pencil className="w-3 h-3 text-muted-foreground" />}
                 </div>
                 <p className="font-body text-xs text-muted-foreground">
-                  {format(new Date(tour.tour_date + 'T00:00:00'), 'EEE, MMM d')} · {tour.unit_name} · {tour.pax} pax
+                  {format(new Date(tour.tour_date + 'T00:00:00'), 'EEE, MMM d')} · {tour.guest_name} · {tour.pax} pax
                 </p>
                 {tour.notes && (
                   <div className="flex items-start gap-1 mt-1">
@@ -560,7 +511,7 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="font-display text-sm text-foreground tracking-wider">{tour.tour_name}</p>
-                    <p className="font-body text-xs text-muted-foreground">{tour.unit_name} · {tour.pax} pax</p>
+                    <p className="font-body text-xs text-muted-foreground">{tour.guest_name} · {tour.pax} pax</p>
                   </div>
                   <Badge className={`font-body text-xs ${statusColor(tour.status)}`}>{tour.status}</Badge>
                 </div>
@@ -587,7 +538,7 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
       {/* Edit Tour Modal */}
       <EditTourModal
         open={!!editTour}
-        onOpenChange={(open) => { if (!open) { setEditTour(null); setEditTourSource('guest_tours'); } }}
+        onOpenChange={(open) => { if (!open) { setEditTour(null); setEditTourSource('tour_bookings'); } }}
         tour={editTour}
         unitName={editTour?.unit_name || ''}
         bookingId={editTour?.booking_id || null}
