@@ -657,6 +657,8 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
             </div>
           </div>
         )}
+        </>
+        )}
       </section>
     </div>
   );
