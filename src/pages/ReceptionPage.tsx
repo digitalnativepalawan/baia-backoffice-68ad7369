@@ -16,7 +16,7 @@ import RoomsDashboard from '@/components/admin/RoomsDashboard';
 import ClosedCheckoutsPanel from '@/components/rooms/ClosedCheckoutsPanel';
 import AddPaymentModal from '@/components/rooms/AddPaymentModal';
 import HousekeeperPickerModal from '@/components/rooms/HousekeeperPickerModal';
-import PasswordConfirmModal from '@/components/housekeeping/PasswordConfirmModal';
+
 import HousekeepingInspection from '@/components/admin/HousekeepingInspection';
 import { toast } from 'sonner';
 import { format, addDays } from 'date-fns';
