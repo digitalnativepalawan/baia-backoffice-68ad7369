@@ -6,12 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Cell, Legend,
+  ResponsiveContainer, Cell,
 } from 'recharts';
 
 const BAR_CATEGORIES = new Set(['Cocktails', 'Wine', 'Spirits', 'Beer']);
-
-const UNKNOWN_UNIT_ID = 'unknown';
 
 const P_AND_L_EXPENSE_ROWS: { label: string; keys: string[] }[] = [
   { label: 'Labor/Staff',               keys: ['Labor/Staff'] },
@@ -113,28 +111,6 @@ const ResortOpsPnLReport = ({ monthBookings, orders, monthExpenses, menuItems }:
     () => expenseRows.reduce((s, r) => s + r.amount, 0),
     [expenseRows],
   );
-
-  // ── Chart data ─────────────────────────────────────────────────────────
-  const unitRevenueData = useMemo(() => {
-    const map = new Map<string, { realized: number; projected: number }>();
-    for (const b of monthBookings) {
-      const id = (b.unit_id as string) || UNKNOWN_UNIT_ID;
-      if (!map.has(id)) map.set(id, { realized: 0, projected: 0 });
-      const entry = map.get(id)!;
-      entry.realized += Number(b.paid_amount || 0);
-      if (b.check_in && b.check_out && b.room_rate) {
-        const nights = Math.max(0, Math.round(
-          (new Date(b.check_out as string).getTime() - new Date(b.check_in as string).getTime()) / 86400000,
-        ));
-        entry.projected += Number(b.room_rate) * nights;
-      }
-    }
-    return Array.from(map.entries()).map(([id, data]) => ({
-      unit: id !== UNKNOWN_UNIT_ID ? `Unit ${id.slice(0, 6)}` : 'Unknown Unit',
-      realized: data.realized,
-      projected: data.projected,
-    }));
-  }, [monthBookings]);
 
   // ── Summary metrics ────────────────────────────────────────────────────
   const netProfit = totalRevenue - totalExpenses;
@@ -537,60 +513,6 @@ const ResortOpsPnLReport = ({ monthBookings, orders, monthExpenses, menuItems }:
           </CardContent>
         </Card>
 
-        {/* Chart 4 — Actual vs Expected Room Revenue */}
-        {unitRevenueData.length > 0 && (
-          <Card className="bg-card border-border">
-            <CardHeader className="pb-2">
-              <CardTitle className="font-display text-xs tracking-wider">Actual vs Expected Room Revenue</CardTitle>
-            </CardHeader>
-            <CardContent className="pr-4">
-              <ResponsiveContainer width="100%" height={Math.max(140, unitRevenueData.length * 48 + 40)}>
-                <BarChart
-                  layout="vertical"
-                  data={unitRevenueData}
-                  margin={{ top: 4, right: 16, left: 8, bottom: 4 }}
-                >
-                  <CartesianGrid horizontal={false} stroke="hsl(var(--border))" strokeDasharray="3 3" />
-                  <XAxis
-                    type="number"
-                    tickFormatter={(v: number) => `₱${v.toLocaleString('en-PH', { maximumFractionDigits: 0 })}`}
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="unit"
-                    width={60}
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <Tooltip
-                    formatter={(v: number, name: string) => [`₱${fmt(v)}`, name === 'realized' ? 'Realized' : 'Projected']}
-                    contentStyle={{
-                      background: 'hsl(var(--card))',
-                      color: 'hsl(var(--card-foreground))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '4px',
-                      fontSize: '12px',
-                    }}
-                    cursor={{ fill: 'hsl(var(--muted))' }}
-                  />
-                  <Legend
-                    formatter={(value: string) => (
-                      <span style={{ color: 'hsl(var(--muted-foreground))', fontSize: '11px' }}>
-                        {value === 'realized' ? 'Realized' : 'Projected'}
-                      </span>
-                    )}
-                  />
-                  <Bar dataKey="realized" fill="hsl(var(--success))" radius={[0, 3, 3, 0]} barSize={14} />
-                  <Bar dataKey="projected" fill="hsl(var(--muted-foreground))" radius={[0, 3, 3, 0]} barSize={14} />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        )}
       </div>
     </div>
   );
