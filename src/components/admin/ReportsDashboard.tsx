@@ -130,6 +130,59 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
     },
   });
 
+  // Fetch historical F&B revenue data
+  const { data: histRevenue = [] } = useQuery({
+    queryKey: ['historical-revenue'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('historical_revenue')
+        .select('*')
+        .order('date', { ascending: true });
+      return data || [];
+    },
+  });
+
+  const histStats = useMemo(() => {
+    const totalRevenue = histRevenue.reduce((s, r) => s + (r.revenue || 0), 0);
+    const totalQty = histRevenue.reduce((s, r) => s + (r.qty || 0), 0);
+
+    // Monthly aggregation
+    const monthMap: Record<string, number> = {};
+    histRevenue.forEach(r => {
+      const key = `${r.year}-${String(r.month).padStart(2, '0')}`;
+      monthMap[key] = (monthMap[key] || 0) + (r.revenue || 0);
+    });
+    const monthlyData = Object.entries(monthMap)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, revenue]) => {
+        const [y, m] = month.split('-');
+        const label = format(new Date(Number(y), Number(m) - 1), 'MMM yyyy');
+        return { month: label, revenue };
+      });
+
+    // Category breakdown
+    const catMap: Record<string, number> = {};
+    histRevenue.forEach(r => {
+      const cat = r.category || 'Other';
+      catMap[cat] = (catMap[cat] || 0) + (r.revenue || 0);
+    });
+    const categoryData = Object.entries(catMap)
+      .sort((a, b) => b[1] - a[1])
+      .map(([category, revenue]) => ({ category, revenue }));
+
+    // Payment method breakdown
+    const payMap: Record<string, number> = {};
+    histRevenue.forEach(r => {
+      const pm = r.payment_method || 'Unknown';
+      payMap[pm] = (payMap[pm] || 0) + (r.revenue || 0);
+    });
+    const paymentData = Object.entries(payMap)
+      .sort((a, b) => b[1] - a[1])
+      .map(([method, revenue]) => ({ method, revenue }));
+
+    return { totalRevenue, totalQty, monthlyData, categoryData, paymentData };
+  }, [histRevenue]);
+
   const costMap = useMemo(() => {
     const map: Record<string, number> = {};
     menuItems.forEach(m => { map[m.name] = m.food_cost || 0; });
