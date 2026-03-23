@@ -1,45 +1,46 @@
 
 
-## Add Tours Board to Service Mode
+## Two Fixes: Double Charge Bug + Tours Board Sync
 
-### Overview
-Add a "Tours" card to the `/service` selection screen and a new `/service/tours` board page that displays tour bookings from the existing `tour_bookings` table as cards.
+### Root Cause Analysis
 
-### Changes
+**Double Charge Bug**: Tour room_transaction records are inserted in THREE separate places:
+1. `ExperiencesPage.updateTourStatus` — charges on **confirm** (line 215-231)
+2. `ReceptionPage.updateTourStatus` — charges on **complete** (line 454-470)
+3. `RoomBillingTab.handleCompleteTour` — charges on **complete** (line 197-212)
 
-**1. ServiceModePage.tsx — Add Tours department card**
-- Add a `Compass` icon import from lucide-react
-- Add a new entry to the `departments` array with key `tours`, route `/service/tours`, warm teal gradient, and permKeys `['experiences', 'reception']`
-- Add a `tours` count to the counts memo that queries today's confirmed tour bookings
+A tour confirmed from Experiences gets charged once, then completed from Reception or Billing gets charged again = double entry.
 
-**2. New file: `src/pages/ServiceToursPage.tsx`**
-- Simple page wrapper following the exact pattern of `ServiceKitchenPage.tsx`
-- Uses `ServiceHeader` with department="tours" and renders a new `ToursBoard` component
+**Tours Board Sync**: `RoomsDashboard.addTour` (line 352) only inserts into `guest_tours`. Nothing writes to `tour_bookings`, so `/service/tours` never sees it.
 
-**3. New file: `src/components/service/ToursBoard.tsx`**
-- Fetches from `tour_bookings` table (upcoming + today, ordered by tour_date, pickup_time)
-- Displays each booking as a card showing:
-  - Guest name + unit (from `guest_name` field)
-  - Tour name
-  - Date + pickup time
-  - Pax count badge
-  - Notes (special requests)
-  - Status badge: color-coded pill (confirmed = green, pending = amber, completed = muted)
-- Auto-refreshes every 15 seconds
-- Filter pills at top: All / Today / Upcoming
-- Status filter: All / Confirmed / Pending / Completed
+### Fix 1 — Remove Duplicate Charge Inserts
 
-**4. App.tsx — Add route**
-- Import `ServiceToursPage`
-- Add route: `/service/tours` with `requiredPermission={['experiences', 'reception']}`
+Keep room_transaction insertion ONLY in `RoomBillingTab.handleCompleteTour` (the dedicated billing component). Remove it from:
 
-**5. ServiceHeader.tsx — Add tours label**
-- Add `tours` to the department label map so the header shows "Tours" with appropriate icon
+- **`ReceptionPage.tsx`** (lines 454-470): Remove the `if (status === 'completed' ...)` block that inserts room_transaction
+- **`ExperiencesPage.tsx`** (lines 215-231): Remove the `if (status === 'confirmed' ...)` block that inserts room_transaction
 
-### Files to create/edit
-- `src/pages/ServiceModePage.tsx` (edit — add tours card + count)
-- `src/pages/ServiceToursPage.tsx` (new)
-- `src/components/service/ToursBoard.tsx` (new)
-- `src/App.tsx` (edit — add route)
-- `src/components/service/ServiceHeader.tsx` (edit — add tours label)
+This ensures exactly ONE charge is created, only when the tour is marked done from the room's billing tab.
+
+### Fix 2 — Sync to tour_bookings on Add
+
+In `RoomsDashboard.addTour` (line 352-373), after inserting into `guest_tours`, also insert a matching record into `tour_bookings` with the same data (mapping `unit_name` → looking up `room_id` from the selected unit). This makes the tour visible on `/service/tours`.
+
+Fields to map:
+- `guest_name` ← from `currentBooking.resort_ops_guests.full_name`
+- `tour_name`, `tour_date`, `pax`, `price`, `pickup_time`, `notes` ← same values
+- `booking_id` ← from `currentBooking.id`
+- `room_id` ← from `selectedUnit.id`
+- `status` ← `'confirmed'`
+- `confirmed_by` ← staff name from localStorage
+
+### Files Modified
+- `src/components/admin/RoomsDashboard.tsx` — add tour_bookings insert in `addTour`
+- `src/pages/ReceptionPage.tsx` — remove room_transaction insert from `updateTourStatus`
+- `src/pages/ExperiencesPage.tsx` — remove room_transaction insert from `updateTourStatus`
+
+### What Does NOT Change
+- RoomBillingTab (keeps its single room_transaction on complete)
+- Guest portal, payment flows, cashier, or any other pages
+- No new tables or schema changes
 
