@@ -378,56 +378,13 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
         </div>
       )}
 
-      {/* ── Today's Tours (admin-created) ── */}
+      {/* ── Today's Tours & Activities ── */}
       <div className="mb-6 space-y-2">
-        <h2 className="font-display text-xs tracking-wider text-foreground uppercase">🏝️ Today's Tours & Activities ({todayTours.length + todayBookings.length})</h2>
-        {todayTours.length === 0 && todayBookings.length === 0 ? (
+        <h2 className="font-display text-xs tracking-wider text-foreground uppercase">🏝️ Today's Tours & Activities ({todayBookings.length})</h2>
+        {todayBookings.length === 0 ? (
           <p className="font-body text-sm text-muted-foreground text-center py-4">No tours scheduled today</p>
         ) : (
           <>
-            {todayTours.map((tour: any) => (
-              <div key={tour.id} className="border border-border rounded-lg p-3 space-y-2">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1 min-w-0 cursor-pointer" onClick={() => canDoEdit && setEditTour(tour)}>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-3.5 h-3.5 text-primary" />
-                      <p className="font-display text-sm text-foreground tracking-wider">{tour.tour_name}</p>
-                      {canDoEdit && <Pencil className="w-3 h-3 text-muted-foreground" />}
-                    </div>
-                    <p className="font-body text-xs text-muted-foreground mt-1">
-                      {tour.pickup_time && `${tour.pickup_time} · `}{tour.unit_name} · {tour.pax} pax
-                    </p>
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <CalendarDays className="w-3 h-3 text-muted-foreground" />
-                      <p className="font-body text-xs text-muted-foreground">
-                        {format(new Date(tour.tour_date + 'T00:00:00'), 'EEE, MMM d, yyyy')}
-                      </p>
-                    </div>
-                    {tour.provider && <p className="font-body text-xs text-muted-foreground">Provider: {tour.provider}</p>}
-                    {Number(tour.price) > 0 && <p className="font-body text-xs text-foreground">₱{Number(tour.price).toLocaleString()}</p>}
-                    {tour.notes && (
-                      <div className="flex items-start gap-1 mt-1">
-                        <StickyNote className="w-3 h-3 text-amber-400 mt-0.5 flex-shrink-0" />
-                        <p className="font-body text-[11px] text-amber-400/80 italic">{tour.notes}</p>
-                      </div>
-                    )}
-                  </div>
-                  <Badge className={`font-body text-xs ${statusColor(tour.status)}`}>{tour.status}</Badge>
-                </div>
-                {canDoEdit && tour.status !== 'completed' && tour.status !== 'cancelled' && (
-                  <div className="flex gap-2">
-                    {tour.status === 'booked' && (
-                      <Button size="sm" variant="outline" onClick={() => updateTourStatus(tour.id, 'confirmed', tour)}
-                        className="font-display text-xs tracking-wider min-h-[36px]">Confirm</Button>
-                    )}
-                    <Button size="sm" onClick={() => updateTourStatus(tour.id, 'completed')}
-                      className="font-display text-xs tracking-wider min-h-[36px]">
-                      <CheckCircle className="w-3.5 h-3.5 mr-1" /> Complete
-                    </Button>
-                  </div>
-                )}
-              </div>
-            ))}
             {todayBookings.map((b: any) => (
               <div key={b.id} className="border border-border rounded-lg p-3 space-y-2">
                 <div className="flex justify-between items-start">
@@ -456,11 +413,17 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
                   </div>
                   <Badge className={`font-body text-xs ${statusColor(b.status)}`}>{b.status}</Badge>
                 </div>
-                {canDoEdit && b.status === 'confirmed' && (
-                  <Button size="sm" onClick={() => completeTourBooking(b.id)}
-                    className="font-display text-xs tracking-wider min-h-[36px]">
-                    <CheckCircle className="w-3.5 h-3.5 mr-1" /> Complete
-                  </Button>
+                {canDoEdit && b.status !== 'completed' && b.status !== 'cancelled' && (
+                  <div className="flex gap-2">
+                    {b.status === 'booked' && (
+                      <Button size="sm" variant="outline" onClick={() => updateTourStatus(b.id, 'confirmed', b)}
+                        className="font-display text-xs tracking-wider min-h-[36px]">Confirm</Button>
+                    )}
+                    <Button size="sm" onClick={() => completeTourBooking(b.id)}
+                      className="font-display text-xs tracking-wider min-h-[36px]">
+                      <CheckCircle className="w-3.5 h-3.5 mr-1" /> Complete
+                    </Button>
+                  </div>
                 )}
               </div>
             ))}
