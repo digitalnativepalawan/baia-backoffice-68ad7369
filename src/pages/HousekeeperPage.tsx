@@ -8,7 +8,6 @@ import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { format, startOfMonth } from 'date-fns';
 import HousekeepingInspection from '@/components/admin/HousekeepingInspection';
-import PasswordConfirmModal from '@/components/housekeeping/PasswordConfirmModal';
 import { getStaffSession } from '@/lib/session';
 import { hasAccess, canEdit } from '@/lib/permissions';
 
@@ -18,38 +17,7 @@ const HousekeeperPage = ({ embedded = false }: { embedded?: boolean }) => {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const audioCtxRef = useRef<AudioContext | null>(null);
-  const [acceptingOrderId, setAcceptingOrderId] = useState<string | null>(null);
   const [activeOrder, setActiveOrder] = useState<any>(null);
-
-  // PIN-based accept for cleaning tasks (non pre_inspection)
-  const handlePinAccept = async (employee: { id: string; name: string; display_name: string }) => {
-    if (!acceptingOrderId) return;
-    try {
-      const { data: current } = await from('housekeeping_orders')
-        .select('accepted_by, accepted_by_name')
-        .eq('id', acceptingOrderId)
-        .single() as any;
-      if (current?.accepted_by) {
-        toast.error(`Already assigned to ${current.accepted_by_name || 'someone else'}`);
-        qc.invalidateQueries({ queryKey: ['housekeeping-orders-all'] });
-        setAcceptingOrderId(null);
-        return;
-      }
-      await from('housekeeping_orders').update({
-        accepted_by: employee.id,
-        accepted_by_name: employee.display_name || employee.name,
-        accepted_at: new Date().toISOString(),
-        status: 'pending_inspection',
-      } as any).eq('id', acceptingOrderId);
-      localStorage.setItem('emp_id', employee.id);
-      localStorage.setItem('emp_name', employee.name);
-      qc.invalidateQueries({ queryKey: ['housekeeping-orders-all'] });
-      toast.success(`Accepted — ${employee.display_name || employee.name}`);
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to accept');
-    }
-    setAcceptingOrderId(null);
-  };
 
   // Unlock AudioContext on first interaction (mobile)
   useEffect(() => {
@@ -220,14 +188,6 @@ const HousekeeperPage = ({ embedded = false }: { embedded?: boolean }) => {
 
   return (
     <div className={embedded ? 'space-y-4' : 'min-h-screen bg-background p-4 max-w-lg mx-auto'}>
-      {/* PIN Modal for cleaning accepts */}
-      <PasswordConfirmModal
-        open={!!acceptingOrderId}
-        onClose={() => setAcceptingOrderId(null)}
-        onConfirm={handlePinAccept}
-        title="Accept Assignment"
-        description="Enter your name and PIN to accept this cleaning assignment."
-      />
       {!embedded && (
         <div className="flex items-center gap-3 mb-6">
           <Button size="sm" variant="ghost" onClick={() => navigate('/')}>
@@ -278,19 +238,13 @@ const HousekeeperPage = ({ embedded = false }: { embedded?: boolean }) => {
                     Created: {format(new Date(order.created_at), 'h:mm a')}
                   </p>
                   <Button
-                    onClick={() => {
-                      if (order.status === 'pre_inspection') {
-                        handleDirectAccept(order.id);
-                      } else {
-                        setAcceptingOrderId(order.id);
-                      }
-                    }}
+                    onClick={() => handleDirectAccept(order.id)}
                     className={`w-full font-display tracking-wider text-sm min-h-[52px] ${
                       isAssignedToMe ? 'bg-primary hover:bg-primary/90 animate-pulse' : ''
                     }`}
                     size="lg"
                   >
-                    {order.status === 'pre_inspection' ? '✋ Accept Inspection' : '✋ Accept with PIN'}
+                    {order.status === 'pre_inspection' ? '✋ Accept Inspection' : '✋ Accept Assignment'}
                   </Button>
                 </div>
               );
