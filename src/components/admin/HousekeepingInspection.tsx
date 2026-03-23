@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowLeft, CheckCircle, Search, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { differenceInMinutes } from 'date-fns';
-import PasswordConfirmModal from '@/components/housekeeping/PasswordConfirmModal';
+
 
 const from = (table: string) => supabase.from(table as any);
 
@@ -38,8 +38,6 @@ const HousekeepingInspection = ({ order, onClose, mode }: HousekeepingInspection
   );
   const [currentStep, setCurrentStep] = useState(derivedStep);
 
-  // PIN confirmation state
-  const [pinAction, setPinAction] = useState<'cleaning' | null>(null);
 
   // ── Checklist items for this room type ──
   const { data: checklistItems = [] } = useQuery({
@@ -266,10 +264,6 @@ const HousekeepingInspection = ({ order, onClose, mode }: HousekeepingInspection
     }
   };
 
-  const handlePinConfirm = (employee: { id: string; name: string; display_name: string }) => {
-    completeCleaning(employee);
-    setPinAction(null);
-  };
 
   // ═══ PRE-INSPECTION MODE (simplified damage check) ═══
   if (isPreInspection) {
@@ -534,7 +528,12 @@ const HousekeepingInspection = ({ order, onClose, mode }: HousekeepingInspection
           </div>
 
           <Button
-            onClick={() => setPinAction('cleaning')}
+            onClick={() => {
+              const empId = localStorage.getItem('emp_id') || '';
+              const empName = localStorage.getItem('emp_name') || 'Housekeeper';
+              const empDisplay = localStorage.getItem('emp_display_name') || empName;
+              completeCleaning({ id: empId, name: empName, display_name: empDisplay });
+            }}
             disabled={cleaning}
             variant="default"
             className="w-full font-display tracking-wider min-h-[44px] bg-emerald-600 hover:bg-emerald-700"
@@ -544,15 +543,6 @@ const HousekeepingInspection = ({ order, onClose, mode }: HousekeepingInspection
           </Button>
         </div>
       )}
-
-      {/* PIN Confirmation Modal */}
-      <PasswordConfirmModal
-        open={!!pinAction}
-        onClose={() => setPinAction(null)}
-        onConfirm={handlePinConfirm}
-        title="Confirm Cleaning Complete"
-        description="Enter your PIN to confirm cleaning is done and mark the room as ready."
-      />
     </div>
   );
 };
