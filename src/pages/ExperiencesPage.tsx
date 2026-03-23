@@ -123,7 +123,8 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
   const { data: recentTours = [] } = useQuery({
     queryKey: ['recent-tours-history'],
     queryFn: async () => {
-      const { data } = await from('guest_tours').select('*')
+      const { data } = await (supabase.from('tour_bookings') as any)
+        .select('*')
         .in('status', ['completed', 'cancelled'])
         .gte('tour_date', subDays(new Date(), 1).toISOString().split('T')[0])
         .order('tour_date', { ascending: false }).limit(20);
