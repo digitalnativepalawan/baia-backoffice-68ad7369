@@ -511,7 +511,7 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="font-display text-sm text-foreground tracking-wider">{tour.tour_name}</p>
-                    <p className="font-body text-xs text-muted-foreground">{tour.unit_name} · {tour.pax} pax</p>
+                    <p className="font-body text-xs text-muted-foreground">{tour.guest_name} · {tour.pax} pax</p>
                   </div>
                   <Badge className={`font-body text-xs ${statusColor(tour.status)}`}>{tour.status}</Badge>
                 </div>
