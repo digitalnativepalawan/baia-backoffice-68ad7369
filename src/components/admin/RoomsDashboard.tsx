@@ -352,7 +352,7 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
   const addTour = async () => {
     if (readOnly) { toast.error('View-only access'); return; }
     if (!tourName.trim() || !tourDate || !selectedUnit) return;
-    await from('guest_tours').insert({
+    const tourData = {
       booking_id: currentBooking?.id || null,
       unit_name: selectedUnit.name,
       tour_name: tourName.trim(),
@@ -362,7 +362,25 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
       provider: tourProvider.trim(),
       pickup_time: tourPickupTime.trim(),
       notes: tourNotes.trim(),
+    };
+    await from('guest_tours').insert(tourData);
+
+    // Sync to tour_bookings so it appears on /service/tours board
+    const staffName = localStorage.getItem('emp_name') || '';
+    await (supabase.from('tour_bookings') as any).insert({
+      booking_id: currentBooking?.id || null,
+      room_id: selectedUnit.id || null,
+      guest_name: currentBooking?.resort_ops_guests?.full_name || selectedUnit.name,
+      tour_name: tourData.tour_name,
+      tour_date: tourData.tour_date,
+      pax: tourData.pax,
+      price: tourData.price,
+      pickup_time: tourData.pickup_time,
+      notes: tourData.notes,
+      status: 'confirmed',
+      confirmed_by: staffName,
     });
+
     import('@/lib/telegram').then(({ notifyTelegram }) => {
       notifyTelegram('tours,managers', `🚐 New Booking\n${currentBooking?.resort_ops_guests?.full_name || selectedUnit.name}\n${tourName.trim()} - ${tourDate}${tourPickupTime.trim() ? ' ' + tourPickupTime.trim() : ''}`);
     });
@@ -370,6 +388,7 @@ const RoomsDashboard = ({ readOnly = false, canViewDocuments = true, initialUnit
     setTourProvider(''); setTourPickupTime(''); setTourNotes('');
     setTourCatalogMode('catalog');
     qc.invalidateQueries({ queryKey: ['guest-tours', selectedUnit.name, currentBooking?.id] });
+    qc.invalidateQueries({ queryKey: ['tours-board'] });
     toast.success('Tour added');
   };
 

@@ -211,24 +211,7 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
     if (!canDoEdit) { toast.error('View-only access'); return; }
     await from('guest_tours').update({ status }).eq('id', id);
 
-    // Insert room charge when confirming a guest_tour with a price
-    if (status === 'confirmed' && tour && Number(tour.price) > 0 && tour.booking_id) {
-      const { data: unit } = await supabase.from('units').select('id, unit_name').eq('unit_name', tour.unit_name).maybeSingle();
-      await (supabase.from('room_transactions') as any).insert({
-        unit_id: unit?.id || null,
-        unit_name: tour.unit_name || '',
-        booking_id: tour.booking_id,
-        guest_name: '',
-        transaction_type: 'charge',
-        amount: Number(tour.price),
-        tax_amount: 0,
-        service_charge_amount: 0,
-        total_amount: Number(tour.price),
-        payment_method: 'Charge to Room',
-        staff_name: staffName,
-        notes: `Tour: ${tour.tour_name} (${tour.pax} pax) on ${tour.tour_date}`,
-      });
-    }
+    // Room charge is handled solely by RoomBillingTab to avoid duplicate transactions
 
     qc.invalidateQueries({ queryKey: ['all-tours-experiences'] });
     toast.success(`Tour ${status}`);
