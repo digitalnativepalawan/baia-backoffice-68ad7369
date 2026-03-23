@@ -541,6 +541,8 @@ const HousekeepingInspection = ({ order, onClose, mode }: HousekeepingInspection
             <CheckCircle className="w-4 h-4 mr-2" />
             {cleaning ? 'Completing...' : '✅ Cleaning Done — Room Ready'}
           </Button>
+        </div>
+      )}
     </div>
   );
 };
