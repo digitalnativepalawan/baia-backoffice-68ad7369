@@ -347,12 +347,12 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
         <Download className="w-4 h-4 mr-1" /> Download CSV Report
       </Button>
 
-      {/* Summary cards */}
+      {/* Summary cards — powered by historical_revenue */}
       <div className="grid grid-cols-2 gap-3">
         <Card className="bg-card/50 border-border">
           <CardContent className="p-3 text-center">
             <DollarSign className="w-4 h-4 text-gold mx-auto mb-1" />
-            <p className="font-display text-lg text-foreground">₱{stats.revenue.toLocaleString()}</p>
+            <p className="font-display text-lg text-foreground">₱{histStats.totalRevenue.toLocaleString()}</p>
             <p className="font-body text-xs text-cream-dim">Revenue</p>
           </CardContent>
         </Card>
@@ -366,14 +366,14 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
         <Card className="bg-card/50 border-border">
           <CardContent className="p-3 text-center">
             <PiggyBank className="w-4 h-4 text-gold mx-auto mb-1" />
-            <p className="font-display text-lg text-foreground">₱{stats.totalProfit.toLocaleString()}</p>
+            <p className="font-display text-lg text-foreground">₱{(histStats.totalRevenue - stats.totalFoodCost).toLocaleString()}</p>
             <p className="font-body text-xs text-cream-dim">Profit</p>
           </CardContent>
         </Card>
         <Card className="bg-card/50 border-border">
           <CardContent className="p-3 text-center">
             <Percent className="w-4 h-4 text-gold mx-auto mb-1" />
-            <p className="font-display text-lg text-foreground">{stats.marginPct.toFixed(1)}%</p>
+            <p className="font-display text-lg text-foreground">{histStats.totalRevenue > 0 ? (((histStats.totalRevenue - stats.totalFoodCost) / histStats.totalRevenue) * 100).toFixed(1) : '0.0'}%</p>
             <p className="font-body text-xs text-cream-dim">Margin</p>
           </CardContent>
         </Card>
