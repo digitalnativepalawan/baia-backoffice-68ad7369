@@ -443,7 +443,7 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
                   {canDoEdit && <Pencil className="w-3 h-3 text-muted-foreground" />}
                 </div>
                 <p className="font-body text-xs text-muted-foreground">
-                  {format(new Date(tour.tour_date + 'T00:00:00'), 'EEE, MMM d')} · {tour.unit_name} · {tour.pax} pax
+                  {format(new Date(tour.tour_date + 'T00:00:00'), 'EEE, MMM d')} · {tour.guest_name} · {tour.pax} pax
                 </p>
                 {tour.notes && (
                   <div className="flex items-start gap-1 mt-1">
