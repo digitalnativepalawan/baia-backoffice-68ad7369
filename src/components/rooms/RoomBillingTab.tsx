@@ -8,6 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { format } from 'date-fns';
 import {
   DollarSign, RefreshCw, LogOut, UtensilsCrossed, MapPin, Bike, Truck,
@@ -38,6 +39,7 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
   const [showPayment, setShowPayment] = useState(false);
   const [showAdjustment, setShowAdjustment] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
+  const [showSettlementBlock, setShowSettlementBlock] = useState(false);
 
   // Selective payment states
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
@@ -140,6 +142,14 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
   const balance = totalCharges - totalPayments + unpaidOrdersTotal + activeToursTotal + activeRequestsTotal;
 
   const staffName = localStorage.getItem('emp_display_name') || localStorage.getItem('emp_name') || 'Staff';
+
+  const handleCheckoutClick = () => {
+    if (balance > 0) {
+      setShowSettlementBlock(true);
+    } else {
+      setShowCheckout(true);
+    }
+  };
 
   // ── Actions ──
   const handleCompOrder = async (orderId: string) => {
@@ -505,7 +515,7 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
           </Button>
           <PrintBill unitName={unit.name} guestName={guestName} booking={booking} transactions={transactions} roomOrders={roomOrders} tours={tours} requests={requests} />
           {booking && (
-            <Button size="sm" variant="destructive" onClick={() => setShowCheckout(true)}
+            <Button size="sm" variant="destructive" disabled={isLoading} onClick={handleCheckoutClick}
               className="font-display text-xs tracking-wider gap-1 min-h-[44px]">
               <LogOut className="w-3.5 h-3.5" /> Check Out
             </Button>
@@ -938,6 +948,94 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
               bookingId={booking.id} booking={booking} transactions={transactions}
               roomTypeId={(unit as any).room_type_id || null} />
           )}
+
+          {/* Settlement Block Modal — shown when folio balance > 0 at checkout */}
+          <Dialog open={showSettlementBlock} onOpenChange={setShowSettlementBlock}>
+            <DialogContent className="bg-card border-border max-w-md">
+              <DialogHeader>
+                <DialogTitle className="font-display tracking-wider flex items-center gap-2 text-destructive">
+                  <AlertTriangle className="w-4 h-4" /> Outstanding Balance
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <p className="font-body text-sm text-muted-foreground">
+                  This folio has an outstanding balance. Please settle all charges before checking out.
+                </p>
+
+                {/* All room ledger charges (accommodation, room_charge, tours posted to ledger, adjustments, etc.) */}
+                {charges.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="font-display text-xs tracking-wider text-muted-foreground uppercase">Room Ledger</p>
+                    {charges.map(t => (
+                      <div key={t.id} className="flex justify-between font-body text-sm">
+                        <span className="text-muted-foreground truncate flex-1">{t.notes || t.transaction_type}</span>
+                        <span className="text-foreground">₱{t.total_amount.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Unpaid F&B orders not yet on the ledger */}
+                {unpaidOrders.filter(o => o.payment_type !== 'Charge to Room').length > 0 && (
+                  <div className="space-y-1">
+                    <p className="font-display text-xs tracking-wider text-muted-foreground uppercase">Unpaid F&B Orders</p>
+                    {unpaidOrders.filter(o => o.payment_type !== 'Charge to Room').map(o => {
+                      const items = Array.isArray(o.items) ? o.items : [];
+                      return (
+                        <div key={o.id} className="flex justify-between font-body text-sm">
+                          <span className="text-muted-foreground truncate flex-1">
+                            {items.map((i: any) => `${i.qty || 1}× ${i.name}`).join(', ') || 'F&B Order'}
+                          </span>
+                          <span className="text-foreground">₱{(Number(o.total || 0) + Number(o.service_charge || 0)).toLocaleString()}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Active tours with a price */}
+                {tours.filter((t: any) => t.status !== 'cancelled' && t.status !== 'completed' && Number(t.price) > 0).length > 0 && (
+                  <div className="space-y-1">
+                    <p className="font-display text-xs tracking-wider text-muted-foreground uppercase">Active Tours</p>
+                    {tours.filter((t: any) => t.status !== 'cancelled' && t.status !== 'completed' && Number(t.price) > 0).map((t: any) => (
+                      <div key={t.id} className="flex justify-between font-body text-sm">
+                        <span className="text-muted-foreground truncate flex-1">{t.tour_name}</span>
+                        <span className="text-foreground">₱{Number(t.price).toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Active requests with a price */}
+                {requests.filter((r: any) => r.status !== 'cancelled' && r.status !== 'completed' && Number(r.price) > 0).length > 0 && (
+                  <div className="space-y-1">
+                    <p className="font-display text-xs tracking-wider text-muted-foreground uppercase">Active Requests</p>
+                    {requests.filter((r: any) => r.status !== 'cancelled' && r.status !== 'completed' && Number(r.price) > 0).map((r: any) => (
+                      <div key={r.id} className="flex justify-between font-body text-sm">
+                        <span className="text-muted-foreground truncate flex-1">{r.request_type}</span>
+                        <span className="text-foreground">₱{Number(r.price).toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <Separator />
+
+                <div className="flex justify-between font-display text-base tracking-wider">
+                  <span className="text-foreground">Total Outstanding</span>
+                  <span className="text-destructive">₱{balance.toLocaleString()}</span>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowSettlementBlock(false)} className="font-display text-xs tracking-wider">
+                  Cancel
+                </Button>
+                <Button onClick={() => { setShowSettlementBlock(false); setShowPayment(true); }} className="font-display text-xs tracking-wider">
+                  Settle Now
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </>
       )}
     </div>
