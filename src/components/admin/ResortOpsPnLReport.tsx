@@ -1,4 +1,7 @@
 import { useMemo } from 'react';
+import jsPDF from 'jspdf';
+import { Download } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
@@ -151,10 +154,159 @@ const ResortOpsPnLReport = ({ monthBookings, orders, monthExpenses, menuItems }:
     { label: 'Hotel Services',      value: hotelServices },
   ];
 
+  // ── PDF export ─────────────────────────────────────────────────────────
+  const downloadPDF = () => {
+    const PDF_TOP_MARGIN = 18;
+    const PDF_PAGE_THRESHOLD = 275;
+
+    const monthDate = (() => {
+      const raw = monthExpenses[0]?.expense_date || monthBookings[0]?.check_in;
+      if (raw) {
+        const dateOnly = String(raw).slice(0, 10);
+        const d = new Date(dateOnly + 'T00:00:00');
+        if (!isNaN(d.getTime())) return d;
+      }
+      return new Date();
+    })();
+    const monthName = monthDate.toLocaleString('en-US', { month: 'long' });
+    const yearStr = String(monthDate.getFullYear());
+    const monthYearLabel = `${monthName} ${yearStr}`;
+    const filename = `BAIA-PnL-${monthName}-${yearStr}.pdf`;
+
+    const doc = new jsPDF();
+    const pageW = doc.internal.pageSize.getWidth();
+    let y = PDF_TOP_MARGIN;
+
+    const checkPage = (needed = 8) => {
+      if (y + needed > PDF_PAGE_THRESHOLD) { doc.addPage(); y = PDF_TOP_MARGIN; }
+    };
+
+    // ── HEADER ─────────────────────────────────────────────────────────
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('BAIA Boutique Resort', pageW / 2, y, { align: 'center' });
+    y += 7;
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.text('San Vicente, Palawan', pageW / 2, y, { align: 'center' });
+    y += 7;
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Monthly P&L Report \u2014 ${monthYearLabel}`, pageW / 2, y, { align: 'center' });
+    y += 10;
+    doc.setLineWidth(0.4);
+    doc.line(14, y, pageW - 14, y);
+    y += 8;
+
+    // ── SECTION 1 — Summary ────────────────────────────────────────────
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Section 1 \u2014 Summary', 14, y);
+    y += 7;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    const summaryRows: [string, string][] = [
+      ['Total Revenue',    `PHP ${fmt(totalRevenue)}`],
+      ['Total Expenses',   `PHP ${fmt(totalExpenses)}`],
+      ['Net Profit',       `PHP ${fmt(netProfit)}`],
+      ['Profit Margin',    `${profitMargin.toFixed(1)}%`],
+    ];
+    summaryRows.forEach(([label, value]) => {
+      checkPage();
+      doc.text(label, 18, y);
+      doc.text(value, pageW - 14, y, { align: 'right' });
+      y += 6;
+    });
+    y += 4;
+
+    // ── SECTION 2 — Revenue Breakdown ─────────────────────────────────
+    checkPage(12);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Section 2 \u2014 Revenue Breakdown', 14, y);
+    y += 7;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Source', 18, y);
+    doc.text('Amount', pageW - 14, y, { align: 'right' });
+    y += 5;
+    doc.setLineWidth(0.2);
+    doc.line(14, y, pageW - 14, y);
+    y += 4;
+    doc.setFont('helvetica', 'normal');
+    revenueRows.forEach(row => {
+      checkPage();
+      doc.text(row.label, 18, y);
+      doc.text(`PHP ${fmt(row.value)}`, pageW - 14, y, { align: 'right' });
+      y += 5;
+    });
+    doc.setLineWidth(0.2);
+    doc.line(14, y, pageW - 14, y);
+    y += 4;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Total Revenue', 18, y);
+    doc.text(`PHP ${fmt(totalRevenue)}`, pageW - 14, y, { align: 'right' });
+    y += 8;
+
+    // ── SECTION 3 — Expenses Breakdown ────────────────────────────────
+    checkPage(12);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Section 3 \u2014 Expenses Breakdown', 14, y);
+    y += 7;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Category', 18, y);
+    doc.text('Amount', pageW - 14, y, { align: 'right' });
+    y += 5;
+    doc.setLineWidth(0.2);
+    doc.line(14, y, pageW - 14, y);
+    y += 4;
+    doc.setFont('helvetica', 'normal');
+    expenseRows.forEach(row => {
+      checkPage();
+      doc.text(row.label, 18, y);
+      doc.text(`PHP ${fmt(row.amount)}`, pageW - 14, y, { align: 'right' });
+      y += 5;
+    });
+    doc.setLineWidth(0.2);
+    doc.line(14, y, pageW - 14, y);
+    y += 4;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Total Expenses', 18, y);
+    doc.text(`PHP ${fmt(totalExpenses)}`, pageW - 14, y, { align: 'right' });
+    y += 10;
+
+    // ── SECTION 4 — Footer ────────────────────────────────────────────
+    checkPage(14);
+    doc.setLineWidth(0.4);
+    doc.line(14, y, pageW - 14, y);
+    y += 6;
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    const generatedDate = new Date().toLocaleDateString('en-PH', {
+      year: 'numeric', month: 'long', day: 'numeric',
+    });
+    doc.text(`Generated: ${generatedDate}`, 14, y);
+    doc.text('Powered by BAIA ROS', pageW - 14, y, { align: 'right' });
+
+    doc.save(filename);
+  };
+
   return (
     <div className="space-y-4">
       {/* ── Section heading ── */}
-      <h3 className="font-display text-sm tracking-wider text-foreground">Monthly P&amp;L Report</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="font-display text-sm tracking-wider text-foreground">Monthly P&amp;L Report</h3>
+        <Button
+          size="sm"
+          variant="outline"
+          className="font-display text-xs tracking-wider gap-1 min-h-[36px] whitespace-nowrap flex-shrink-0"
+          onClick={downloadPDF}
+        >
+          <Download className="w-3.5 h-3.5" /> Download PDF
+        </Button>
+      </div>
 
       {/* ── Top-row metric cards ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
