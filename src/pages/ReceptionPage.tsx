@@ -1721,14 +1721,7 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
         }}
       />
 
-      {/* ══════ HOUSEKEEPING ACCEPT PIN MODAL ══════ */}
-      <PasswordConfirmModal
-        open={!!acceptingHkOrderId}
-        onClose={() => setAcceptingHkOrderId(null)}
-        onConfirm={handleHkAccept}
-        title="Accept Assignment"
-        description="Enter your name and PIN to accept this housekeeping assignment."
-      />
+
       {/* ══════ ROOM DETAIL SHEET ══════ */}
       <Sheet open={detailSheetOpen} onOpenChange={(open) => { setDetailSheetOpen(open); if (!open) setDetailUnit(null); }}>
         <SheetContent side="bottom" className="h-[90vh] overflow-y-auto p-0">

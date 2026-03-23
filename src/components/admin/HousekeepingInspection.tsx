@@ -528,7 +528,12 @@ const HousekeepingInspection = ({ order, onClose, mode }: HousekeepingInspection
           </div>
 
           <Button
-            onClick={() => setPinAction('cleaning')}
+            onClick={() => {
+              const empId = localStorage.getItem('emp_id') || '';
+              const empName = localStorage.getItem('emp_name') || 'Housekeeper';
+              const empDisplay = localStorage.getItem('emp_display_name') || empName;
+              completeCleaning({ id: empId, name: empName, display_name: empDisplay });
+            }}
             disabled={cleaning}
             variant="default"
             className="w-full font-display tracking-wider min-h-[44px] bg-emerald-600 hover:bg-emerald-700"
@@ -536,17 +541,6 @@ const HousekeepingInspection = ({ order, onClose, mode }: HousekeepingInspection
             <CheckCircle className="w-4 h-4 mr-2" />
             {cleaning ? 'Completing...' : '✅ Cleaning Done — Room Ready'}
           </Button>
-        </div>
-      )}
-
-      {/* PIN Confirmation Modal */}
-      <PasswordConfirmModal
-        open={!!pinAction}
-        onClose={() => setPinAction(null)}
-        onConfirm={handlePinConfirm}
-        title="Confirm Cleaning Complete"
-        description="Enter your PIN to confirm cleaning is done and mark the room as ready."
-      />
     </div>
   );
 };
