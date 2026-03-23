@@ -1325,10 +1325,14 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
                 <Badge className={`font-body text-xs ${statusColor('confirmed')}`}>confirmed</Badge>
               </div>
               {canDoEdit && (
-                <Button size="sm" onClick={() => completeTourBooking(b)}
-                  className="font-display text-xs tracking-wider min-h-[36px]">
-                  <CheckCircle className="w-3.5 h-3.5 mr-1" /> Complete
-                </Button>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={() => completeTourBooking(b)}
+                    className="font-display text-xs tracking-wider min-h-[36px]">
+                    <CheckCircle className="w-3.5 h-3.5 mr-1" /> Complete
+                  </Button>
+                  <Button size="sm" variant="destructive" onClick={() => cancelTourBooking(b.id)}
+                    className="font-display text-xs tracking-wider min-h-[36px]">Cancel</Button>
+                </div>
               )}
             </div>
           ))}

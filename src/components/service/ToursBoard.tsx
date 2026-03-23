@@ -1,9 +1,11 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useState, useMemo } from 'react';
-import { Users, Clock, MapPin, CalendarDays } from 'lucide-react';
+import { Users, Clock, MapPin, CalendarDays, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { format, isToday, isBefore, startOfDay } from 'date-fns';
+import { toast } from 'sonner';
 
 const STATUS_COLORS: Record<string, string> = {
   confirmed: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
@@ -13,11 +15,12 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 type DateFilter = 'all' | 'today' | 'upcoming';
-type StatusFilter = 'all' | 'confirmed' | 'pending' | 'completed';
+type StatusFilter = 'all' | 'confirmed' | 'pending' | 'completed' | 'cancelled';
 
 const ToursBoard = () => {
   const [dateFilter, setDateFilter] = useState<DateFilter>('today');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const qc = useQueryClient();
 
   const { data: tours = [], isLoading } = useQuery({
     queryKey: ['tours-board'],
@@ -33,12 +36,20 @@ const ToursBoard = () => {
     refetchInterval: 15000,
   });
 
+  const cancelTour = async (id: string) => {
+    await (supabase.from('tour_bookings') as any).update({ status: 'cancelled' }).eq('id', id);
+    qc.invalidateQueries({ queryKey: ['tours-board'] });
+    toast.success('Tour cancelled');
+  };
+
   const filtered = useMemo(() => {
     const today = startOfDay(new Date());
     return tours.filter((t: any) => {
       const d = new Date(t.tour_date);
       if (dateFilter === 'today' && !isToday(d)) return false;
       if (dateFilter === 'upcoming' && isBefore(d, today)) return false;
+      // Hide cancelled unless explicitly filtering for them
+      if (statusFilter === 'all' && t.status === 'cancelled') return false;
       if (statusFilter !== 'all' && t.status !== statusFilter) return false;
       return true;
     });
@@ -70,6 +81,7 @@ const ToursBoard = () => {
           <Pill label="Confirmed" active={statusFilter === 'confirmed'} onClick={() => setStatusFilter('confirmed')} />
           <Pill label="Pending" active={statusFilter === 'pending'} onClick={() => setStatusFilter('pending')} />
           <Pill label="Completed" active={statusFilter === 'completed'} onClick={() => setStatusFilter('completed')} />
+          <Pill label="Cancelled" active={statusFilter === 'cancelled'} onClick={() => setStatusFilter('cancelled')} />
         </div>
       </div>
 
@@ -83,6 +95,7 @@ const ToursBoard = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {filtered.map((tour: any) => {
           const statusClass = STATUS_COLORS[tour.status] || STATUS_COLORS.pending;
+          const canCancel = tour.status !== 'cancelled' && tour.status !== 'completed';
           return (
             <div
               key={tour.id}
@@ -127,6 +140,14 @@ const ToursBoard = () => {
               {/* Notes */}
               {tour.notes && (
                 <p className="text-xs text-muted-foreground/80 italic line-clamp-2">{tour.notes}</p>
+              )}
+
+              {/* Cancel button */}
+              {canCancel && (
+                <Button size="sm" variant="destructive" className="font-display text-xs tracking-wider w-full min-h-[36px]"
+                  onClick={() => cancelTour(tour.id)}>
+                  <X className="w-3.5 h-3.5 mr-1" /> Cancel
+                </Button>
               )}
             </div>
           );
