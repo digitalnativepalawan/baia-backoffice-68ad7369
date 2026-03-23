@@ -37,7 +37,7 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
 
   const [historyOpen, setHistoryOpen] = useState(false);
   const [editTour, setEditTour] = useState<any>(null);
-  const [editTourSource, setEditTourSource] = useState<'guest_tours' | 'tour_bookings'>('guest_tours');
+  const [editTourSource, setEditTourSource] = useState<'guest_tours' | 'tour_bookings'>('tour_bookings');
   const [editRequest, setEditRequest] = useState<any>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
