@@ -452,7 +452,17 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
 
     // Room charge is handled solely by RoomBillingTab to avoid duplicate transactions
 
+    // Sync status to tour_bookings if a matching record exists
+    if (tour && (status === 'cancelled' || status === 'completed')) {
+      await (supabase.from('tour_bookings') as any)
+        .update({ status, confirmed_by: staffName })
+        .eq('tour_name', tour.tour_name)
+        .eq('tour_date', tour.tour_date)
+        .eq('guest_name', tour.unit_name || '');
+    }
+
     qc.invalidateQueries({ queryKey: ['reception-tours-today'] });
+    qc.invalidateQueries({ queryKey: ['tours-board'] });
     toast.success(`Tour ${status}`);
   };
 
