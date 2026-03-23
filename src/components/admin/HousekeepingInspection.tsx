@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowLeft, CheckCircle, Search, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { differenceInMinutes } from 'date-fns';
-import PasswordConfirmModal from '@/components/housekeeping/PasswordConfirmModal';
+
 
 const from = (table: string) => supabase.from(table as any);
 
