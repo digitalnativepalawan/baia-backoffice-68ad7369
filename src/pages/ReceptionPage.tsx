@@ -484,6 +484,7 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
       confirmed_by: staffName,
     }).eq('id', id);
     qc.invalidateQueries({ queryKey: ['reception-tour-bookings'] });
+    qc.invalidateQueries({ queryKey: ['tours-board'] });
     toast.success('Tour booking cancelled');
   };
 
