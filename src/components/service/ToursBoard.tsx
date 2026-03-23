@@ -48,8 +48,8 @@ const ToursBoard = () => {
       const d = new Date(t.tour_date);
       if (dateFilter === 'today' && !isToday(d)) return false;
       if (dateFilter === 'upcoming' && isBefore(d, today)) return false;
-      // Hide cancelled unless explicitly filtering for them
-      if (statusFilter === 'all' && t.status === 'cancelled') return false;
+      // In default view, only show confirmed & pending
+      if (statusFilter === 'all' && (t.status === 'cancelled' || t.status === 'completed')) return false;
       if (statusFilter !== 'all' && t.status !== statusFilter) return false;
       return true;
     });
