@@ -1,25 +1,36 @@
 
 
-## Add Cancel to Tours — Display Only
+## Two Fixes: Guest Services Double Display + Guest Portal Bill Tours
 
-### 1. ToursBoard.tsx (`/service/tours`)
+### Problem 1: Guest Services (ExperiencesPage) Double Display
+The ExperiencesPage queries BOTH `guest_tours` (lines 74-82) and `tour_bookings` (lines 86-96), then displays both in "Today's Tours" section (lines 393-481). Since tours added from RoomsDashboard now insert into BOTH tables, the same tour appears twice.
 
-- Add `useQueryClient` import and a `cancelTour` handler that sets `status = 'cancelled'` on `tour_bookings` and invalidates the query
-- Expand `StatusFilter` type to include `'cancelled'`
-- Add a "Cancelled" filter pill next to "Completed"
-- Update the default filter behavior: when `statusFilter === 'all'`, hide cancelled tours (user must explicitly select "Cancelled" pill to see them)
-- Add a "Cancel" button on each non-cancelled/non-completed tour card
+**Fix**: Remove the `guest_tours` query entirely from ExperiencesPage. Switch all tour display and actions to use `tour_bookings` only. This means:
+- Remove the `guest_tours` query (lines 74-82) and the `recentTours` history query (lines 123-131)
+- Update the `tour_bookings` query to include all statuses needed (booked, confirmed, completed, pending) and cover today + upcoming dates
+- Update `todayTours`, `completedToday`, `upcomingTours` variables to derive from the unified `tourBookings` data
+- Update the summary counts and "Today's Tours" rendering to use only `tourBookings`
+- Remove the separate `todayTours.map(...)` rendering block (lines 400-441) since `todayBookings` from tour_bookings now covers everything
+- Keep the `updateTourStatus` function but change it to update `tour_bookings` instead of `guest_tours`
+- Update the "Upcoming Tours" section to use filtered `tourBookings`
+- Keep recent history query but switch to `tour_bookings` table
 
-### 2. ReceptionPage.tsx (Tours & Activities section)
+### Problem 2: Guest Portal Bill — Show Tours Immediately
+The BillView (GuestPortal.tsx) queries `guest_tours` for pending tours (lines 1108-1118) with status `['booked', 'pending']` and completed tours (lines 1120-1130) with status `['completed', 'confirmed']`. Since tours are now in `tour_bookings`, these queries return empty.
 
-- **guest_tours items (line 1261-1272)**: Add a "Cancel" button next to "Complete". On click, call `updateTourStatus(tour.id, 'cancelled', tour)` — this already updates `guest_tours` status. Also update the corresponding `tour_bookings` record if one exists (query by matching tour_name + tour_date + guest unit).
-- **confirmed tour_bookings items (line 1315-1320)**: Add a "Cancel" button next to "Complete". On click, set `status = 'cancelled'` on `tour_bookings` (reuse existing `cancelTourBooking` which already exists but is only wired to pending bookings).
+**Fix**: Switch both queries to read from `tour_bookings` instead of `guest_tours`. Also adjust the logic so confirmed tours show immediately in the bill with their full amount:
+- Change `pendingTours` query to read from `tour_bookings` with status `['booked', 'pending', 'confirmed']` — this ensures confirmed tours appear immediately with a "Pending" badge
+- Change `completedTours` query to read from `tour_bookings` with status `['completed']`
+- Update the balance calculation: `activeToursTotal` now includes confirmed tours (already does since confirmed is in pendingTours)
+- Update realtime subscription from `guest_tours` table to `tour_bookings` table (line 1201)
 
 ### Files Modified
-- `src/components/service/ToursBoard.tsx`
-- `src/pages/ReceptionPage.tsx`
+- `src/pages/ExperiencesPage.tsx` — consolidate to `tour_bookings` only
+- `src/pages/GuestPortal.tsx` — switch bill queries from `guest_tours` to `tour_bookings`, include confirmed status
 
 ### What Does NOT Change
-- Billing, payment flows, room charges
-- ExperiencesPage, GuestPortal, RoomsDashboard, or any other pages
+- Guest Portal tour booking flow (already writes to `tour_bookings`)
+- RoomsDashboard, RoomBillingTab, ReceptionPage
+- Payment flows, billing logic
+- No schema changes
 
