@@ -209,11 +209,11 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
 
   const updateTourStatus = async (id: string, status: string, tour?: any) => {
     if (!canDoEdit) { toast.error('View-only access'); return; }
-    await from('guest_tours').update({ status }).eq('id', id);
+    await (supabase.from('tour_bookings') as any).update({ status, confirmed_by: staffName }).eq('id', id);
 
     // Room charge is handled solely by RoomBillingTab to avoid duplicate transactions
 
-    qc.invalidateQueries({ queryKey: ['all-tours-experiences'] });
+    qc.invalidateQueries({ queryKey: ['tour-bookings-experiences'] });
     toast.success(`Tour ${status}`);
   };
 
