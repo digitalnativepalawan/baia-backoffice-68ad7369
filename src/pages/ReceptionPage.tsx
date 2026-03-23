@@ -1278,6 +1278,8 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
                     className="font-display text-xs tracking-wider min-h-[36px]">
                     <CheckCircle className="w-3.5 h-3.5 mr-1" /> Complete
                   </Button>
+                  <Button size="sm" variant="destructive" onClick={() => updateTourStatus(tour.id, 'cancelled', tour)}
+                    className="font-display text-xs tracking-wider min-h-[36px]">Cancel</Button>
                 </div>
               )}
             </div>
