@@ -1030,7 +1030,7 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
                 <Button variant="outline" onClick={() => setShowSettlementBlock(false)} className="font-display text-xs tracking-wider">
                   Cancel
                 </Button>
-                <Button onClick={() => setShowSettlementBlock(false)} className="font-display text-xs tracking-wider">
+                <Button onClick={() => { setShowSettlementBlock(false); setShowPayment(true); }} className="font-display text-xs tracking-wider">
                   Settle Now
                 </Button>
               </DialogFooter>
