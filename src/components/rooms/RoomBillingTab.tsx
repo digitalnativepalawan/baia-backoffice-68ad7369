@@ -143,6 +143,14 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
 
   const staffName = localStorage.getItem('emp_display_name') || localStorage.getItem('emp_name') || 'Staff';
 
+  const handleCheckoutClick = () => {
+    if (balance > 0) {
+      setShowSettlementBlock(true);
+    } else {
+      setShowCheckout(true);
+    }
+  };
+
   // ── Actions ──
   const handleCompOrder = async (orderId: string) => {
     await supabase.from('orders').update({ status: 'Paid', payment_type: 'Comp' }).eq('id', orderId);
@@ -507,7 +515,7 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
           </Button>
           <PrintBill unitName={unit.name} guestName={guestName} booking={booking} transactions={transactions} roomOrders={roomOrders} tours={tours} requests={requests} />
           {booking && (
-            <Button size="sm" variant="destructive" onClick={() => balance > 0 ? setShowSettlementBlock(true) : setShowCheckout(true)}
+            <Button size="sm" variant="destructive" disabled={isLoading} onClick={handleCheckoutClick}
               className="font-display text-xs tracking-wider gap-1 min-h-[44px]">
               <LogOut className="w-3.5 h-3.5" /> Check Out
             </Button>
@@ -954,13 +962,13 @@ const RoomBillingTab = ({ unit, booking, guestName, readOnly = false }: RoomBill
                   This folio has an outstanding balance. Please settle all charges before checking out.
                 </p>
 
-                {/* Room-charge ledger entries */}
-                {visibleTransactions.filter(t => t.transaction_type === 'room_charge').length > 0 && (
+                {/* All room ledger charges (accommodation, room_charge, tours posted to ledger, adjustments, etc.) */}
+                {charges.length > 0 && (
                   <div className="space-y-1">
-                    <p className="font-display text-xs tracking-wider text-muted-foreground uppercase">Charged to Room</p>
-                    {visibleTransactions.filter(t => t.transaction_type === 'room_charge').map(t => (
+                    <p className="font-display text-xs tracking-wider text-muted-foreground uppercase">Room Ledger</p>
+                    {charges.map(t => (
                       <div key={t.id} className="flex justify-between font-body text-sm">
-                        <span className="text-muted-foreground truncate flex-1">{t.notes || 'F&B Charge'}</span>
+                        <span className="text-muted-foreground truncate flex-1">{t.notes || t.transaction_type}</span>
                         <span className="text-foreground">₱{t.total_amount.toLocaleString()}</span>
                       </div>
                     ))}
