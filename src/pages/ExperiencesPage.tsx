@@ -70,13 +70,14 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
   const sevenDaysAgo = subDays(today, 7).toISOString();
   const oneDayAgo = subDays(today, 1).toISOString();
 
-  // Admin-created tours (guest_tours) — only actionable (booked/confirmed)
-  const { data: tours = [] } = useQuery({
-    queryKey: ['all-tours-experiences'],
+  // All tours from tour_bookings (single source of truth)
+  const { data: tourBookings = [] } = useQuery({
+    queryKey: ['tour-bookings-experiences'],
     queryFn: async () => {
-      const { data } = await from('guest_tours').select('*')
+      const { data } = await (supabase.from('tour_bookings') as any)
+        .select('*')
+        .in('status', ['pending', 'confirmed', 'booked', 'completed'])
         .gte('tour_date', todayStr)
-        .in('status', ['booked', 'confirmed', 'completed'])
         .order('tour_date').order('pickup_time');
       return (data || []) as any[];
     },
