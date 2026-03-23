@@ -38,8 +38,6 @@ const HousekeepingInspection = ({ order, onClose, mode }: HousekeepingInspection
   );
   const [currentStep, setCurrentStep] = useState(derivedStep);
 
-  // PIN confirmation state
-  const [pinAction, setPinAction] = useState<'cleaning' | null>(null);
 
   // ── Checklist items for this room type ──
   const { data: checklistItems = [] } = useQuery({
