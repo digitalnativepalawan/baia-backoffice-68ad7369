@@ -130,13 +130,17 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
     },
   });
 
-  // Fetch historical F&B revenue data
+  // Fetch historical F&B revenue data filtered by selected date range
+  const histDateFrom = dateFrom.slice(0, 10); // 'YYYY-MM-DD'
+  const histDateTo = dateTo.slice(0, 10);
   const { data: histRevenue = [], isLoading: histLoading } = useQuery({
-    queryKey: ['historical-revenue'],
+    queryKey: ['historical-revenue', histDateFrom, histDateTo],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('historical_revenue')
         .select('*')
+        .gte('date', histDateFrom)
+        .lte('date', histDateTo)
         .order('date', { ascending: true })
         .limit(5000);
       if (error) {
