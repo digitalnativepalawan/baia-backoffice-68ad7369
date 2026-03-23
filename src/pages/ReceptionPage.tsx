@@ -1448,9 +1448,15 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
                       </Button>
                     )}
                     {hasHousekeepingAccess && !order.accepted_by && (
-                      <Button size="sm" onClick={() => setAcceptingHkOrderId(order.id)}
+                      <Button size="sm" onClick={() => {
+                        const empId = localStorage.getItem('emp_id') || '';
+                        const empName = localStorage.getItem('emp_name') || 'Staff';
+                        const empDisplay = localStorage.getItem('emp_display_name') || empName;
+                        handleHkAccept({ id: empId, name: empName, display_name: empDisplay });
+                        setAcceptingHkOrderId(order.id);
+                      }}
                         className="font-display text-[10px] tracking-wider min-h-[32px]">
-                        Accept with PIN
+                        ✋ Accept
                       </Button>
                     )}
                     {hasHousekeepingAccess && isMyOrder && (
