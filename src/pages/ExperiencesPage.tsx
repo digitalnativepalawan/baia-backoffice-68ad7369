@@ -436,7 +436,7 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
         <div className="mb-6 space-y-2">
           <h2 className="font-display text-xs tracking-wider text-muted-foreground uppercase">Upcoming Tours</h2>
           {upcomingTours.slice(0, 10).map((tour: any) => (
-            <div key={tour.id} className="border border-border rounded-lg p-3 flex justify-between items-start cursor-pointer" onClick={() => canDoEdit && setEditTour(tour)}>
+            <div key={tour.id} className="border border-border rounded-lg p-3 flex justify-between items-start cursor-pointer" onClick={() => { if (canDoEdit) { setEditTourSource('tour_bookings'); setEditTour(tour); } }}>
               <div>
                 <div className="flex items-center gap-2">
                   <p className="font-display text-sm text-foreground tracking-wider">{tour.tour_name}</p>
