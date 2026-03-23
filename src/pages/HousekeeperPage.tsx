@@ -8,7 +8,6 @@ import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { format, startOfMonth } from 'date-fns';
 import HousekeepingInspection from '@/components/admin/HousekeepingInspection';
-import PasswordConfirmModal from '@/components/housekeeping/PasswordConfirmModal';
 import { getStaffSession } from '@/lib/session';
 import { hasAccess, canEdit } from '@/lib/permissions';
 
