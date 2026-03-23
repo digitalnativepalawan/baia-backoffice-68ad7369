@@ -83,19 +83,6 @@ const ExperiencesPage = ({ embedded = false }: { embedded?: boolean }) => {
     },
   });
 
-  // Guest portal tour bookings (tour_bookings) — only pending/confirmed
-  const { data: tourBookings = [] } = useQuery({
-    queryKey: ['tour-bookings-experiences'],
-    queryFn: async () => {
-      const { data } = await (supabase.from('tour_bookings') as any)
-        .select('*')
-        .in('status', ['pending', 'confirmed'])
-        .gte('created_at', sevenDaysAgo)
-        .order('created_at', { ascending: false })
-        .limit(50);
-      return (data || []) as any[];
-    },
-  });
 
   // Guest requests (transport, rentals) — only pending/confirmed
   const { data: requests = [] } = useQuery({
