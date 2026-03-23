@@ -188,14 +188,6 @@ const HousekeeperPage = ({ embedded = false }: { embedded?: boolean }) => {
 
   return (
     <div className={embedded ? 'space-y-4' : 'min-h-screen bg-background p-4 max-w-lg mx-auto'}>
-      {/* PIN Modal for cleaning accepts */}
-      <PasswordConfirmModal
-        open={!!acceptingOrderId}
-        onClose={() => setAcceptingOrderId(null)}
-        onConfirm={handlePinAccept}
-        title="Accept Assignment"
-        description="Enter your name and PIN to accept this cleaning assignment."
-      />
       {!embedded && (
         <div className="flex items-center gap-3 mb-6">
           <Button size="sm" variant="ghost" onClick={() => navigate('/')}>
