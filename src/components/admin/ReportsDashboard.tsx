@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
@@ -8,7 +8,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { startOfDay, startOfWeek, startOfMonth, startOfYear, subDays, endOfDay, format } from 'date-fns';
-import { DollarSign, ShoppingCart, TrendingUp, Lock, Download, CalendarIcon, Percent, PiggyBank, Receipt, ChevronDown, ChevronUp, BarChart3 } from 'lucide-react';
+import { DollarSign, ShoppingCart, TrendingUp, Lock, Download, Upload, CalendarIcon, Percent, PiggyBank, Receipt, ChevronDown, ChevronUp, BarChart3 } from 'lucide-react';
+import { toast } from 'sonner';
 import AccountingExport from './AccountingExport';
 import { cn } from '@/lib/utils';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
@@ -29,6 +30,8 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
   const [customTo, setCustomTo] = useState<Date | undefined>();
   const [tabTypeFilter, setTabTypeFilter] = useState<string>('all');
   const [expandedTabId, setExpandedTabId] = useState<string | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const csvImportRef = useRef<HTMLInputElement>(null);
 
   const { dateFrom, dateTo } = useMemo(() => {
     const now = new Date();
@@ -297,6 +300,129 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
     URL.revokeObjectURL(url);
   };
 
+  const parseCSVLine = (line: string): string[] => {
+    const result: string[] = [];
+    let inQuote = false;
+    let current = '';
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        // RFC-4180: two consecutive quotes inside a quoted field = literal quote
+        if (inQuote && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuote = !inQuote;
+        }
+      } else if (ch === ',' && !inQuote) {
+        result.push(current);
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+    result.push(current);
+    return result;
+  };
+
+  const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onerror = () => {
+      toast.error('Failed to read CSV file');
+    };
+    reader.onload = async (event) => {
+      const text = event.target?.result as string;
+      const lines = text.split(/\r?\n/);
+
+      // Find the TRANSACTIONS section header
+      let headerIdx = -1;
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].trim() === 'TRANSACTIONS') {
+          headerIdx = i + 1; // next line is the column header
+          break;
+        }
+      }
+      if (headerIdx === -1) {
+        toast.error('No TRANSACTIONS section found in CSV');
+        e.target.value = '';
+        return;
+      }
+
+      // Collect data rows: stop at blank lines or new section headers
+      const KNOWN_SECTIONS = new Set(['REPORT SUMMARY', 'ITEM BREAKDOWN', 'TRANSACTIONS']);
+      const dataLines = lines
+        .slice(headerIdx + 1)
+        .filter(l => l.trim() !== '' && !KNOWN_SECTIONS.has(l.trim()));
+      const rows: Record<string, unknown>[] = [];
+
+      for (const line of dataLines) {
+        const cols = parseCSVLine(line);
+        if (cols.length < 10) continue;
+        // cols: [0] Order ID, [1] Date/Time, [2] Order Type, [3] Location,
+        //       [4] Items, [5] Subtotal, [6] Service Charge, [7] Total,
+        //       [8] Payment Type, [9] Status
+        const dateTime = cols[1];
+        const orderType = cols[2];
+        const location = cols[3];
+        const itemsStr = cols[4];
+        const serviceChargeStr = cols[6];
+        const totalStr = cols[7];
+        const paymentType = cols[8];
+        const status = cols[9];
+
+        // Parse items string: "Name xQty @Price; ..."
+        const items = itemsStr
+          .split('; ')
+          .map(part => {
+            // Greedy match so item names containing ' x' are handled correctly
+            const match = part.match(/^(.+) x(\d+) @([\d.]+)$/);
+            if (match) return { name: match[1], qty: parseInt(match[2], 10), price: parseFloat(match[3]) };
+            return part.trim() ? { name: part.trim(), qty: 1, price: 0 } : null;
+          })
+          .filter(Boolean);
+
+        // Validate and parse closed_at date
+        let closedAt: string | null = null;
+        if (dateTime) {
+          const parsed = new Date(dateTime);
+          closedAt = isNaN(parsed.getTime()) ? null : parsed.toISOString();
+        }
+
+        rows.push({
+          order_type: orderType || 'WalkIn',
+          location_detail: location || '',
+          items,
+          total: parseFloat(totalStr) || 0,
+          service_charge: parseFloat(serviceChargeStr) || 0,
+          payment_type: paymentType || '',
+          status: status?.trim() || 'Paid',
+          closed_at: closedAt,
+        });
+      }
+
+      if (rows.length === 0) {
+        toast.error('No valid transaction rows found in CSV');
+        e.target.value = '';
+        return;
+      }
+
+      setIsImporting(true);
+      try {
+        const { error } = await supabase.from('orders').insert(rows as any);
+        if (error) throw error;
+        toast.success(`${rows.length} transaction${rows.length !== 1 ? 's' : ''} imported successfully`);
+      } catch (err: any) {
+        toast.error(`Import failed: ${err.message}`);
+      } finally {
+        setIsImporting(false);
+        e.target.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
+
   return (
     <div className="space-y-6">
       {/* Date filter */}
@@ -342,10 +468,28 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
         </div>
       )}
 
-      {/* CSV Download */}
-      <Button size="sm" variant="outline" onClick={generateCSV} className="font-body text-xs w-full">
-        <Download className="w-4 h-4 mr-1" /> Download CSV Report
-      </Button>
+      {/* CSV Download / Import */}
+      <div className="flex gap-2">
+        <Button size="sm" variant="outline" onClick={generateCSV} className="font-body text-xs flex-1">
+          <Download className="w-4 h-4 mr-1" /> Download CSV Report
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => csvImportRef.current?.click()}
+          disabled={isImporting}
+          className="font-body text-xs flex-1"
+        >
+          <Upload className="w-4 h-4 mr-1" /> {isImporting ? 'Importing…' : 'Import CSV'}
+        </Button>
+        <input
+          ref={csvImportRef}
+          type="file"
+          accept=".csv,text/csv"
+          className="hidden"
+          onChange={handleImportCSV}
+        />
+      </div>
 
       {/* Summary cards — powered by historical_revenue */}
       <div className="grid grid-cols-2 gap-3">
