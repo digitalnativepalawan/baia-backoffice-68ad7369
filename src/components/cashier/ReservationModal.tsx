@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { notifyTelegram } from '@/lib/telegram';
 import {
   Dialog,
   DialogContent,
@@ -101,7 +102,7 @@ const ReservationModal = ({ open, onOpenChange }: ReservationModalProps) => {
     setLoading(true);
     
     try {
-      const { error } = await supabase
+      const { error, data } = await supabase
         .from('dining_reservations')
         .insert({
           guest_name: formData.guest_name,
@@ -115,9 +116,29 @@ const ReservationModal = ({ open, onOpenChange }: ReservationModalProps) => {
           reservation_type: formData.reservation_type,
           pre_orders: preOrders.length > 0 ? preOrders : null,
           status: 'pending',
-        });
+        })
+        .select()
+        .single();
       
       if (error) throw error;
+      
+      // Send Telegram notification
+      const preOrderText = preOrders.length > 0 
+        ? `\n📋 Pre-order: ${preOrders.length} items (₱${preOrderTotal.toLocaleString()})` 
+        : '';
+      
+      const occasionText = formData.occasion ? `\n🎉 Occasion: ${formData.occasion}` : '';
+      const notesText = formData.notes ? `\n📝 Notes: ${formData.notes}` : '';
+      const contactText = formData.contact_number ? `\n📞 Contact: ${formData.contact_number}` : '';
+      
+      const message = `📅 NEW ${formData.reservation_type.toUpperCase()} RESERVATION\n\n` +
+        `👤 Guest: ${formData.guest_name}\n` +
+        `📆 Date: ${formData.reservation_date}\n` +
+        `⏰ Time: ${formData.reservation_time}\n` +
+        `👥 Pax: ${formData.pax}\n` +
+        `${occasionText}${contactText}${preOrderText}${notesText}`;
+      
+      await notifyTelegram('reception,managers,staffops,kitchen,waitstaff', message);
       
       toast.success(`${formData.reservation_type === 'catering' ? 'Catering' : 'Dinner'} reservation created for ${formData.guest_name}`);
       onOpenChange(false);
