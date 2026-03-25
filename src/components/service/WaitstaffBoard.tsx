@@ -22,8 +22,12 @@ const STATUS_BORDER: Record<string, string> = {
   Paid: 'border-l-emerald-400',
 };
 
-// In-house unit patterns
-const IN_HOUSE_UNITS = ['COT1', 'COT2', 'COT3', 'SUI1'];
+// Check if a unit is in-house (COT or SUI)
+const isInHouseUnit = (unitKey: string): boolean => {
+  if (!unitKey) return false;
+  const upperKey = unitKey.toUpperCase();
+  return upperKey.includes('COT') || upperKey.includes('SUI');
+};
 
 const WaitstaffBoard = () => {
   const qc = useQueryClient();
@@ -78,11 +82,11 @@ const WaitstaffBoard = () => {
   const handleSendGroupToCashier = useCallback(async (group: OrderGroup) => {
     const ids = group.orders.map(o => o.id);
     
-    // Check if this is an in-house guest (unit matches COT1, COT2, COT3, or SUI1)
-    const isInHouse = IN_HOUSE_UNITS.includes(group.key);
+    // Check if this is an in-house guest (unit contains COT or SUI)
+    const isInHouse = isInHouseUnit(group.key);
     
     if (isInHouse) {
-      // For in-house guests: mark as Ready for reception to handle (guest portal billing)
+      // For in-house guests: mark for reception/guest portal billing
       await supabase
         .from('orders')
         .update({ 
@@ -93,7 +97,7 @@ const WaitstaffBoard = () => {
       
       qc.invalidateQueries({ queryKey: ['waitstaff-orders'] });
       qc.invalidateQueries({ queryKey: ['reception-orders'] });
-      toast.success(`${group.label} sent to Reception — will appear in guest portal for billing`);
+      toast.success(`${group.label} sent to Reception — guest can view bill in portal`);
     } else {
       // For walk-in guests: send to cashier as before
       await supabase
@@ -194,9 +198,9 @@ const GroupCard = ({ group, onSendToCashier, compact }: {
     try { await onSendToCashier(group); } finally { setBusy(false); }
   };
 
-  // Check if this is an in-house unit to show different button text
-  const isInHouse = IN_HOUSE_UNITS.includes(group.key);
-  const buttonText = isInHouse ? 'Send to Reception' : 'Send to Cashier';
+  // Check if this is an in-house unit (contains COT or SUI)
+  const isInHouse = isInHouseUnit(group.key);
+  const buttonText = isInHouse ? 'Charge to Room' : 'Send to Cashier';
   const buttonIcon = isInHouse ? <Home className="w-5 h-5" /> : <Send className="w-5 h-5" />;
 
   return (
@@ -270,9 +274,13 @@ const GroupCard = ({ group, onSendToCashier, compact }: {
               onClick={handleSend}
               disabled={busy}
               size="lg"
-              className="font-display tracking-wider gap-2 text-sm min-h-[48px] px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white"
+              className={`font-display tracking-wider gap-2 text-sm min-h-[48px] px-5 rounded-xl ${
+                isInHouse 
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+              }`}
             >
-              {busy ? 'Sending…' : <>{buttonIcon} {buttonText}</>}
+              {busy ? 'Processing…' : <>{buttonIcon} {buttonText}</>}
             </Button>
           )}
         </div>
