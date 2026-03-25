@@ -251,8 +251,7 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
     queryFn: async () => {
       const { data } = await supabase.from('orders').select('*')
         .gte('created_at', monthStartStr)
-        .lte('created_at', monthEndStr + 'T23:59:59')
-        .in('status', ['Paid', 'Closed']);
+        .lte('created_at', monthEndStr + 'T23:59:59');
       return data || [];
     },
   });
@@ -277,7 +276,13 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
       return sum + items.reduce((s: number, i: any) => s + (Number(menuMap.get(i.name) || 0) * (i.qty || 1)), 0);
     }, 0);
   }, [orders, menuItems]);
-  const foodRevenue = useMemo(() => orders.reduce((s: number, o: any) => s + Number(o.total || 0), 0), [orders]);
+  
+  // FIXED: Food revenue now reads from orders (historical F&B data), not monthPayments
+  const foodRevenue = useMemo(
+    () => orders.reduce((s, o) => s + Number(o.total || 0), 0),
+    [orders]
+  );
+  
   const totalRevenue = revenue + foodRevenue;
   const foodProfit = foodRevenue - foodCost;
   const netProfit = totalRevenue - foodCost - totalExpenses;
