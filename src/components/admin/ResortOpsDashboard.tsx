@@ -274,18 +274,20 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
   const { data: orders = [] } = useQuery({
     queryKey: ['resort-ops-orders', dateFrom, dateTo],
     queryFn: async () => {
+      if (!dateFrom || !dateTo) return [];
       const { data } = await supabase.from('orders').select('*')
         .gte('created_at', dateFrom)
         .lte('created_at', dateTo + 'T23:59:59');
       return data || [];
     },
+    enabled: !!dateFrom && !!dateTo,
   });
   const { data: menuItems = [] } = useQuery({
     queryKey: ['resort-ops-menu'],
     queryFn: async () => { const { data } = await supabase.from('menu_items').select('*'); return data || []; },
   });
 
-  // ── Filtered data ──
+  // ── Filtered data with null checks ──
   const monthBookings = useMemo(() => bookings.filter((b: any) => b.check_in >= dateFrom && b.check_in <= dateTo), [bookings, dateFrom, dateTo]);
   const monthExpenses = useMemo(() => expenses.filter((e: any) => e.expense_date >= dateFrom && e.expense_date <= dateTo), [expenses, dateFrom, dateTo]);
   const monthTasks = useMemo(() => tasks.filter((t: any) => t.due_date >= dateFrom && t.due_date <= dateTo), [tasks, dateFrom, dateTo]);
@@ -302,7 +304,6 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
     }, 0);
   }, [orders, menuItems]);
   
-  // FIXED: Food revenue now reads from orders (historical F&B data), not monthPayments
   const foodRevenue = useMemo(
     () => orders.reduce((s, o) => s + Number(o.total || 0), 0),
     [orders]
@@ -369,7 +370,6 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
 
   // ── Editing states ──
   const [editingUnit, setEditingUnit] = useState<any>(null);
-  
   const [editingBooking, setEditingBooking] = useState<any>(null);
   const [editingExpense, setEditingExpense] = useState<any>(null);
   const [editingTask, setEditingTask] = useState<any>(null);
@@ -429,7 +429,6 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
   };
 
   const deleteRow = async (table: string, id: string) => {
-    // If deleting a booking, reset the associated unit status
     if (table === 'resort_ops_bookings') {
       const booking = (bookings as any[]).find((b) => b.id === id);
       if (booking?.unit_id) {
@@ -438,7 +437,6 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
           const displayUnit = await supabase.from('units' as any).select('id, status').ilike('unit_name', resortUnit.name.trim()).limit(1);
           const dUnit = (displayUnit.data as any)?.[0];
           if (dUnit && (dUnit.status === 'occupied' || dUnit.status === 'to_clean')) {
-            // Check if any OTHER active booking exists for this unit
             const otherActive = (bookings as any[]).find((b: any) => b.id !== id && b.unit_id === booking.unit_id && b.check_in <= new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }) && b.check_out > new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }));
             if (!otherActive) {
               await supabase.from('units' as any).update({ status: 'ready' } as any).eq('id', dUnit.id);
@@ -491,10 +489,8 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
     toast.success('Unit added');
   };
 
-
   const addBooking = async () => {
     let guestId = newBooking.guest_id;
-    // If no guest_id but we have a name, create a new guest
     if (!guestId && newBooking.guest_name.trim()) {
       const { data: newGuest, error } = await from('resort_ops_guests').insert({ full_name: newBooking.guest_name.trim() }).select('id').single();
       if (error || !newGuest) { toast.error('Failed to create guest'); return; }
@@ -502,7 +498,6 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
       qc.invalidateQueries({ queryKey: ['resort-ops-guests'] });
     }
     if (!guestId || !newBooking.unit_id || !newBooking.check_in || !newBooking.check_out) { toast.error('Fill in all required fields'); return; }
-    // Conflict check
     const conflicting = (bookings as any[]).find((b: any) =>
       b.unit_id === newBooking.unit_id &&
       b.check_in < newBooking.check_out &&
@@ -525,7 +520,6 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
     toast.success('Booking added');
   };
 
-  // ── Save edit handlers ──
   const saveUnit = async () => {
     if (!editingUnit) return;
     await from('resort_ops_units').update({ name: editingUnit.name, type: editingUnit.type, base_price: parseFloat(editingUnit.base_price) || 0, capacity: parseInt(editingUnit.capacity) || 2 }).eq('id', editingUnit.id);
@@ -534,10 +528,8 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
     toast.success('Unit updated');
   };
 
-
   const saveBooking = async () => {
     if (!editingBooking) return;
-    // Conflict check on update
     const conflicting = (bookings as any[]).find((b: any) =>
       b.unit_id === editingBooking.unit_id &&
       b.id !== editingBooking.id &&
@@ -600,14 +592,18 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
 
   const today = format(new Date(), 'yyyy-MM-dd');
 
-  // Format date range for display
   const formatDateRange = () => {
-    const fromDate = new Date(dateFrom);
-    const toDate = new Date(dateTo);
-    return `${format(fromDate, 'MMM d, yyyy')} - ${format(toDate, 'MMM d, yyyy')}`;
+    if (!dateFrom || !dateTo) return '';
+    try {
+      const fromDate = new Date(dateFrom);
+      const toDate = new Date(dateTo);
+      if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) return '';
+      return `${format(fromDate, 'MMM d, yyyy')} - ${format(toDate, 'MMM d, yyyy')}`;
+    } catch {
+      return '';
+    }
   };
 
-  // Reusable action buttons
   const EditBtn = ({ onClick }: { onClick: () => void }) => (
     <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-primary flex-shrink-0" onClick={onClick}><Pencil className="w-3.5 h-3.5" /></Button>
   );
@@ -621,14 +617,12 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
     </div>
   );
 
-  // ── Scan Receipt Handler ──
   const handleScanReceipt = async (file: File, data: typeof EMPTY_EXPENSE, onChange: (d: typeof EMPTY_EXPENSE) => void) => {
     if (file.size > 10 * 1024 * 1024) { toast.error('Image must be under 10MB'); return; }
     setScanningReceipt(true);
     setScannedFields(new Set());
 
     try {
-      // 1. Upload to storage
       const ext = file.name.split('.').pop() || 'jpg';
       const now = new Date();
       const year = now.getFullYear();
@@ -642,7 +636,6 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
       if (uploadError) { toast.error(`Upload failed: ${uploadError.message}`, { id: 'receipt-scan' }); return; }
       const { data: urlData } = supabase.storage.from('receipts').getPublicUrl(storagePath);
 
-      // 2. Convert to base64 for AI
       const reader = new FileReader();
       const base64 = await new Promise<string>((resolve, reject) => {
         reader.onload = () => resolve(reader.result as string);
@@ -650,7 +643,6 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
         reader.readAsDataURL(file);
       });
 
-      // 3. Call scan-receipt edge function
       const { data: scanResult, error: fnError } = await supabase.functions.invoke('scan-receipt', {
         body: { image_base64: base64 },
       });
@@ -667,7 +659,6 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
       if (d.vat_status && ['VAT', 'Non-VAT', 'VAT-Exempt', 'Zero-Rated'].includes(d.vat_status)) {
         updated.vat_status = d.vat_status; filledFields.add('vat_status');
       }
-      // If TIN detected, auto-set VAT
       if (d.supplier_tin && !d.vat_status) { updated.vat_status = 'VAT'; filledFields.add('vat_status'); }
       if (d.invoice_number) { updated.invoice_number = d.invoice_number; filledFields.add('invoice_number'); }
       if (d.official_receipt_number) { updated.official_receipt_number = d.official_receipt_number; filledFields.add('official_receipt_number'); }
@@ -675,18 +666,11 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
       if (d.total_amount != null) { updated.amount = String(d.total_amount); filledFields.add('amount'); }
       if (d.description) { updated.description = d.description; filledFields.add('description'); }
 
-      // VAT validation
       if (updated.vat_status === 'VAT' && d.total_amount && !d.vat_amount) {
-        // Auto-calculate if missing
         const vatAmt = d.total_amount / 1.12 * 0.12;
-        const vatSale = d.total_amount - vatAmt;
         updated.notes = (updated.notes ? updated.notes + '\n' : '') + `Auto-computed VAT: ₱${vatAmt.toFixed(2)} from total ₱${d.total_amount}`;
       }
-      if (updated.vat_status === 'Non-VAT') {
-        // Ensure vat_amount = 0
-      }
 
-      // Check VAT total mismatch
       if (d.vatable_sale != null && d.vat_amount != null && d.total_amount != null) {
         const sum = (d.vatable_sale || 0) + (d.vat_amount || 0);
         if (Math.abs(sum - d.total_amount) > 1) {
@@ -705,14 +689,12 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
     }
   };
 
-  // ExpenseFormFields is now extracted outside the component — see below
   const renderExpenseFormFields = (data: typeof EMPTY_EXPENSE, onChange: (d: typeof EMPTY_EXPENSE) => void) => (
     <ExpenseFormFields data={data} onChange={onChange} scannedFields={scannedFields} scanningReceipt={scanningReceipt} onScanReceipt={(file) => handleScanReceipt(file, data, onChange)} />
   );
 
   const inputCls = "bg-secondary border-border text-foreground font-body text-sm";
 
-  // ── Helpers for bookings display ──
   const platformColor = (p: string) => {
     const lp = p?.toLowerCase() || '';
     if (lp.includes('airbnb')) return 'bg-pink-500/20 text-pink-300 border-pink-500/30';
@@ -869,7 +851,6 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
         </CardContent>
       </Card>
 
-
       {/* ── Reservations Ledger ── */}
       <Card className="bg-card border-border">
         <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
@@ -880,13 +861,11 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          {/* Booking filter */}
           <div className="flex flex-wrap gap-1.5">
             {(['all','staying','arriving','departing','unpaid'] as const).map(f => (
               <Button key={f} size="sm" variant={ledgerFilter === f ? 'default' : 'outline'} className="text-xs h-7 capitalize" onClick={() => setLedgerFilter(f)}>{f}</Button>
             ))}
           </div>
-          {/* Booking list */}
           <div className="space-y-2">
             {monthBookings
               .filter((b: any) => {
@@ -982,7 +961,6 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
                 );
               })}
           </div>
-          {/* Add booking form */}
           <div className="space-y-2 pt-2 border-t border-border">
             <div className="grid grid-cols-2 gap-2">
               <div className="relative">
@@ -1116,7 +1094,6 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          {/* VAT Filter Pills */}
           <div className="flex flex-wrap gap-1.5">
             {(['all', 'VAT', 'Non-VAT', 'VAT-Exempt', 'missing-tin'] as const).map(f => (
               <Button key={f} size="sm" variant={expenseVatFilter === f ? 'default' : 'outline'}
@@ -1126,7 +1103,6 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
             ))}
           </div>
 
-          {/* Category Filter */}
           <Select value={expenseCategoryFilter} onValueChange={setExpenseCategoryFilter}>
             <SelectTrigger className="bg-secondary border-border text-foreground font-body text-xs h-8 w-full">
               <SelectValue placeholder="All Categories" />
@@ -1172,70 +1148,98 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
             );
           })()}
 
-          {/* Expense List - Mobile-first stacked cards */}
-          <div className="space-y-2">
-            {(() => {
-              let filtered = monthExpenses;
-              if (expenseCategoryFilter !== 'all') filtered = filtered.filter((e: any) => e.category === expenseCategoryFilter);
-              if (expenseVatFilter === 'VAT') filtered = filtered.filter((e: any) => e.vat_status === 'VAT');
-              else if (expenseVatFilter === 'Non-VAT') filtered = filtered.filter((e: any) => e.vat_status === 'Non-VAT');
-              else if (expenseVatFilter === 'VAT-Exempt') filtered = filtered.filter((e: any) => e.vat_status === 'VAT-Exempt');
-              else if (expenseVatFilter === 'missing-tin') filtered = filtered.filter((e: any) => e.vat_status === 'VAT' && !e.supplier_tin);
+          {/* Expense List - Compact Table View */}
+          <div className="border border-border rounded-lg overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-secondary">
+                  <TableHead className="font-body text-xs text-muted-foreground py-2 pl-3">Date</TableHead>
+                  <TableHead className="font-body text-xs text-muted-foreground py-2">Supplier</TableHead>
+                  <TableHead className="font-body text-xs text-muted-foreground py-2">Category</TableHead>
+                  <TableHead className="font-body text-xs text-muted-foreground py-2 text-right">Amount</TableHead>
+                  <TableHead className="font-body text-xs text-muted-foreground py-2 text-center w-16">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(() => {
+                  let filtered = monthExpenses;
+                  if (expenseCategoryFilter !== 'all') filtered = filtered.filter((e: any) => e.category === expenseCategoryFilter);
+                  if (expenseVatFilter === 'VAT') filtered = filtered.filter((e: any) => e.vat_status === 'VAT');
+                  else if (expenseVatFilter === 'Non-VAT') filtered = filtered.filter((e: any) => e.vat_status === 'Non-VAT');
+                  else if (expenseVatFilter === 'VAT-Exempt') filtered = filtered.filter((e: any) => e.vat_status === 'VAT-Exempt');
+                  else if (expenseVatFilter === 'missing-tin') filtered = filtered.filter((e: any) => e.vat_status === 'VAT' && !e.supplier_tin);
 
-              return filtered.map((e: any) => (
-                editingExpense?.id === e.id ? (
-                  <div key={e.id} className="p-3 rounded border border-primary/50 space-y-2">
-                    {renderExpenseFormFields(editingExpense, setEditingExpense)}
-                    <div className="flex justify-end"><SaveCancelBtns onSave={saveExpense} onCancel={() => setEditingExpense(null)} /></div>
-                  </div>
-                ) : (
-                  <div key={e.id} className="p-3 rounded border border-border space-y-1.5">
-                    {/* Row 1: Vendor + Actions */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-body text-sm text-foreground font-medium truncate">{e.name}</p>
-                      </div>
-                      <div className="flex items-center gap-0.5 flex-shrink-0">
-                        {e.image_url && (
-                          <a href={e.image_url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary p-1">
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          </a>
-                        )}
-                        <EditBtn onClick={() => setEditingExpense({
-                          ...e, amount: String(e.amount), withholding_tax: String(e.withholding_tax || 0),
-                          supplier_tin: e.supplier_tin || '', vat_status: e.vat_status || 'Non-VAT',
-                          invoice_number: e.invoice_number || '', official_receipt_number: e.official_receipt_number || '',
-                          description: e.description || '', payment_method: e.payment_method || 'Cash',
-                          is_paid: e.is_paid !== false, project_unit: e.project_unit || '',
-                          notes: e.notes || '', image_url: e.image_url || '',
-                        })} />
-                        <DelBtn onClick={() => deleteRow('resort_ops_expenses', e.id)} />
-                      </div>
-                    </div>
-                    {/* Row 2: Description */}
-                    {e.description && <p className="font-body text-xs text-muted-foreground">{e.description}</p>}
-                    {/* Row 3: Date + Category */}
-                    <p className="font-body text-xs text-muted-foreground">{e.expense_date} · {e.category}</p>
-                    {/* Row 4: Amount + VAT info */}
-                    <div className="flex items-center justify-between">
-                      <p className="font-display text-base text-foreground">₱{fmt(Number(e.amount))}</p>
-                      <div className="flex items-center gap-1.5">
-                        <Badge variant="outline" className="font-body text-[10px]">{e.vat_status || 'Non-VAT'}</Badge>
-                        {!e.is_paid && <Badge variant="destructive" className="font-body text-[10px]">UNPAID</Badge>}
-                      </div>
-                    </div>
-                    {/* Row 5: VAT details if applicable */}
-                    {e.vat_status === 'VAT' && (
-                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 font-body text-xs text-muted-foreground">
-                        {e.supplier_tin && <span>TIN: {e.supplier_tin}</span>}
-                        {Number(e.vatable_sale) > 0 && <span>Subtotal: ₱{fmtDec(Number(e.vatable_sale))}</span>}
-                        {Number(e.vat_amount) > 0 && <span>VAT: ₱{fmtDec(Number(e.vat_amount))}</span>}
-                      </div>
-                    )}
-                  </div>
-                )
-              ));
-            })()}
+                  if (filtered.length === 0) {
+                    return (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                          No expenses found for this period
+                        </TableCell>
+                      </TableRow>
+                    );
+                  }
+
+                  return filtered.map((e: any) => (
+                    editingExpense?.id === e.id ? (
+                      <TableRow key={e.id} className="border-border">
+                        <TableCell colSpan={5} className="p-3">
+                          <div className="space-y-2">
+                            {renderExpenseFormFields(editingExpense, setEditingExpense)}
+                            <div className="flex justify-end gap-2">
+                              <Button size="sm" onClick={saveExpense} className="h-8"><Check className="w-3.5 h-3.5 mr-1" /> Save</Button>
+                              <Button size="sm" variant="outline" onClick={() => setEditingExpense(null)} className="h-8">Cancel</Button>
+                            </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      <TableRow key={e.id} className="border-border hover:bg-secondary/50">
+                        <TableCell className="font-body text-sm py-2 pl-3">
+                          {e.expense_date ? format(parseISO(e.expense_date), 'MMM d, yyyy') : '—'}
+                        </TableCell>
+                        <TableCell className="font-body text-sm py-2">
+                          <div>
+                            <span className="font-medium">{e.name}</span>
+                            {e.description && (
+                              <p className="font-body text-xs text-muted-foreground truncate max-w-[200px]">{e.description}</p>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-body text-sm py-2">
+                          <div className="flex flex-col">
+                            <span>{e.category || '—'}</span>
+                            {e.vat_status === 'VAT' && (
+                              <span className="text-[10px] text-muted-foreground">VAT: ₱{fmtDec(Number(e.vat_amount || 0))}</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-body text-sm py-2 text-right">
+                          <span className="font-mono">₱{fmt(Number(e.amount))}</span>
+                        </TableCell>
+                        <TableCell className="py-2 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            {e.image_url && (
+                              <a href={e.image_url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary">
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </a>
+                            )}
+                            <EditBtn onClick={() => setEditingExpense({
+                              ...e, amount: String(e.amount), withholding_tax: String(e.withholding_tax || 0),
+                              supplier_tin: e.supplier_tin || '', vat_status: e.vat_status || 'Non-VAT',
+                              invoice_number: e.invoice_number || '', official_receipt_number: e.official_receipt_number || '',
+                              description: e.description || '', payment_method: e.payment_method || 'Cash',
+                              is_paid: e.is_paid !== false, project_unit: e.project_unit || '',
+                              notes: e.notes || '', image_url: e.image_url || '',
+                            })} />
+                            <DelBtn onClick={() => deleteRow('resort_ops_expenses', e.id)} />
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  ));
+                })()}
+              </TableBody>
+            </Table>
           </div>
 
           {/* Add Expense Form */}
@@ -1256,7 +1260,7 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
         open={expenseReportsOpen}
         onOpenChange={setExpenseReportsOpen}
         expenses={monthExpenses}
-        monthLabel={`${format(parseISO(dateFrom), 'MMM d, yyyy')} - ${format(parseISO(dateTo), 'MMM d, yyyy')}`}
+        monthLabel={dateFrom && dateTo ? `${format(parseISO(dateFrom), 'MMM d, yyyy')} - ${format(parseISO(dateTo), 'MMM d, yyyy')}` : ''}
         onCategoryClick={(cat) => setExpenseCategoryFilter(cat)}
       />
       <ExpenseBulkImportModal
