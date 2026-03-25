@@ -10,7 +10,7 @@ import {
   type CalendarView, type BookingWithGuest, type ResortUnit,
 } from './calendarUtils';
 import AddReservationModal from './AddReservationModal';
-import PendingCharges from './PendingCharges';
+import PendingCharges from './PendingCharges'; // Force rebuild
 
 interface UnitWithStatus {
   id: string;
