@@ -65,10 +65,9 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
       const { data } = await supabase
         .from('orders')
         .select('*')
-        .in('status', ['Paid', 'Closed'])
-        .gte('closed_at', dateFrom)
-        .lte('closed_at', dateTo)
-        .order('closed_at', { ascending: false });
+        .gte('created_at', dateFrom)
+        .lte('created_at', dateTo)
+        .order('created_at', { ascending: false });
       return data || [];
     },
   });
@@ -124,6 +123,7 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
     const types = new Set(closedTabs.map(t => t.location_type));
     return Array.from(types).sort();
   }, [closedTabs]);
+
   // Fetch menu items for food cost lookup
   const { data: menuItems = [] } = useQuery({
     queryKey: ['menu-items-cost'],
@@ -134,7 +134,7 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
   });
 
   // Fetch historical F&B revenue data filtered by selected date range
-  const histDateFrom = dateFrom.slice(0, 10); // 'YYYY-MM-DD'
+  const histDateFrom = dateFrom.slice(0, 10);
   const histDateTo = dateTo.slice(0, 10);
   const { data: histRevenue = [], isLoading: histLoading } = useQuery({
     queryKey: ['historical-revenue', histDateFrom, histDateTo],
@@ -157,8 +157,6 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
   const histStats = useMemo(() => {
     const totalRevenue = histRevenue.reduce((s, r) => s + (r.revenue || 0), 0);
     const totalQty = histRevenue.reduce((s, r) => s + (r.qty || 0), 0);
-
-    // Monthly aggregation
     const monthMap: Record<string, number> = {};
     histRevenue.forEach(r => {
       const key = `${r.year}-${String(r.month).padStart(2, '0')}`;
@@ -171,8 +169,6 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
         const label = format(new Date(Number(y), Number(m) - 1), 'MMM yyyy');
         return { month: label, revenue };
       });
-
-    // Category breakdown
     const catMap: Record<string, number> = {};
     histRevenue.forEach(r => {
       const cat = r.category || 'Other';
@@ -181,8 +177,6 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
     const categoryData = Object.entries(catMap)
       .sort((a, b) => b[1] - a[1])
       .map(([category, revenue]) => ({ category, revenue }));
-
-    // Payment method breakdown
     const payMap: Record<string, number> = {};
     histRevenue.forEach(r => {
       const pm = r.payment_method || 'Unknown';
@@ -191,7 +185,6 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
     const paymentData = Object.entries(payMap)
       .sort((a, b) => b[1] - a[1])
       .map(([method, revenue]) => ({ method, revenue }));
-
     return { totalRevenue, totalQty, monthlyData, categoryData, paymentData };
   }, [histRevenue]);
 
@@ -205,14 +198,10 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
     const revenue = orders.reduce((s, o) => s + (o.total || 0), 0);
     const count = orders.length;
     const avg = count ? revenue / count : 0;
-
-    // Revenue by type
     const byType: Record<string, number> = {};
     orders.forEach(o => {
       byType[o.order_type] = (byType[o.order_type] || 0) + (o.total || 0);
     });
-
-    // Per-item breakdown with food cost
     const itemMap: Record<string, { qty: number; revenue: number; foodCost: number }> = {};
     orders.forEach(o => {
       ((o.items as any[]) || []).forEach((i: any) => {
@@ -225,7 +214,6 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
         itemMap[i.name].foodCost += fc * qty;
       });
     });
-
     const itemBreakdown = Object.entries(itemMap)
       .map(([name, d]) => ({
         name,
@@ -236,12 +224,10 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
         margin: d.revenue > 0 ? ((d.revenue - d.foodCost) / d.revenue) * 100 : 0,
       }))
       .sort((a, b) => b.revenue - a.revenue);
-
     const totalFoodCost = itemBreakdown.reduce((s, i) => s + i.foodCost, 0);
     const totalProfit = revenue - totalFoodCost;
     const marginPct = revenue > 0 ? (totalProfit / revenue) * 100 : 0;
     const totalServiceCharge = orders.reduce((s, o) => s + (o.service_charge || 0), 0);
-
     return { revenue, count, avg, byType, itemBreakdown, totalFoodCost, totalProfit, marginPct, totalServiceCharge };
   }, [orders, costMap]);
 
@@ -258,9 +244,7 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
     const periodLabel = range === 'custom'
       ? `${customFrom ? format(customFrom, 'yyyy-MM-dd') : 'start'}_to_${customTo ? format(customTo, 'yyyy-MM-dd') : 'now'}`
       : range;
-
     let csv = '';
-    // Summary
     csv += 'REPORT SUMMARY\n';
     csv += `Period,${periodLabel}\n`;
     csv += `Total Revenue,${stats.revenue.toFixed(2)}\n`;
@@ -270,16 +254,12 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
     csv += `Total Service Charge,${stats.totalServiceCharge.toFixed(2)}\n`;
     csv += `Total Orders,${stats.count}\n`;
     csv += '\n';
-
-    // Item breakdown
     csv += 'ITEM BREAKDOWN\n';
     csv += 'Item,Qty Sold,Revenue,Food Cost,Profit,Margin %\n';
     stats.itemBreakdown.forEach(i => {
       csv += `"${i.name}",${i.qty},${i.revenue.toFixed(2)},${i.foodCost.toFixed(2)},${i.profit.toFixed(2)},${i.margin.toFixed(1)}%\n`;
     });
     csv += '\n';
-
-    // Transactions
     csv += 'TRANSACTIONS\n';
     csv += 'Order ID,Date/Time,Order Type,Location,Items,Subtotal,Service Charge,Total,Payment Type,Status\n';
     orders.forEach(o => {
@@ -287,10 +267,9 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
         .map((i: any) => `${i.name} x${i.qty || 1} @${i.price || 0}`)
         .join('; ');
       const subtotal = (o.total || 0) - (o.service_charge || 0);
-      const dateStr = o.closed_at ? format(new Date(o.closed_at), 'yyyy-MM-dd HH:mm') : '';
+      const dateStr = o.created_at ? format(new Date(o.created_at), 'yyyy-MM-dd HH:mm') : '';
       csv += `"${o.id}","${dateStr}","${o.order_type}","${o.location_detail || ''}","${items}",${subtotal.toFixed(2)},${(o.service_charge || 0).toFixed(2)},${(o.total || 0).toFixed(2)},"${o.payment_type || ''}","${o.status}"\n`;
     });
-
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -307,7 +286,6 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
     for (let i = 0; i < line.length; i++) {
       const ch = line[i];
       if (ch === '"') {
-        // RFC-4180: two consecutive quotes inside a quoted field = literal quote
         if (inQuote && line[i + 1] === '"') {
           current += '"';
           i++;
@@ -335,12 +313,10 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
     reader.onload = async (event) => {
       const text = event.target?.result as string;
       const lines = text.split(/\r?\n/);
-
-      // Find the TRANSACTIONS section header
       let headerIdx = -1;
       for (let i = 0; i < lines.length; i++) {
         if (lines[i].trim() === 'TRANSACTIONS') {
-          headerIdx = i + 1; // next line is the column header
+          headerIdx = i + 1;
           break;
         }
       }
@@ -349,20 +325,14 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
         e.target.value = '';
         return;
       }
-
-      // Collect data rows: stop at blank lines or new section headers
       const KNOWN_SECTIONS = new Set(['REPORT SUMMARY', 'ITEM BREAKDOWN', 'TRANSACTIONS']);
       const dataLines = lines
         .slice(headerIdx + 1)
         .filter(l => l.trim() !== '' && !KNOWN_SECTIONS.has(l.trim()));
       const rows: Record<string, unknown>[] = [];
-
       for (const line of dataLines) {
         const cols = parseCSVLine(line);
         if (cols.length < 10) continue;
-        // cols: [0] Order ID, [1] Date/Time, [2] Order Type, [3] Location,
-        //       [4] Items, [5] Subtotal, [6] Service Charge, [7] Total,
-        //       [8] Payment Type, [9] Status
         const dateTime = cols[1];
         const orderType = cols[2];
         const location = cols[3];
@@ -371,25 +341,19 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
         const totalStr = cols[7];
         const paymentType = cols[8];
         const status = cols[9];
-
-        // Parse items string: "Name xQty @Price; ..."
         const items = itemsStr
           .split('; ')
           .map(part => {
-            // Greedy match so item names containing ' x' are handled correctly
             const match = part.match(/^(.+) x(\d+) @([\d.]+)$/);
             if (match) return { name: match[1], qty: parseInt(match[2], 10), price: parseFloat(match[3]) };
             return part.trim() ? { name: part.trim(), qty: 1, price: 0 } : null;
           })
           .filter(Boolean);
-
-        // Validate and parse closed_at date
-        let closedAt: string | null = null;
+        let createdAt: string | null = null;
         if (dateTime) {
           const parsed = new Date(dateTime);
-          closedAt = isNaN(parsed.getTime()) ? null : parsed.toISOString();
+          createdAt = isNaN(parsed.getTime()) ? null : parsed.toISOString();
         }
-
         rows.push({
           order_type: orderType || 'WalkIn',
           location_detail: location || '',
@@ -397,17 +361,15 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
           total: parseFloat(totalStr) || 0,
           service_charge: parseFloat(serviceChargeStr) || 0,
           payment_type: paymentType || '',
-          status: status?.trim() || 'Paid',
-          closed_at: closedAt,
+          status: status?.trim() || 'closed',
+          created_at: createdAt,
         });
       }
-
       if (rows.length === 0) {
         toast.error('No valid transaction rows found in CSV');
         e.target.value = '';
         return;
       }
-
       setIsImporting(true);
       try {
         const { error } = await supabase.from('orders').insert(rows as any);
@@ -425,7 +387,6 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
 
   return (
     <div className="space-y-6">
-      {/* Date filter */}
       <div className="flex flex-wrap gap-2">
         {ranges.map(r => (
           <Button
@@ -440,7 +401,6 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
         ))}
       </div>
 
-      {/* Custom date pickers */}
       {range === 'custom' && (
         <div className="flex gap-2 flex-wrap">
           <Popover>
@@ -468,7 +428,6 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
         </div>
       )}
 
-      {/* CSV Download / Import */}
       <div className="flex gap-2">
         <Button size="sm" variant="outline" onClick={generateCSV} className="font-body text-xs flex-1">
           <Download className="w-4 h-4 mr-1" /> Download CSV Report
@@ -491,7 +450,6 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
         />
       </div>
 
-      {/* Summary cards — powered by orders query */}
       <div className="grid grid-cols-2 gap-3">
         <Card className="bg-card/50 border-border">
           <CardContent className="p-3 text-center">
@@ -523,7 +481,6 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
         </Card>
       </div>
 
-      {/* Service Charge card */}
       <Card className="bg-card/50 border-border">
         <CardContent className="p-3 text-center">
           <Receipt className="w-4 h-4 text-gold mx-auto mb-1" />
@@ -532,7 +489,6 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
         </CardContent>
       </Card>
 
-      {/* Orders count & avg */}
       <div className="grid grid-cols-2 gap-3">
         <Card className="bg-card/50 border-border">
           <CardContent className="p-3 text-center">
@@ -548,7 +504,6 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
         </Card>
       </div>
 
-      {/* Revenue by Type */}
       {Object.keys(stats.byType).length > 0 && (
         <section>
           <h3 className="font-display text-sm tracking-wider text-foreground mb-3">Revenue by Order Type</h3>
@@ -563,7 +518,6 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
         </section>
       )}
 
-      {/* Per-item Profit Breakdown */}
       {stats.itemBreakdown.length > 0 && (
         <section>
           <h3 className="font-display text-sm tracking-wider text-foreground mb-3">Item Profit Breakdown</h3>
@@ -586,7 +540,6 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
         </section>
       )}
 
-      {/* Closed Tabs Log */}
       <section>
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-display text-sm tracking-wider text-foreground flex items-center gap-2">
@@ -594,8 +547,6 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
             Closed Tabs ({filteredTabs.length})
           </h3>
         </div>
-
-        {/* Type filter */}
         <div className="flex flex-wrap gap-1.5 mb-3">
           <Button
             size="sm"
@@ -617,7 +568,6 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
             </Button>
           ))}
         </div>
-
         {filteredTabs.length === 0 ? (
           <p className="font-body text-xs text-cream-dim text-center py-4">No closed tabs for this period.</p>
         ) : (
@@ -627,10 +577,8 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
               const tabTotal = orders.reduce((s, o) => s + (o.total || 0), 0);
               const tabSC = orders.reduce((s, o) => s + (o.service_charge || 0), 0);
               const isExpanded = expandedTabId === tab.id;
-
               return (
                 <div key={tab.id} className="border border-border rounded-lg overflow-hidden">
-                  {/* Tab header - clickable */}
                   <button
                     onClick={() => setExpandedTabId(isExpanded ? null : tab.id)}
                     className="w-full flex items-center justify-between p-3 text-left hover:bg-secondary/30 transition-colors"
@@ -663,8 +611,6 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
                       {isExpanded ? <ChevronUp className="w-4 h-4 text-cream-dim" /> : <ChevronDown className="w-4 h-4 text-cream-dim" />}
                     </div>
                   </button>
-
-                  {/* Expanded details */}
                   {isExpanded && (
                     <div className="border-t border-border p-3 bg-secondary/10 space-y-3">
                       {orders.length === 0 ? (
@@ -696,7 +642,6 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
                           );
                         })
                       )}
-                      {/* Tab totals */}
                       <div className="border-t border-border pt-2 flex justify-between font-display text-sm">
                         <span className="text-foreground">Tab Total</span>
                         <span className="text-gold">₱{(tabTotal + tabSC).toLocaleString()}</span>
@@ -710,104 +655,7 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
         )}
       </section>
 
-      {/* Accounting Export */}
       <AccountingExport />
-
-      {/* Historical F&B Revenue */}
-      <section className="space-y-4">
-        <div className="flex items-center gap-2">
-          <BarChart3 className="w-4 h-4 text-gold" />
-          <h3 className="font-display text-sm tracking-wider text-foreground">F&B Revenue (Historical)</h3>
-        </div>
-
-        {histLoading ? (
-          <p className="font-body text-xs text-muted-foreground text-center py-4">Loading historical data…</p>
-        ) : histRevenue.length === 0 ? (
-          <p className="font-body text-xs text-muted-foreground text-center py-4">No historical revenue data found.</p>
-        ) : (
-        <>
-        {/* Total historical revenue */}
-        <div className="grid grid-cols-2 gap-3">
-          <Card className="bg-card/50 border-border">
-            <CardContent className="p-3 text-center">
-              <DollarSign className="w-4 h-4 text-gold mx-auto mb-1" />
-              <p className="font-display text-lg text-foreground">₱{histStats.totalRevenue.toLocaleString()}</p>
-              <p className="font-body text-xs text-muted-foreground">Total F&B Revenue</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-card/50 border-border">
-            <CardContent className="p-3 text-center">
-              <ShoppingCart className="w-4 h-4 text-gold mx-auto mb-1" />
-              <p className="font-display text-lg text-foreground">{histStats.totalQty.toLocaleString()}</p>
-              <p className="font-body text-xs text-muted-foreground">Items Sold</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Monthly Revenue Chart */}
-        {histStats.monthlyData.length > 0 && (
-          <Card className="bg-card/50 border-border">
-            <CardContent className="p-3">
-              <p className="font-display text-xs tracking-wider text-foreground mb-3">Monthly Revenue</p>
-              <ChartContainer
-                config={{
-                  revenue: { label: 'Revenue', color: 'hsl(var(--primary))' },
-                }}
-                className="h-[220px] w-full"
-              >
-                <BarChart data={histStats.monthlyData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border/30" />
-                  <XAxis dataKey="month" tick={{ fontSize: 10 }} className="fill-muted-foreground" angle={-45} textAnchor="end" height={60} />
-                  <YAxis tick={{ fontSize: 10 }} className="fill-muted-foreground" tickFormatter={(v) => `₱${(v / 1000).toFixed(0)}k`} />
-                  <ChartTooltip content={<ChartTooltipContent formatter={(value) => `₱${Number(value).toLocaleString()}`} />} />
-                  <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ChartContainer>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Category Breakdown */}
-        {histStats.categoryData.length > 0 && (
-          <div>
-            <p className="font-display text-xs tracking-wider text-foreground mb-3">Revenue by Category</p>
-            <div className="space-y-2">
-              {histStats.categoryData.map(c => {
-                const pct = histStats.totalRevenue > 0 ? ((c.revenue / histStats.totalRevenue) * 100).toFixed(1) : '0';
-                return (
-                  <div key={c.category} className="border border-border rounded-lg p-3">
-                    <div className="flex justify-between items-center">
-                      <span className="font-body text-sm text-foreground">{c.category}</span>
-                      <span className="font-display text-sm text-primary">₱{c.revenue.toLocaleString()}</span>
-                    </div>
-                    <div className="mt-1.5 h-1.5 bg-secondary rounded-full overflow-hidden">
-                      <div className="h-full bg-primary rounded-full" style={{ width: `${pct}%` }} />
-                    </div>
-                    <p className="font-body text-[10px] text-muted-foreground mt-1">{pct}% of total</p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Payment Method Breakdown */}
-        {histStats.paymentData.length > 0 && (
-          <div>
-            <p className="font-display text-xs tracking-wider text-foreground mb-3">Revenue by Payment Method</p>
-            <div className="space-y-2">
-              {histStats.paymentData.map(p => (
-                <div key={p.method} className="flex justify-between items-center p-2 border border-border rounded">
-                  <span className="font-body text-sm text-foreground">{p.method}</span>
-                  <span className="font-display text-sm text-primary">₱{p.revenue.toLocaleString()}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        </>
-        )}
-      </section>
     </div>
   );
 };
