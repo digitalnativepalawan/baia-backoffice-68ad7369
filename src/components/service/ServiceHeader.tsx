@@ -53,7 +53,7 @@ const ServiceHeader = ({ department }: ServiceHeaderProps) => {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {canOrder && department !== 'reception' && department !== 'cashier' && (
+          {canOrder && department !== 'reception' && department !== 'cashier' && department !== 'tours' && (
             <Button
               size="sm"
               onClick={() => navigate(`/order-type?mode=staff&returnTo=/service/${department}`)}
