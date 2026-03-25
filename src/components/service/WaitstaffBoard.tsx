@@ -2,8 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, ChevronUp, Clock, Flame, GlassWater, Home, Receipt, Send } from 'lucide-react';
+import { Clock, Flame, GlassWater, Home, Receipt, Send } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
@@ -45,7 +44,7 @@ const WaitstaffBoard = () => {
       const { data } = await supabase
         .from('orders')
         .select('*')
-        .in('status', ['New', 'Preparing', 'Ready', 'Served', 'Paid'])
+        .in('status', ['New', 'Preparing', 'Ready'])
         .gte('created_at', start.toISOString())
         .order('created_at', { ascending: true })
         .limit(300);
@@ -54,11 +53,9 @@ const WaitstaffBoard = () => {
     refetchInterval: 5000,
   });
 
-  // Split active vs completed, then group (completed is filtered out entirely)
+  // Only active orders — completed orders are never fetched
   const { activeGroups, allUnitKeys } = useMemo(() => {
-    const active = orders.filter(o => ['New', 'Preparing', 'Ready'].includes(o.status));
-    // Completed orders are filtered out — not shown anywhere
-    const ag = groupOrdersByUnit(active);
+    const ag = groupOrdersByUnit(orders);
     const keys = [...new Set(ag.map(g => g.key))];
     return { activeGroups: ag, allUnitKeys: keys };
   }, [orders]);
