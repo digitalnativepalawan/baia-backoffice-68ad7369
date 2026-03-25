@@ -17,13 +17,7 @@ import ExpenseReportsModal from './ExpenseReportsModal';
 import ResortOpsPnLReport from './ResortOpsPnLReport';
 import ExpenseBulkImportModal from './ExpenseBulkImportModal';
 import WebhookSettings from './WebhookSettings';
-import { format, startOfMonth, endOfMonth, getDaysInMonth, eachDayOfInterval, isWithinInterval, parseISO, isBefore } from 'date-fns';
-
-const MONTHS = [
-  '2025-10', '2025-11', '2025-12',
-  '2026-01', '2026-02', '2026-03', '2026-04', '2026-05',
-  '2026-06', '2026-07', '2026-08', '2026-09',
-];
+import { format, startOfMonth, endOfMonth, getDaysInMonth, eachDayOfInterval, isWithinInterval, parseISO, isBefore, subMonths } from 'date-fns';
 
 export const EXPENSE_CATEGORIES = [
   'Food & Beverage', 'Utilities (Electric/Water/Gas/Fuel)', 'Labor/Staff', 'Housekeeping',
@@ -52,12 +46,6 @@ export const computeVatFields = (vatStatus: string, totalAmount: number) => {
     default:
       return { vatable_sale: ta, vat_amount: 0, vat_exempt_amount: 0, zero_rated_amount: 0 };
   }
-};
-
-const monthLabel = (m: string) => {
-  const [y, mo] = m.split('-');
-  const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return `${names[parseInt(mo) - 1]} ${y}`;
 };
 
 const from = (table: string) => supabase.from(table as any);
@@ -204,18 +192,55 @@ const ExpenseFormFields = ({ data, onChange, scannedFields, scanningReceipt, onS
 
 const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
   const qc = useQueryClient();
-  const [selectedMonth, setSelectedMonth] = useState(() => {
-    const now = new Date();
-    const cur = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    return MONTHS.includes(cur) ? cur : MONTHS[0];
+  
+  // Date range state
+  const [dateFrom, setDateFrom] = useState(() => {
+    // Default to Jan 1, 2025
+    return '2025-01-01';
   });
+  const [dateTo, setDateTo] = useState(() => {
+    // Default to today
+    return format(new Date(), 'yyyy-MM-dd');
+  });
+  const [datePreset, setDatePreset] = useState<'ytd' | 'custom'>('ytd');
 
-  const monthStart = startOfMonth(parseISO(`${selectedMonth}-01`));
-  const monthEnd = endOfMonth(monthStart);
-  const daysInMonth = getDaysInMonth(monthStart);
-  const daysArray = eachDayOfInterval({ start: monthStart, end: monthEnd });
-  const monthStartStr = format(monthStart, 'yyyy-MM-dd');
-  const monthEndStr = format(monthEnd, 'yyyy-MM-dd');
+  // Helper to set YTD
+  const setYTD = () => {
+    const now = new Date();
+    const startOfYear = `${now.getFullYear()}-01-01`;
+    setDateFrom(startOfYear);
+    setDateTo(format(now, 'yyyy-MM-dd'));
+    setDatePreset('ytd');
+  };
+
+  // Helper to set current month
+  const setCurrentMonth = () => {
+    const now = new Date();
+    const startOfMonthDate = startOfMonth(now);
+    const endOfMonthDate = endOfMonth(now);
+    setDateFrom(format(startOfMonthDate, 'yyyy-MM-dd'));
+    setDateTo(format(endOfMonthDate, 'yyyy-MM-dd'));
+    setDatePreset('custom');
+  };
+
+  // Helper to set last month
+  const setLastMonth = () => {
+    const lastMonthDate = subMonths(new Date(), 1);
+    const start = startOfMonth(lastMonthDate);
+    const end = endOfMonth(lastMonthDate);
+    setDateFrom(format(start, 'yyyy-MM-dd'));
+    setDateTo(format(end, 'yyyy-MM-dd'));
+    setDatePreset('custom');
+  };
+
+  const monthStartStr = dateFrom;
+  const monthEndStr = dateTo;
+
+  // For occupancy grid - we need the number of days in the selected range
+  const startDateObj = parseISO(dateFrom);
+  const endDateObj = parseISO(dateTo);
+  const daysArray = eachDayOfInterval({ start: startDateObj, end: endDateObj });
+  const daysInMonth = daysArray.length;
 
   // ── Data queries ──
   const { data: units = [] } = useQuery({
@@ -247,11 +272,11 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
     queryFn: async () => { const { data } = await from('resort_ops_incoming_payments').select('*').order('expected_date'); return data || []; },
   });
   const { data: orders = [] } = useQuery({
-    queryKey: ['resort-ops-orders', selectedMonth],
+    queryKey: ['resort-ops-orders', dateFrom, dateTo],
     queryFn: async () => {
       const { data } = await supabase.from('orders').select('*')
-        .gte('created_at', monthStartStr)
-        .lte('created_at', monthEndStr + 'T23:59:59');
+        .gte('created_at', dateFrom)
+        .lte('created_at', dateTo + 'T23:59:59');
       return data || [];
     },
   });
@@ -261,10 +286,10 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
   });
 
   // ── Filtered data ──
-  const monthBookings = useMemo(() => bookings.filter((b: any) => b.check_in >= monthStartStr && b.check_in <= monthEndStr), [bookings, monthStartStr, monthEndStr]);
-  const monthExpenses = useMemo(() => expenses.filter((e: any) => e.expense_date >= monthStartStr && e.expense_date <= monthEndStr), [expenses, monthStartStr, monthEndStr]);
-  const monthTasks = useMemo(() => tasks.filter((t: any) => t.due_date >= monthStartStr && t.due_date <= monthEndStr), [tasks, monthStartStr, monthEndStr]);
-  const monthPayments = useMemo(() => payments.filter((p: any) => p.expected_date >= monthStartStr && p.expected_date <= monthEndStr), [payments, monthStartStr, monthEndStr]);
+  const monthBookings = useMemo(() => bookings.filter((b: any) => b.check_in >= dateFrom && b.check_in <= dateTo), [bookings, dateFrom, dateTo]);
+  const monthExpenses = useMemo(() => expenses.filter((e: any) => e.expense_date >= dateFrom && e.expense_date <= dateTo), [expenses, dateFrom, dateTo]);
+  const monthTasks = useMemo(() => tasks.filter((t: any) => t.due_date >= dateFrom && t.due_date <= dateTo), [tasks, dateFrom, dateTo]);
+  const monthPayments = useMemo(() => payments.filter((p: any) => p.expected_date >= dateFrom && p.expected_date <= dateTo), [payments, dateFrom, dateTo]);
 
   // ── KPI calculations ──
   const revenue = useMemo(() => monthBookings.reduce((s: number, b: any) => s + Number(b.paid_amount || 0), 0), [monthBookings]);
@@ -575,6 +600,13 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
 
   const today = format(new Date(), 'yyyy-MM-dd');
 
+  // Format date range for display
+  const formatDateRange = () => {
+    const fromDate = new Date(dateFrom);
+    const toDate = new Date(dateTo);
+    return `${format(fromDate, 'MMM d, yyyy')} - ${format(toDate, 'MMM d, yyyy')}`;
+  };
+
   // Reusable action buttons
   const EditBtn = ({ onClick }: { onClick: () => void }) => (
     <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-primary flex-shrink-0" onClick={onClick}><Pencil className="w-3.5 h-3.5" /></Button>
@@ -701,17 +733,62 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
-      {/* Month Selector */}
-      <div className="flex items-center gap-3">
-        <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-          <SelectTrigger className="bg-card border-border text-foreground font-display tracking-wider w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {MONTHS.map(m => <SelectItem key={m} value={m}>{monthLabel(m)}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <h2 className="font-display text-lg tracking-wider text-foreground">Resort Ops</h2>
+      {/* Date Range Selector */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <h2 className="font-display text-lg tracking-wider text-foreground">Resort Ops</h2>
+          <div className="flex gap-2">
+            <Button 
+              size="sm" 
+              variant={datePreset === 'ytd' ? 'default' : 'outline'}
+              onClick={setYTD}
+              className="text-xs h-8"
+            >
+              YTD
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={setCurrentMonth}
+              className="text-xs h-8"
+            >
+              This Month
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={setLastMonth}
+              className="text-xs h-8"
+            >
+              Last Month
+            </Button>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <label className="font-body text-xs text-muted-foreground">From:</label>
+          <Input 
+            type="date" 
+            value={dateFrom} 
+            onChange={(e) => {
+              setDateFrom(e.target.value);
+              setDatePreset('custom');
+            }}
+            className="w-36 h-8 text-sm"
+          />
+          <label className="font-body text-xs text-muted-foreground">To:</label>
+          <Input 
+            type="date" 
+            value={dateTo} 
+            onChange={(e) => {
+              setDateTo(e.target.value);
+              setDatePreset('custom');
+            }}
+            className="w-36 h-8 text-sm"
+          />
+          <span className="font-body text-xs text-muted-foreground ml-2">
+            {formatDateRange()}
+          </span>
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -1179,7 +1256,7 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
         open={expenseReportsOpen}
         onOpenChange={setExpenseReportsOpen}
         expenses={monthExpenses}
-        monthLabel={monthLabel(selectedMonth)}
+        monthLabel={`${format(parseISO(dateFrom), 'MMM d, yyyy')} - ${format(parseISO(dateTo), 'MMM d, yyyy')}`}
         onCategoryClick={(cat) => setExpenseCategoryFilter(cat)}
       />
       <ExpenseBulkImportModal
