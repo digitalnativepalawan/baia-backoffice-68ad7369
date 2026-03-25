@@ -25,7 +25,6 @@ const STATUS_BORDER: Record<string, string> = {
 
 const WaitstaffBoard = () => {
   const qc = useQueryClient();
-  const [completedOpen, setCompletedOpen] = useState(false);
   const [activeUnit, setActiveUnit] = useState<string | null>(null);
 
   useEffect(() => {
@@ -55,14 +54,13 @@ const WaitstaffBoard = () => {
     refetchInterval: 5000,
   });
 
-  // Split active vs completed, then group
-  const { activeGroups, completedGroups, allUnitKeys } = useMemo(() => {
+  // Split active vs completed, then group (completed is filtered out entirely)
+  const { activeGroups, allUnitKeys } = useMemo(() => {
     const active = orders.filter(o => ['New', 'Preparing', 'Ready'].includes(o.status));
-    const completed = orders.filter(o => o.status === 'Served' || o.status === 'Paid');
+    // Completed orders are filtered out — not shown anywhere
     const ag = groupOrdersByUnit(active);
-    const cg = groupOrdersByUnit(completed);
     const keys = [...new Set(ag.map(g => g.key))];
-    return { activeGroups: ag, completedGroups: cg, allUnitKeys: keys };
+    return { activeGroups: ag, allUnitKeys: keys };
   }, [orders]);
 
   // Column assignment by worst status
@@ -141,29 +139,9 @@ const WaitstaffBoard = () => {
           ))}
         </div>
 
-        {/* Completed — Desktop */}
-        {completedGroups.length > 0 && (
-          <div className="hidden md:block px-4 pb-4">
-            <Collapsible open={completedOpen} onOpenChange={setCompletedOpen}>
-              <CollapsibleTrigger className="w-full flex items-center justify-between bg-secondary/50 border border-border rounded-lg px-4 py-3 hover:bg-secondary transition-colors">
-                <span className="font-display text-sm tracking-wider text-muted-foreground">✓ Completed Today ({completedGroups.length})</span>
-                {completedOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pt-3">
-                <div className="grid gap-3 max-h-[40vh] overflow-y-auto grid-cols-3">
-                  {completedGroups.map(group => (
-                    <GroupCard key={group.key} group={group} onSendToCashier={handleSendGroupToCashier} compact />
-                  ))}
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          </div>
-        )}
-
         {/* Mobile view */}
         <MobileTabView
           columns={columns}
-          completedGroups={completedGroups}
           onSendToCashier={handleSendGroupToCashier}
         />
       </div>
@@ -180,7 +158,6 @@ const GroupCard = ({ group, onSendToCashier, compact }: {
   const [busy, setBusy] = useState(false);
   const elapsed = formatDistanceToNow(new Date(group.oldestCreatedAt), { addSuffix: false });
   const isReady = group.worstStatus === 'Ready';
-  const isCompleted = group.worstStatus === 'Served' || group.worstStatus === 'Paid';
   const borderClass = STATUS_BORDER[group.worstStatus] || 'border-l-border';
 
   const foodItems = group.items.filter(i => { const d = i.department || 'kitchen'; return d === 'kitchen' || d === 'both'; });
@@ -196,7 +173,7 @@ const GroupCard = ({ group, onSendToCashier, compact }: {
   return (
     <div className={`rounded-xl border border-border/60 border-l-4 ${borderClass} bg-card/90 backdrop-blur-sm ${
       group.worstStatus === 'New' ? 'new-order-card' : ''
-    } ${isCompleted ? 'opacity-60' : ''} ${compact ? 'p-3' : 'p-4'}`}>
+    } ${compact ? 'p-3' : 'p-4'}`}>
       {/* Header */}
       <div className="flex items-start justify-between mb-2">
         <div className="min-w-0 flex-1">
@@ -269,11 +246,6 @@ const GroupCard = ({ group, onSendToCashier, compact }: {
               {busy ? 'Sending…' : <><Send className="w-5 h-5" /> Send to Cashier</>}
             </Button>
           )}
-          {isCompleted && (
-            <Badge variant="outline" className="font-body text-[10px] h-5 border-emerald-400/50 text-emerald-400">
-              {group.worstStatus === 'Paid' ? 'Paid' : 'Served'}
-            </Badge>
-          )}
         </div>
       </div>
     </div>
@@ -281,13 +253,11 @@ const GroupCard = ({ group, onSendToCashier, compact }: {
 };
 
 /* ── Mobile Tab View ── */
-const MobileTabView = ({ columns, completedGroups, onSendToCashier }: {
+const MobileTabView = ({ columns, onSendToCashier }: {
   columns: Record<string, OrderGroup[]>;
-  completedGroups: OrderGroup[];
   onSendToCashier: (g: OrderGroup) => Promise<void>;
 }) => {
   const [tab, setTab] = useState<string>('New');
-  const [completedOpen, setCompletedOpen] = useState(false);
 
   return (
     <div className="md:hidden flex flex-col h-full">
@@ -317,21 +287,6 @@ const MobileTabView = ({ columns, completedGroups, onSendToCashier }: {
           <GroupCard key={group.key} group={group} onSendToCashier={onSendToCashier} />
         ))}
       </div>
-      {completedGroups.length > 0 && (
-        <div className="px-3 pb-4 flex-shrink-0">
-          <Collapsible open={completedOpen} onOpenChange={setCompletedOpen}>
-            <CollapsibleTrigger className="w-full flex items-center justify-between bg-secondary/50 border border-border rounded-lg px-4 py-3">
-              <span className="font-display text-xs tracking-wider text-muted-foreground">✓ Completed ({completedGroups.length})</span>
-              {completedOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
-            </CollapsibleTrigger>
-            <CollapsibleContent className="pt-3 space-y-3 max-h-[40vh] overflow-y-auto">
-              {completedGroups.map(group => (
-                <GroupCard key={group.key} group={group} onSendToCashier={onSendToCashier} />
-              ))}
-            </CollapsibleContent>
-          </Collapsible>
-        </div>
-      )}
     </div>
   );
 };
