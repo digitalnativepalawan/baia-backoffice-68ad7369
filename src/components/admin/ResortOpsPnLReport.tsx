@@ -10,16 +10,30 @@ import {
 
 const BAR_CATEGORIES = new Set(['Cocktails', 'Wine', 'Spirits', 'Beer']);
 
-const P_AND_L_EXPENSE_ROWS: { label: string; keys: string[] }[] = [
-  { label: 'Labor/Staff',               keys: ['Labor/Staff'] },
-  { label: 'Utilities',                 keys: ['Utilities (Electric/Water/Gas/Fuel)'] },
-  { label: 'Food & Beverage (COGS)',    keys: ['Food & Beverage'] },
-  { label: 'Housekeeping',              keys: ['Housekeeping'] },
-  { label: 'Maintenance/Repairs',       keys: ['Maintenance/Repairs'] },
-  { label: 'Transportation',            keys: ['Transportation'] },
-  { label: 'Taxes/Government',          keys: ['Taxes/Government'] },
-  { label: 'Miscellaneous',             keys: ['Miscellaneous'] },
-  { label: 'Capital Expenditures',      keys: ['Capital Expenditures'] },
+// ── Expense category mapping from your actual data to summary categories ──
+const EXPENSE_MAPPING: { summary: string; sourceKeys: string[] }[] = [
+  { summary: 'Food & Beverage (COGS)', sourceKeys: ['Cost of Goods Sold (Bar& Resto)'] },
+  { summary: 'Labor/Staff', sourceKeys: ['Payroll Expense', 'RENTAL EXPENSE', 'Employee Meals', 'Meal Allowance', 'Employee Benefits & Other\'s'] },
+  { summary: 'Utilities', sourceKeys: ['Fuel & Utilities', 'Utilities (Electric/Water/Gas/Fuel)'] },
+  { summary: 'Housekeeping', sourceKeys: ['Supplies'] },
+  { summary: 'Maintenance/Repairs', sourceKeys: ['Maintenance'] },
+  { summary: 'Transportation', sourceKeys: ['Transportation Expense'] },
+  { summary: 'Taxes/Government', sourceKeys: ['Business related Taxes'] },
+  { summary: 'Miscellaneous', sourceKeys: ['Miscellaneous'] },
+  { summary: 'Capital Expenditures', sourceKeys: ['CAPEX'] },
+];
+
+// Order for display
+const P_AND_L_EXPENSE_ORDER = [
+  'Food & Beverage (COGS)',
+  'Labor/Staff',
+  'Utilities',
+  'Housekeeping',
+  'Maintenance/Repairs',
+  'Transportation',
+  'Taxes/Government',
+  'Miscellaneous',
+  'Capital Expenditures',
 ];
 
 interface Props {
@@ -87,8 +101,8 @@ const ResortOpsPnLReport = ({ monthBookings, orders, monthExpenses, menuItems }:
 
   const totalRevenue = hotelAccommodation + hotelServices + foodBevRevenue + barRevenue;
 
-  // ── Expense breakdown ──────────────────────────────────────────────────
-  const expenseByCategory = useMemo(() => {
+  // ── Expense breakdown with proper mapping ──────────────────────────────────
+  const expenseBySource = useMemo(() => {
     const map = new Map<string, number>();
     for (const e of monthExpenses) {
       const cat = (e.category as string) || '';
@@ -97,14 +111,34 @@ const ResortOpsPnLReport = ({ monthBookings, orders, monthExpenses, menuItems }:
     return map;
   }, [monthExpenses]);
 
-  const expenseRows = useMemo(
-    () =>
-      P_AND_L_EXPENSE_ROWS.map(row => ({
-        label: row.label,
-        amount: row.keys.reduce((s, k) => s + (expenseByCategory.get(k) || 0), 0),
-      })),
-    [expenseByCategory],
-  );
+  const expenseRows = useMemo(() => {
+    // First, aggregate by summary category using the mapping
+    const summaryMap = new Map<string, number>();
+    
+    for (const mapping of EXPENSE_MAPPING) {
+      let total = 0;
+      for (const sourceKey of mapping.sourceKeys) {
+        total += expenseBySource.get(sourceKey) || 0;
+      }
+      if (total > 0) {
+        summaryMap.set(mapping.summary, total);
+      }
+    }
+    
+    // Also capture any categories not in mapping (as Misc)
+    for (const [sourceKey, amount] of expenseBySource.entries()) {
+      const isMapped = EXPENSE_MAPPING.some(m => m.sourceKeys.includes(sourceKey));
+      if (!isMapped && amount > 0) {
+        summaryMap.set('Miscellaneous', (summaryMap.get('Miscellaneous') || 0) + amount);
+      }
+    }
+    
+    // Build rows in the correct display order
+    return P_AND_L_EXPENSE_ORDER.map(summaryLabel => ({
+      label: summaryLabel,
+      amount: summaryMap.get(summaryLabel) || 0,
+    })).filter(row => row.amount > 0);
+  }, [expenseBySource]);
 
   const totalExpenses = useMemo(
     () => expenseRows.reduce((s, r) => s + r.amount, 0),
