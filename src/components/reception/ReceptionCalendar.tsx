@@ -10,6 +10,7 @@ import {
   type CalendarView, type BookingWithGuest, type ResortUnit,
 } from './calendarUtils';
 import AddReservationModal from './AddReservationModal';
+import PendingCharges from './PendingCharges';
 
 interface UnitWithStatus {
   id: string;
@@ -213,6 +214,9 @@ const ReceptionCalendar = ({ bookings, rooms, units, canEdit, canManage }: Recep
 
   return (
     <div className="space-y-3">
+      {/* Pending Room Charges Section */}
+      <PendingCharges />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
         <div className="flex items-center gap-2">
