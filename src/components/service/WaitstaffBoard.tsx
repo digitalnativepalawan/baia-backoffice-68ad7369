@@ -86,18 +86,27 @@ const WaitstaffBoard = () => {
     const isInHouse = isInHouseUnit(group.key);
     
     if (isInHouse) {
-      // For in-house guests: mark for reception/guest portal billing
+      // Find the room_id for this unit
+      const { data: unit } = await supabase
+        .from('resort_ops_units')
+        .select('id')
+        .ilike('name', `%${group.key}%`)
+        .single();
+      
+      const roomId = unit?.id;
+      
+      // For in-house guests: mark as Served (hides from Waitstaff) and flag for billing
       await supabase
         .from('orders')
         .update({ 
-          status: 'Ready',
-          ready_for_billing: true
+          status: 'Served',
+          ready_for_billing: true,
+          room_id: roomId
         })
         .in('id', ids);
       
       qc.invalidateQueries({ queryKey: ['waitstaff-orders'] });
-      qc.invalidateQueries({ queryKey: ['reception-orders'] });
-      toast.success(`${group.label} sent to Reception — guest can view bill in portal`);
+      toast.success(`${group.label} — charges added to room bill`);
     } else {
       // For walk-in guests: send to cashier as before
       await supabase
