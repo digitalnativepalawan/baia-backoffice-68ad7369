@@ -9,11 +9,12 @@ import { usePaymentMethods } from '@/hooks/usePaymentMethods';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Clock, Home, ChevronDown, ChevronUp, CreditCard, Check, ArrowLeft, Printer, CalendarIcon, BedDouble } from 'lucide-react';
+import { Clock, Home, ChevronDown, ChevronUp, CreditCard, Check, ArrowLeft, Printer, CalendarIcon, BedDouble, CalendarPlus } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { formatDistanceToNow, format } from 'date-fns';
 import CashierReceipt from './CashierReceipt';
 import { groupOrdersByUnit, type OrderGroup } from '@/lib/groupOrders';
+import ReservationModal from '@/components/cashier/ReservationModal';
 
 const normalizeMatchKey = (value?: string | null) => (value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
@@ -29,6 +30,7 @@ const CashierBoard = () => {
   const [receiptOrder, setReceiptOrder] = useState<any | null>(null);
   const [completedOpen, setCompletedOpen] = useState(false);
   const [completedDate, setCompletedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [reservationOpen, setReservationOpen] = useState(false);
 
   // Realtime
   useEffect(() => {
@@ -242,91 +244,104 @@ const CashierBoard = () => {
   }
 
   return (
-    <div className="min-h-0 flex flex-col md:flex-row md:h-full md:overflow-hidden max-w-full">
-      {/* Left: Order list */}
-      <div className="flex-1 flex flex-col md:overflow-hidden border-r border-border/50 min-w-0">
-        <div className="flex items-center gap-4 px-4 py-3 border-b border-border bg-card/50 flex-shrink-0">
-          <span className="font-display text-sm text-foreground tracking-wider">
-            {orderGroups.length} unit{orderGroups.length !== 1 ? 's' : ''} awaiting settlement
-          </span>
-        </div>
+    <>
+      <div className="min-h-0 flex flex-col md:flex-row md:h-full md:overflow-hidden max-w-full">
+        {/* Left: Order list */}
+        <div className="flex-1 flex flex-col md:overflow-hidden border-r border-border/50 min-w-0">
+          <div className="flex items-center justify-between gap-4 px-4 py-3 border-b border-border bg-card/50 flex-shrink-0">
+            <span className="font-display text-sm text-foreground tracking-wider">
+              {orderGroups.length} unit{orderGroups.length !== 1 ? 's' : ''} awaiting settlement
+            </span>
+            <Button
+              size="sm"
+              onClick={() => setReservationOpen(true)}
+              className="gap-1.5 h-9 bg-gold text-background hover:bg-gold/90 font-display text-xs tracking-wider"
+            >
+              <CalendarPlus className="w-4 h-4" />
+              <span>Reservation</span>
+            </Button>
+          </div>
 
-        <div className="flex-1 md:overflow-y-auto">
-          {orderGroups.length > 0 ? (
-            <div className="p-3 space-y-2">
-              {orderGroups.map(group => (
-                <GroupRow
-                  key={group.key}
-                  group={group}
-                  selected={selectedGroup?.key === group.key}
-                  onSelect={() => handleGroupSelect(group)}
-                />
-              ))}
-            </div>
-          ) : (
-            <p className="font-body text-sm text-muted-foreground text-center py-12">No orders awaiting settlement</p>
-          )}
-
-          {/* Completed */}
-          <div className="px-3 pb-4">
-            <Collapsible open={completedOpen} onOpenChange={setCompletedOpen}>
-              <CollapsibleTrigger className="w-full flex items-center justify-between bg-secondary/50 border border-border rounded-lg px-4 py-3 hover:bg-secondary transition-colors">
-                <span className="font-display text-xs tracking-wider text-muted-foreground">
-                  ✓ Completed ({completedOrders.length})
-                </span>
-                {completedOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pt-3 space-y-2">
-                <div className="flex items-center gap-2 px-1">
-                  <CalendarIcon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                  <Input
-                    type="date"
-                    value={completedDate}
-                    onChange={e => setCompletedDate(e.target.value || format(new Date(), 'yyyy-MM-dd'))}
-                    className="bg-secondary border-border text-foreground font-body text-sm h-9 w-auto"
+          <div className="flex-1 md:overflow-y-auto">
+            {orderGroups.length > 0 ? (
+              <div className="p-3 space-y-2">
+                {orderGroups.map(group => (
+                  <GroupRow
+                    key={group.key}
+                    group={group}
+                    selected={selectedGroup?.key === group.key}
+                    onSelect={() => handleGroupSelect(group)}
                   />
-                </div>
-                {completedOrders.length === 0 && (
-                  <p className="font-body text-xs text-muted-foreground text-center py-4">No completed orders for this date</p>
-                )}
-                {completedOrders.map(order => (
-                  <CompletedRow key={order.id} order={order} onSelect={() => setReceiptOrder(order)} />
                 ))}
-              </CollapsibleContent>
-            </Collapsible>
+              </div>
+            ) : (
+              <p className="font-body text-sm text-muted-foreground text-center py-12">No orders awaiting settlement</p>
+            )}
+
+            {/* Completed */}
+            <div className="px-3 pb-4">
+              <Collapsible open={completedOpen} onOpenChange={setCompletedOpen}>
+                <CollapsibleTrigger className="w-full flex items-center justify-between bg-secondary/50 border border-border rounded-lg px-4 py-3 hover:bg-secondary transition-colors">
+                  <span className="font-display text-xs tracking-wider text-muted-foreground">
+                    ✓ Completed ({completedOrders.length})
+                  </span>
+                  {completedOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-3 space-y-2">
+                  <div className="flex items-center gap-2 px-1">
+                    <CalendarIcon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                    <Input
+                      type="date"
+                      value={completedDate}
+                      onChange={e => setCompletedDate(e.target.value || format(new Date(), 'yyyy-MM-dd'))}
+                      className="bg-secondary border-border text-foreground font-body text-sm h-9 w-auto"
+                    />
+                  </div>
+                  {completedOrders.length === 0 && (
+                    <p className="font-body text-xs text-muted-foreground text-center py-4">No completed orders for this date</p>
+                  )}
+                  {completedOrders.map(order => (
+                    <CompletedRow key={order.id} order={order} onSelect={() => setReceiptOrder(order)} />
+                  ))}
+                </CollapsibleContent>
+              </Collapsible>
+            </div>
           </div>
         </div>
+
+        {/* Right: Payment Panel */}
+        <div className="w-full md:w-[400px] lg:w-[440px] flex-shrink-0 bg-card/50 flex flex-col md:overflow-y-auto">
+          {selectedGroup ? (
+            <BillOutPanel
+              group={selectedGroup}
+              paymentMethods={activePaymentMethods}
+              selectedPayment={selectedPayment}
+              onSelectPayment={(p) => { setSelectedPayment(p); setChargeToRoom(false); }}
+              chargeToRoom={chargeToRoom}
+              onChargeToRoom={() => { setChargeToRoom(true); setSelectedPayment(''); }}
+              activeBookings={activeBookings}
+              selectedBooking={selectedBooking}
+              onSelectBooking={setSelectedBooking}
+              onConfirm={handleConfirmPayment}
+              busy={busy}
+              onBack={() => setSelectedGroup(null)}
+              onPreviewReceipt={() => setReceiptOrder({
+                ...selectedGroup.orders[0],
+                items: selectedGroup.items.map(i => ({ name: i.name, price: i.price, qty: i.qty, quantity: i.qty })),
+                total: selectedGroup.total,
+                service_charge: selectedGroup.serviceCharge,
+              })}
+              inStayBooking={selectedGroupInStay}
+            />
+          ) : (
+            <DailySummary completed={completedOrders} />
+          )}
+        </div>
       </div>
 
-      {/* Right: Payment Panel */}
-      <div className="w-full md:w-[400px] lg:w-[440px] flex-shrink-0 bg-card/50 flex flex-col md:overflow-y-auto">
-        {selectedGroup ? (
-          <BillOutPanel
-            group={selectedGroup}
-            paymentMethods={activePaymentMethods}
-            selectedPayment={selectedPayment}
-            onSelectPayment={(p) => { setSelectedPayment(p); setChargeToRoom(false); }}
-            chargeToRoom={chargeToRoom}
-            onChargeToRoom={() => { setChargeToRoom(true); setSelectedPayment(''); }}
-            activeBookings={activeBookings}
-            selectedBooking={selectedBooking}
-            onSelectBooking={setSelectedBooking}
-            onConfirm={handleConfirmPayment}
-            busy={busy}
-            onBack={() => setSelectedGroup(null)}
-            onPreviewReceipt={() => setReceiptOrder({
-              ...selectedGroup.orders[0],
-              items: selectedGroup.items.map(i => ({ name: i.name, price: i.price, qty: i.qty, quantity: i.qty })),
-              total: selectedGroup.total,
-              service_charge: selectedGroup.serviceCharge,
-            })}
-            inStayBooking={selectedGroupInStay}
-          />
-        ) : (
-          <DailySummary completed={completedOrders} />
-        )}
-      </div>
-    </div>
+      {/* Reservation Modal */}
+      <ReservationModal open={reservationOpen} onOpenChange={setReservationOpen} />
+    </>
   );
 };
 
