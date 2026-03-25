@@ -9,12 +9,13 @@ import { usePaymentMethods } from '@/hooks/usePaymentMethods';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Clock, Home, ChevronDown, ChevronUp, CreditCard, Check, ArrowLeft, Printer, CalendarIcon, BedDouble, CalendarPlus } from 'lucide-react';
+import { Clock, Home, ChevronDown, ChevronUp, CreditCard, Check, ArrowLeft, Printer, CalendarIcon, BedDouble, CalendarPlus, Calendar } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { formatDistanceToNow, format } from 'date-fns';
 import CashierReceipt from './CashierReceipt';
 import { groupOrdersByUnit, type OrderGroup } from '@/lib/groupOrders';
 import ReservationModal from '@/components/cashier/ReservationModal';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 
 const normalizeMatchKey = (value?: string | null) => (value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
@@ -31,6 +32,7 @@ const CashierBoard = () => {
   const [completedOpen, setCompletedOpen] = useState(false);
   const [completedDate, setCompletedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [reservationOpen, setReservationOpen] = useState(false);
+  const [reservationsOpen, setReservationsOpen] = useState(false);
 
   // Realtime
   useEffect(() => {
@@ -106,6 +108,29 @@ const CashierBoard = () => {
         .order('unit_name');
       return (data || []) as Array<{ id: string; unit_name: string }>;
     },
+  });
+
+  // Upcoming reservations query
+  const { data: upcomingReservations = [] } = useQuery({
+    queryKey: ['upcoming-reservations'],
+    queryFn: async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const nextWeek = new Date();
+      nextWeek.setDate(nextWeek.getDate() + 7);
+      const nextWeekStr = nextWeek.toISOString().split('T')[0];
+      
+      const { data } = await supabase
+        .from('dining_reservations')
+        .select('*')
+        .eq('status', 'pending')
+        .gte('reservation_date', today)
+        .lte('reservation_date', nextWeekStr)
+        .order('reservation_date', { ascending: true })
+        .order('reservation_time', { ascending: true })
+        .limit(50);
+      return data || [];
+    },
+    refetchInterval: 30000,
   });
 
   const resolveRoomUnit = useCallback((booking: any) => {
@@ -252,14 +277,25 @@ const CashierBoard = () => {
             <span className="font-display text-sm text-foreground tracking-wider">
               {orderGroups.length} unit{orderGroups.length !== 1 ? 's' : ''} awaiting settlement
             </span>
-            <Button
-              size="sm"
-              onClick={() => setReservationOpen(true)}
-              className="gap-1.5 h-9 bg-gold text-background hover:bg-gold/90 font-display text-xs tracking-wider"
-            >
-              <CalendarPlus className="w-4 h-4" />
-              <span>Reservation</span>
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setReservationsOpen(true)}
+                className="gap-1.5 h-9 font-display text-xs tracking-wider"
+              >
+                <Calendar className="w-4 h-4" />
+                <span>Upcoming</span>
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => setReservationOpen(true)}
+                className="gap-1.5 h-9 bg-gold text-background hover:bg-gold/90 font-display text-xs tracking-wider"
+              >
+                <CalendarPlus className="w-4 h-4" />
+                <span>Reservation</span>
+              </Button>
+            </div>
           </div>
 
           <div className="flex-1 md:overflow-y-auto">
@@ -341,6 +377,73 @@ const CashierBoard = () => {
 
       {/* Reservation Modal */}
       <ReservationModal open={reservationOpen} onOpenChange={setReservationOpen} />
+
+      {/* Upcoming Reservations Modal */}
+      <Dialog open={reservationsOpen} onOpenChange={setReservationsOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl tracking-wider">Upcoming Reservations</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-4">
+            {upcomingReservations.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">No upcoming reservations</p>
+            ) : (
+              upcomingReservations.map((res: any) => (
+                <div key={res.id} className="rounded-xl border border-border p-4 space-y-2">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-display text-base text-foreground">{res.guest_name}</p>
+                      <p className="font-body text-sm text-muted-foreground">
+                        {res.reservation_type === 'catering' ? '🍽️ Catering' : '🍷 Dinner'} · {res.pax} pax
+                      </p>
+                    </div>
+                    <Badge className={res.reservation_type === 'catering' ? 'bg-purple-500/20 text-purple-400' : 'bg-gold/20 text-gold'}>
+                      {res.reservation_type === 'catering' ? 'Catering' : 'Dinner'}
+                    </Badge>
+                  </div>
+                  
+                  <div className="flex gap-4 text-sm text-muted-foreground flex-wrap">
+                    <span>📅 {new Date(res.reservation_date).toLocaleDateString()}</span>
+                    <span>⏰ {res.reservation_time}</span>
+                    {res.contact_number && <span>📞 {res.contact_number}</span>}
+                  </div>
+                  
+                  {res.occasion && (
+                    <p className="text-sm text-muted-foreground">🎉 {res.occasion}</p>
+                  )}
+                  
+                  {res.notes && (
+                    <p className="text-sm text-muted-foreground italic">📝 {res.notes}</p>
+                  )}
+                  
+                  {res.pre_orders && res.pre_orders.length > 0 && (
+                    <Collapsible>
+                      <CollapsibleTrigger className="text-xs text-gold hover:underline">
+                        View Pre-order ({res.pre_orders.length} items)
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="pt-2 space-y-1">
+                        {res.pre_orders.map((item: any, idx: number) => (
+                          <div key={idx} className="flex justify-between text-sm">
+                            <span>{item.qty}× {item.name}</span>
+                            <span>₱{(item.price * item.qty).toLocaleString()}</span>
+                          </div>
+                        ))}
+                        <div className="flex justify-between pt-1 border-t border-border text-sm font-medium">
+                          <span>Pre-order Total</span>
+                          <span className="text-gold">₱{res.pre_orders.reduce((s: number, i: any) => s + (i.price * i.qty), 0).toLocaleString()}</span>
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setReservationsOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };
