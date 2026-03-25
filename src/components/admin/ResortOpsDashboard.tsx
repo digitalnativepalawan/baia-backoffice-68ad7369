@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Trash2, AlertTriangle, Upload, Pencil, Check, X, Banknote, CalendarPlus, Printer, Settings, BarChart3, FileUp, ExternalLink, Camera, Image, ScanLine, Loader2 } from 'lucide-react';
+import { Plus, Trash2, AlertTriangle, Upload, Pencil, Check, X, Banknote, CalendarPlus, Printer, Settings, BarChart3, FileUp, ExternalLink, Camera, Image, ScanLine, Loader2, Info } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import ImportReservationsModal from './ImportReservationsModal';
 import ExpenseReportsModal from './ExpenseReportsModal';
@@ -195,16 +195,13 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
   
   // Date range state
   const [dateFrom, setDateFrom] = useState(() => {
-    // Default to Jan 1, 2025
     return '2025-01-01';
   });
   const [dateTo, setDateTo] = useState(() => {
-    // Default to today
     return format(new Date(), 'yyyy-MM-dd');
   });
   const [datePreset, setDatePreset] = useState<'ytd' | 'custom'>('ytd');
 
-  // Helper to set YTD
   const setYTD = () => {
     const now = new Date();
     const startOfYear = `${now.getFullYear()}-01-01`;
@@ -213,7 +210,6 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
     setDatePreset('ytd');
   };
 
-  // Helper to set current month
   const setCurrentMonth = () => {
     const now = new Date();
     const startOfMonthDate = startOfMonth(now);
@@ -223,7 +219,6 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
     setDatePreset('custom');
   };
 
-  // Helper to set last month
   const setLastMonth = () => {
     const lastMonthDate = subMonths(new Date(), 1);
     const start = startOfMonth(lastMonthDate);
@@ -236,7 +231,6 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
   const monthStartStr = dateFrom;
   const monthEndStr = dateTo;
 
-  // For occupancy grid - we need the number of days in the selected range
   const startDateObj = parseISO(dateFrom);
   const endDateObj = parseISO(dateTo);
   const daysArray = eachDayOfInterval({ start: startDateObj, end: endDateObj });
@@ -287,7 +281,7 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
     queryFn: async () => { const { data } = await supabase.from('menu_items').select('*'); return data || []; },
   });
 
-  // ── Filtered data with null checks ──
+  // ── Filtered data ──
   const monthBookings = useMemo(() => bookings.filter((b: any) => b.check_in >= dateFrom && b.check_in <= dateTo), [bookings, dateFrom, dateTo]);
   const monthExpenses = useMemo(() => expenses.filter((e: any) => e.expense_date >= dateFrom && e.expense_date <= dateTo), [expenses, dateFrom, dateTo]);
   const monthTasks = useMemo(() => tasks.filter((t: any) => t.due_date >= dateFrom && t.due_date <= dateTo), [tasks, dateFrom, dateTo]);
@@ -1148,94 +1142,82 @@ const ResortOpsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
             );
           })()}
 
-          {/* Expense List - Compact Table View */}
+          {/* Expense List - Consolidated by Category */}
           <div className="border border-border rounded-lg overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow className="bg-secondary">
-                  <TableHead className="font-body text-xs text-muted-foreground py-2 pl-3">Date</TableHead>
-                  <TableHead className="font-body text-xs text-muted-foreground py-2">Supplier</TableHead>
-                  <TableHead className="font-body text-xs text-muted-foreground py-2">Category</TableHead>
-                  <TableHead className="font-body text-xs text-muted-foreground py-2 text-right">Amount</TableHead>
-                  <TableHead className="font-body text-xs text-muted-foreground py-2 text-center w-16">Actions</TableHead>
+                  <TableHead className="font-body text-xs text-muted-foreground py-2 pl-3">Category</TableHead>
+                  <TableHead className="font-body text-xs text-muted-foreground py-2">Transactions</TableHead>
+                  <TableHead className="font-body text-xs text-muted-foreground py-2 text-right">Total Amount</TableHead>
+                  <TableHead className="font-body text-xs text-muted-foreground py-2 text-center w-16"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {(() => {
                   let filtered = monthExpenses;
-                  if (expenseCategoryFilter !== 'all') filtered = filtered.filter((e: any) => e.category === expenseCategoryFilter);
                   if (expenseVatFilter === 'VAT') filtered = filtered.filter((e: any) => e.vat_status === 'VAT');
                   else if (expenseVatFilter === 'Non-VAT') filtered = filtered.filter((e: any) => e.vat_status === 'Non-VAT');
                   else if (expenseVatFilter === 'VAT-Exempt') filtered = filtered.filter((e: any) => e.vat_status === 'VAT-Exempt');
                   else if (expenseVatFilter === 'missing-tin') filtered = filtered.filter((e: any) => e.vat_status === 'VAT' && !e.supplier_tin);
 
-                  if (filtered.length === 0) {
+                  // Group by category
+                  const categoryMap = new Map<string, { count: number; total: number }>();
+                  
+                  filtered.forEach((e: any) => {
+                    const category = e.category || 'Uncategorized';
+                    const existing = categoryMap.get(category);
+                    const amount = Number(e.amount) || 0;
+                    if (existing) {
+                      existing.count++;
+                      existing.total += amount;
+                    } else {
+                      categoryMap.set(category, { count: 1, total: amount });
+                    }
+                  });
+
+                  const categories = Array.from(categoryMap.entries())
+                    .map(([category, data]) => ({
+                      category,
+                      count: data.count,
+                      total: data.total,
+                    }))
+                    .sort((a, b) => b.total - a.total);
+
+                  if (categories.length === 0) {
                     return (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
                           No expenses found for this period
                         </TableCell>
                       </TableRow>
                     );
                   }
 
-                  return filtered.map((e: any) => (
-                    editingExpense?.id === e.id ? (
-                      <TableRow key={e.id} className="border-border">
-                        <TableCell colSpan={5} className="p-3">
-                          <div className="space-y-2">
-                            {renderExpenseFormFields(editingExpense, setEditingExpense)}
-                            <div className="flex justify-end gap-2">
-                              <Button size="sm" onClick={saveExpense} className="h-8"><Check className="w-3.5 h-3.5 mr-1" /> Save</Button>
-                              <Button size="sm" variant="outline" onClick={() => setEditingExpense(null)} className="h-8">Cancel</Button>
-                            </div>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      <TableRow key={e.id} className="border-border hover:bg-secondary/50">
-                        <TableCell className="font-body text-sm py-2 pl-3">
-                          {e.expense_date ? format(parseISO(e.expense_date), 'MMM d, yyyy') : '—'}
-                        </TableCell>
-                        <TableCell className="font-body text-sm py-2">
-                          <div>
-                            <span className="font-medium">{e.name}</span>
-                            {e.description && (
-                              <p className="font-body text-xs text-muted-foreground truncate max-w-[200px]">{e.description}</p>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-body text-sm py-2">
-                          <div className="flex flex-col">
-                            <span>{e.category || '—'}</span>
-                            {e.vat_status === 'VAT' && (
-                              <span className="text-[10px] text-muted-foreground">VAT: ₱{fmtDec(Number(e.vat_amount || 0))}</span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-body text-sm py-2 text-right">
-                          <span className="font-mono">₱{fmt(Number(e.amount))}</span>
-                        </TableCell>
-                        <TableCell className="py-2 text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            {e.image_url && (
-                              <a href={e.image_url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary">
-                                <ExternalLink className="w-3.5 h-3.5" />
-                              </a>
-                            )}
-                            <EditBtn onClick={() => setEditingExpense({
-                              ...e, amount: String(e.amount), withholding_tax: String(e.withholding_tax || 0),
-                              supplier_tin: e.supplier_tin || '', vat_status: e.vat_status || 'Non-VAT',
-                              invoice_number: e.invoice_number || '', official_receipt_number: e.official_receipt_number || '',
-                              description: e.description || '', payment_method: e.payment_method || 'Cash',
-                              is_paid: e.is_paid !== false, project_unit: e.project_unit || '',
-                              notes: e.notes || '', image_url: e.image_url || '',
-                            })} />
-                            <DelBtn onClick={() => deleteRow('resort_ops_expenses', e.id)} />
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
+                  return categories.map((cat) => (
+                    <TableRow key={cat.category} className="border-border hover:bg-secondary/50">
+                      <TableCell className="font-body text-sm py-2 pl-3 font-medium">
+                        {cat.category}
+                      </TableCell>
+                      <TableCell className="font-body text-sm py-2">
+                        {cat.count} transaction{cat.count !== 1 ? 's' : ''}
+                      </TableCell>
+                      <TableCell className="font-body text-sm py-2 text-right">
+                        <span className="font-mono font-medium">₱{fmt(cat.total)}</span>
+                      </TableCell>
+                      <TableCell className="py-2 text-center">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 w-7 p-0"
+                          onClick={() => {
+                            toast.info(`${cat.category}: ${cat.count} items totaling ₱${fmt(cat.total)}`);
+                          }}
+                        >
+                          <Info className="w-3.5 h-3.5" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
                   ));
                 })()}
               </TableBody>
