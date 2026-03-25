@@ -42,7 +42,7 @@ const ReservationModal = ({ open, onOpenChange }: ReservationModalProps) => {
     contact_number: '',
     email: '',
     notes: '',
-    reservation_type: 'dinner', // 'dinner' or 'catering'
+    reservation_type: 'dinner',
   });
 
   // Fetch menu items
@@ -52,7 +52,7 @@ const ReservationModal = ({ open, onOpenChange }: ReservationModalProps) => {
       const { data } = await supabase
         .from('menu_items')
         .select('id, name, price, category')
-        .eq('is_active', true)
+        .eq('available', true)
         .order('category', { ascending: true })
         .order('name', { ascending: true });
       return data || [];
