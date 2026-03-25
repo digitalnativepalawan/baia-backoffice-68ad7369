@@ -30,7 +30,6 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [detailOrder, setDetailOrder] = useState<any | null>(null);
-  const [completedOpen, setCompletedOpen] = useState(false);
 
   // Read staff permissions from session
   const permissions = useMemo(() => {
@@ -119,13 +118,13 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
       const field = department === 'kitchen' ? 'kitchen_status' : 'bar_status';
       relevantOrders.forEach(o => {
         const deptStatus = o[field] as string;
-        // Once dept is done (ready) or order is served/paid → Completed (collapsed)
+        // Once dept is done (ready) or order is served/paid → skip (not shown)
         if (o.status === 'Paid' || o.status === 'Served') {
-          const isRoomOrder = o.room_id || o.payment_type === 'Charge to Room';
-          if (!isRoomOrder) cols.Completed.push(o);
+          // Skip completed orders entirely
+          return;
         } else if (deptStatus === 'ready') {
-          // Dept finished — move to Completed for kitchen/bar view
-          cols.Completed.push(o);
+          // Dept finished — skip, don't show
+          return;
         } else if (deptStatus === 'pending' && (o.status === 'New' || o.status === 'Preparing')) {
           cols.New.push(o);
         } else if (deptStatus === 'preparing') {
@@ -139,8 +138,8 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
         else if (o.status === 'Preparing') cols.Preparing.push(o);
         else if (o.status === 'Ready') cols.Ready.push(o);
         else if (o.status === 'Paid' || o.status === 'Served') {
-          const isRoomOrder = o.room_id || o.payment_type === 'Charge to Room';
-          if (!isRoomOrder) cols.Completed.push(o);
+          // Skip completed orders entirely
+          return;
         }
       });
     }
@@ -277,36 +276,6 @@ const ServiceBoard = ({ department }: ServiceBoardProps) => {
           ))}
         </div>
 
-        {/* Collapsible Completed Section — Tablet/Desktop */}
-        {columns.Completed.length > 0 && (
-          <div className="hidden md:block px-4 pb-4">
-            <Collapsible open={completedOpen} onOpenChange={setCompletedOpen}>
-              <CollapsibleTrigger className="w-full flex items-center justify-between bg-secondary/50 border border-border rounded-lg px-4 py-3 hover:bg-secondary transition-colors">
-                <span className="font-display text-sm tracking-wider text-muted-foreground">
-                  ✓ Completed Today ({columns.Completed.length})
-                </span>
-                {completedOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pt-3">
-                <div className="grid gap-3 max-h-[40vh] overflow-y-auto grid-cols-3">
-                  {columns.Completed.map(order => (
-                    <ServiceOrderCard
-                      key={order.id}
-                      order={order}
-                      department={department}
-                      permissions={permissions}
-                      onAction={handleAction}
-                      onOpenDetail={setDetailOrder}
-                      resortProfile={resortProfile}
-                      compact
-                    />
-                  ))}
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          </div>
-        )}
-
         {/* Mobile: tabbed view */}
         <MobileTabView columns={columns} department={department} permissions={permissions} onAction={handleAction} onOpenDetail={setDetailOrder} resortProfile={resortProfile} />
       </div>
@@ -335,7 +304,6 @@ const MobileTabView = ({ columns, department, permissions, onAction, onOpenDetai
   resortProfile?: any;
 }) => {
   const [tab, setTab] = useState<string>('New');
-  const [completedOpen, setCompletedOpen] = useState(false);
 
   const MOBILE_TABS = ['New', 'Preparing', 'Ready'] as const;
 
@@ -379,33 +347,6 @@ const MobileTabView = ({ columns, department, permissions, onAction, onOpenDetai
           />
         ))}
       </div>
-
-      {/* Collapsible Completed Section — Mobile */}
-      {columns.Completed.length > 0 && (
-        <div className="px-3 pb-4 flex-shrink-0">
-          <Collapsible open={completedOpen} onOpenChange={setCompletedOpen}>
-            <CollapsibleTrigger className="w-full flex items-center justify-between bg-secondary/50 border border-border rounded-lg px-4 py-3">
-              <span className="font-display text-xs tracking-wider text-muted-foreground">
-                ✓ Completed ({columns.Completed.length})
-              </span>
-              {completedOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
-            </CollapsibleTrigger>
-            <CollapsibleContent className="pt-3 space-y-3 max-h-[40vh] overflow-y-auto">
-              {columns.Completed.map(order => (
-                <ServiceOrderCard
-                  key={order.id}
-                  order={order}
-                  department={department}
-                  permissions={permissions}
-                  onAction={onAction}
-                  onOpenDetail={onOpenDetail}
-                  resortProfile={resortProfile}
-                />
-              ))}
-            </CollapsibleContent>
-          </Collapsible>
-        </div>
-      )}
     </div>
   );
 };
