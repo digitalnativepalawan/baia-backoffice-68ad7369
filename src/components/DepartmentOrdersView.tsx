@@ -121,28 +121,29 @@ const DepartmentOrdersView = ({ department, embedded = false }: DepartmentOrders
   const { data: allOrders = [] } = useQuery({
     queryKey: [`orders-${department}`],
     queryFn: async () => {
-      const start = new Date();
-      start.setHours(0, 0, 0, 0);
+      // Fetch recent orders regardless of date (limited to 200)
       const { data } = await supabase
         .from('orders')
         .select('*')
         .in('status', ['New', 'Preparing', 'Served'])
-        .gte('created_at', start.toISOString())
         .order('created_at', { ascending: false })
         .limit(200);
+      console.log(`[${department}] Fetched ${data?.length || 0} orders raw`);
       return data || [];
     },
   });
 
   // Filter orders that have items for this department
   const orders = useMemo(() => {
-    return allOrders.filter(order => {
+    const filtered = allOrders.filter(order => {
       const items = (order.items as any[]) || [];
       return items.some(item => {
         const dept = item.department || 'kitchen';
         return dept === department || dept === 'both';
       });
     });
+    console.log(`[${department}] After dept filter: ${filtered.length} orders (from ${allOrders.length} raw)`);
+    return filtered;
   }, [allOrders, department]);
 
   // Get department-specific status for an order
