@@ -38,6 +38,115 @@ export type Database = {
         }
         Relationships: []
       }
+      asset_categories: {
+        Row: {
+          created_at: string | null
+          department: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          department: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          department?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      asset_transactions: {
+        Row: {
+          asset_id: string | null
+          created_at: string | null
+          id: string
+          performed_by: string | null
+          quantity_change: number
+          reason: string | null
+          transaction_type: string | null
+        }
+        Insert: {
+          asset_id?: string | null
+          created_at?: string | null
+          id?: string
+          performed_by?: string | null
+          quantity_change: number
+          reason?: string | null
+          transaction_type?: string | null
+        }
+        Update: {
+          asset_id?: string | null
+          created_at?: string | null
+          id?: string
+          performed_by?: string | null
+          quantity_change?: number
+          reason?: string | null
+          transaction_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_transactions_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assets: {
+        Row: {
+          breakage_count: number | null
+          category_id: string | null
+          created_at: string | null
+          current_quantity: number
+          department: string | null
+          id: string
+          last_restocked: string | null
+          min_quantity: number
+          name: string
+          unit: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          breakage_count?: number | null
+          category_id?: string | null
+          created_at?: string | null
+          current_quantity?: number
+          department?: string | null
+          id?: string
+          last_restocked?: string | null
+          min_quantity?: number
+          name: string
+          unit?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          breakage_count?: number | null
+          category_id?: string | null
+          created_at?: string | null
+          current_quantity?: number
+          department?: string | null
+          id?: string
+          last_restocked?: string | null
+          min_quantity?: number
+          name?: string
+          unit?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assets_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "asset_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_log: {
         Row: {
           action: string
@@ -199,6 +308,39 @@ export type Database = {
         }
         Relationships: []
       }
+      breakfast_orders: {
+        Row: {
+          created_at: string | null
+          date: string
+          guest_name: string | null
+          id: string
+          order_items: string | null
+          pax: number | null
+          requested_time: string | null
+          room_name: string
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          guest_name?: string | null
+          id?: string
+          order_items?: string | null
+          pax?: number | null
+          requested_time?: string | null
+          room_name: string
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          guest_name?: string | null
+          id?: string
+          order_items?: string | null
+          pax?: number | null
+          requested_time?: string | null
+          room_name?: string
+        }
+        Relationships: []
+      }
       cleaning_package_items: {
         Row: {
           created_at: string
@@ -267,6 +409,27 @@ export type Database = {
           },
         ]
       }
+      daily_briefing: {
+        Row: {
+          created_at: string | null
+          date: string
+          id: number
+          notes: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          id?: number
+          notes?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          id?: number
+          notes?: string | null
+        }
+        Relationships: []
+      }
       devices: {
         Row: {
           created_at: string
@@ -297,6 +460,57 @@ export type Database = {
           is_active?: boolean
           last_login_at?: string | null
           last_login_employee_id?: string | null
+        }
+        Relationships: []
+      }
+      dining_reservations: {
+        Row: {
+          contact_number: string | null
+          created_at: string | null
+          created_by: string | null
+          email: string | null
+          guest_name: string
+          id: string
+          notes: string | null
+          occasion: string | null
+          pax: number
+          pre_orders: Json | null
+          reservation_date: string
+          reservation_time: string
+          reservation_type: string | null
+          status: string | null
+        }
+        Insert: {
+          contact_number?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          email?: string | null
+          guest_name: string
+          id?: string
+          notes?: string | null
+          occasion?: string | null
+          pax?: number
+          pre_orders?: Json | null
+          reservation_date: string
+          reservation_time: string
+          reservation_type?: string | null
+          status?: string | null
+        }
+        Update: {
+          contact_number?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          email?: string | null
+          guest_name?: string
+          id?: string
+          notes?: string | null
+          occasion?: string | null
+          pax?: number
+          pre_orders?: Json | null
+          reservation_date?: string
+          reservation_time?: string
+          reservation_type?: string | null
+          status?: string | null
         }
         Relationships: []
       }
@@ -978,45 +1192,6 @@ export type Database = {
         }
         Relationships: []
       }
-      historical_revenue: {
-        Row: {
-          category: string | null
-          created_at: string | null
-          date: string
-          id: string
-          month: number | null
-          payment_method: string | null
-          product: string | null
-          qty: number | null
-          revenue: number | null
-          year: number | null
-        }
-        Insert: {
-          category?: string | null
-          created_at?: string | null
-          date: string
-          id?: string
-          month?: number | null
-          payment_method?: string | null
-          product?: string | null
-          qty?: number | null
-          revenue?: number | null
-          year?: number | null
-        }
-        Update: {
-          category?: string | null
-          created_at?: string | null
-          date?: string
-          id?: string
-          month?: number | null
-          payment_method?: string | null
-          product?: string | null
-          qty?: number | null
-          revenue?: number | null
-          year?: number | null
-        }
-        Relationships: []
-      }
       housekeeping_checklists: {
         Row: {
           count_expected: number | null
@@ -1445,6 +1620,7 @@ export type Database = {
           location_detail: string | null
           order_type: string
           payment_type: string | null
+          ready_for_billing: boolean | null
           room_id: string | null
           scheduled_for: string | null
           service_charge: number
@@ -1466,6 +1642,7 @@ export type Database = {
           location_detail?: string | null
           order_type?: string
           payment_type?: string | null
+          ready_for_billing?: boolean | null
           room_id?: string | null
           scheduled_for?: string | null
           service_charge?: number
@@ -1487,6 +1664,7 @@ export type Database = {
           location_detail?: string | null
           order_type?: string
           payment_type?: string | null
+          ready_for_billing?: boolean | null
           room_id?: string | null
           scheduled_for?: string | null
           service_charge?: number
@@ -2401,9 +2579,11 @@ export type Database = {
       tour_bookings: {
         Row: {
           booking_id: string | null
+          captain_confirmed: boolean | null
           confirmed_by: string
           created_at: string
           guest_name: string
+          guide_confirmed: boolean | null
           id: string
           notes: string
           pax: number
@@ -2416,9 +2596,11 @@ export type Database = {
         }
         Insert: {
           booking_id?: string | null
+          captain_confirmed?: boolean | null
           confirmed_by?: string
           created_at?: string
           guest_name?: string
+          guide_confirmed?: boolean | null
           id?: string
           notes?: string
           pax?: number
@@ -2431,9 +2613,11 @@ export type Database = {
         }
         Update: {
           booking_id?: string | null
+          captain_confirmed?: boolean | null
           confirmed_by?: string
           created_at?: string
           guest_name?: string
+          guide_confirmed?: boolean | null
           id?: string
           notes?: string
           pax?: number
