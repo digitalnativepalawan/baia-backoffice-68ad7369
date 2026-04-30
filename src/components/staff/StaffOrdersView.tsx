@@ -87,6 +87,14 @@ const StaffOrdersView = () => {
         .in('status', ['New', 'Preparing', 'Ready', 'Served', 'Paid'])
         .order('created_at', { ascending: false })
         .limit(200);
+      
+      console.log('👷 StaffOrdersView fetched', data?.length || 0, 'orders');
+        // Debug: log first few order IDs and their items/departments
+        if (data && data.length > 0) {
+          data.slice(0,3).forEach(o => {
+            console.log('  Order:', o.id.substring(0,8), 'status:', o.status, 'items:', o.items);
+          });
+        }
       return data || [];
     },
     refetchInterval: 5000,

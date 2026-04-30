@@ -20,7 +20,7 @@ src/pages/GuestPortal.tsx                 # Widget integrated
 
 ## 🔧 Step 1: Add Environment Variables to Supabase
 
-In your Supabase dashboard (`kektzjtsdpgduvvjfrig`):
+In your Supabase dashboard (`paghxagqnaisxesmhnwj` — see `.env` for `VITE_SUPABASE_URL`):
 
 **Project Settings → Functions → Environment Variables**
 
@@ -31,11 +31,11 @@ Add:
 | `STEPFUN_API_KEY` | `sk-...` (your StepFun key) |
 | `HERMES_MODEL` | `step-3.5-flash` (optional, default) |
 
-Also verify these are already set (used by other functions):
+Also verify these are already set:
 - `SUPABASE_SERVICE_ROLE_KEY` (auto-provided)
 - `TELEGRAM_BOT_TOKEN` (for future notifications)
 
-⚠️ **Important:** After adding env vars, **redeploy** the function (next step) so they take effect.
+⚠️ **Important:** After adding env vars, **redeploy** the function next.
 
 ---
 
@@ -48,14 +48,15 @@ From the project root (`baia-menu-feb19`):
 supabase login
 
 # Deploy the hermes-chat function
-supabase functions deploy hermes-chat --project-ref kektzjtsdpgduvvjfrig
+# --no-verify-jwt: allow unauthenticated (guest) access
+supabase functions deploy hermes-chat --project-ref paghxagqnaisxesmhnwj --no-verify-jwt
 ```
 
 Wait for deployment to complete (~10–20s).
 
 **Test the function:**
 ```bash
-curl -X POST https://kektzjtsdpgduvvjfrig.functions.supabase.co/hermes-chat \
+curl -X POST https://paghxagqnaisxesmhnwj.functions.supabase.co/hermes-chat \
   -H "Content-Type: application/json" \
   -d '{"message":"Hello","guestSession":{"booking_id":"test","room_id":"test","room_name":"101","guest_name":"Test","check_out":"2026-12-31"}}'
 ```

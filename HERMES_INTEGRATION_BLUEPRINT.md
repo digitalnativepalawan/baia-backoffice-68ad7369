@@ -603,6 +603,22 @@ Admin:
 
 ---
 
+## ✅ Implementation Status
+
+**Guest MVP (Implemented)** — Files ready for deployment:
+- `supabase/functions/hermes-chat/index.ts` — Deno Edge Function (StepFun)
+- `src/components/HermesChatWidget.tsx` — Floating chat widget
+- `src/pages/GuestPortal.tsx` — Integrated (see commit)
+- See deployment guide: `HERMES_DEPLOY.md`
+
+**Next:**
+1. Deploy Edge Function to Supabase with STEPFUN_API_KEY
+2. Push frontend to GitHub (Vercel auto-deploys)
+3. Test live on guest portal
+4. Phase 2: Add Telegram notifications, voice input, memory, admin panel
+
+---
+
 ## 📚 Appendix: Existing Patterns to Follow
 
 BAIA's existing code patterns (important for integration):

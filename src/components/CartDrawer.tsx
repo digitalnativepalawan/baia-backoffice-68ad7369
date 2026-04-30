@@ -216,6 +216,7 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
     }
 
     setSubmitting(true);
+      console.log('📦 Order insert data:', { insertData, orderItems });
     try {
       const { data: existingTabs } = await supabase
         .from('tabs')
@@ -312,6 +313,7 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
       if (scheduledFor) insertData.scheduled_for = scheduledFor;
 
       const { data: orderRow } = await supabase.from('orders').insert(insertData).select('id').single();
+      console.log('✅ Order inserted:', orderRow, 'with items:', insertData.items);
 
       // Auto-create room_transaction when "Charge to Room"
       if ((resolvedPayment === 'Charge to Room' || isGuestOrder) && roomUnit && orderRow) {
