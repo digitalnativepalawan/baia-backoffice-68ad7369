@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { LogOut, UtensilsCrossed, MapPin, Car, Bike, MessageSquare, Star, Receipt, ArrowLeft, ChevronRight, ClipboardList, Calendar, Clock, Users, StickyNote, CheckCircle2, Utensils, Palmtree, Truck, CreditCard, FileText, Loader2, ConciergeBell, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { setGuestSession } from '@/hooks/useGuestSession';
+import { HermesChatWidget } from '@/components/HermesChatWidget';
 
 const GUEST_PORTAL_KEY = 'guest_portal_session';
 
@@ -248,6 +249,9 @@ const GuestPortal = () => {
         {view === 'orders' && <OrdersView session={session} />}
         {view === 'requests' && <RequestsTrackerView session={session} />}
         {view === 'bill' && <BillView session={session} />}
+
+        {/* Hermes AI Assistant — available on all guest pages */}
+        <HermesChatWidget guestSession={session} />
       </div>
     </div>
   );
