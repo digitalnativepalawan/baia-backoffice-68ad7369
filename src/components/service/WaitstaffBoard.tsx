@@ -46,15 +46,14 @@ const WaitstaffBoard = () => {
   const { data: orders = [] } = useQuery({
     queryKey: ['waitstaff-orders'],
     queryFn: async () => {
-      const start = new Date();
-      start.setHours(0, 0, 0, 0);
+      // Fetch recent orders regardless of date (limited to 200)
       const { data } = await supabase
         .from('orders')
         .select('*')
         .in('status', ['New', 'Preparing', 'Ready'])
-        .gte('created_at', start.toISOString())
         .order('created_at', { ascending: true })
         .limit(300);
+      console.log(`[waitstaff] Fetched ${data?.length || 0} orders raw`);
       return data || [];
     },
     refetchInterval: 5000,
