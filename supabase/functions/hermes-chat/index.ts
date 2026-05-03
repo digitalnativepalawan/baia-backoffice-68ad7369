@@ -14,9 +14,9 @@ function getSupabaseAdmin() {
   );
 }
 
-const STEPFUN_API_KEY = Deno.env.get('STEPFUN_API_KEY')!;
-const STEPFUN_API_URL = 'https://api.stepfun.com/v1/chat/completions';
-const HERMES_MODEL = Deno.env.get('HERMES_MODEL') || 'step-3.5-flash';
+const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY')!;
+const AI_GATEWAY_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions';
+const HERMES_MODEL = Deno.env.get('HERMES_MODEL') || 'google/gemini-2.5-flash';
 
 // Build system prompt with guest context
 function buildSystemPrompt(context: {

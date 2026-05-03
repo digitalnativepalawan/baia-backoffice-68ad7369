@@ -1,36 +1,30 @@
+## Goal
+Get the guest portal chatbot working without requiring an external StepFun API key, and remove the "Hermes Assistant" name from the chat panel header.
 
+## Why it's broken now
+The `hermes-chat` edge function is hardcoded to call StepFun (`https://api.stepfun.com/v1/chat/completions`) using `STEPFUN_API_KEY`. That secret isn't set in this project (only `LOVABLE_API_KEY` and `TELEGRAM_BOT_TOKEN` exist), so every send fails. Lovable AI Gateway is already available with no extra setup, so we'll use it instead.
 
-## Two Fixes: Guest Services Double Display + Guest Portal Bill Tours
+## Changes
 
-### Problem 1: Guest Services (ExperiencesPage) Double Display
-The ExperiencesPage queries BOTH `guest_tours` (lines 74-82) and `tour_bookings` (lines 86-96), then displays both in "Today's Tours" section (lines 393-481). Since tours added from RoomsDashboard now insert into BOTH tables, the same tour appears twice.
+### 1. `supabase/functions/hermes-chat/index.ts`
+- Replace StepFun endpoint/key with Lovable AI Gateway:
+  - URL: `https://ai.gateway.lovable.dev/v1/chat/completions`
+  - Auth: `Bearer ${Deno.env.get('LOVABLE_API_KEY')}`
+  - Default model: `google/gemini-2.5-flash` (fast, supports tool calling, free tier)
+- Keep the same request shape (messages, tools, tool_choice) — the gateway is OpenAI-compatible.
+- Handle 429 (rate limit) and 402 (credits) with friendly error messages returned to the client.
+- Keep all existing tools (`query_menu_items`, `get_order_status`, `create_tour_booking`, `submit_guest_request`, `get_resort_info`) and the two-pass tool-calling loop unchanged.
 
-**Fix**: Remove the `guest_tours` query entirely from ExperiencesPage. Switch all tour display and actions to use `tour_bookings` only. This means:
-- Remove the `guest_tours` query (lines 74-82) and the `recentTours` history query (lines 123-131)
-- Update the `tour_bookings` query to include all statuses needed (booked, confirmed, completed, pending) and cover today + upcoming dates
-- Update `todayTours`, `completedToday`, `upcomingTours` variables to derive from the unified `tourBookings` data
-- Update the summary counts and "Today's Tours" rendering to use only `tourBookings`
-- Remove the separate `todayTours.map(...)` rendering block (lines 400-441) since `todayBookings` from tour_bookings now covers everything
-- Keep the `updateTourStatus` function but change it to update `tour_bookings` instead of `guest_tours`
-- Update the "Upcoming Tours" section to use filtered `tourBookings`
-- Keep recent history query but switch to `tour_bookings` table
+### 2. `src/components/HermesChatWidget.tsx`
+- Header: remove the "Hermes Assistant" title line. Keep only the subtitle ("BAIA Resort — Here to help") or replace with a single "Assistant" label — final wording: just show "BAIA Resort — Here to help" with no name above it.
+- Switch the fetch call from the raw `https://<ref>.functions.supabase.co/hermes-chat` URL to `supabase.functions.invoke('hermes-chat', { body: {...} })` so it routes through the SDK and avoids CORS/URL-construction issues.
+- Surface backend error messages (rate limit / credits) via the existing `toast.error`.
 
-### Problem 2: Guest Portal Bill — Show Tours Immediately
-The BillView (GuestPortal.tsx) queries `guest_tours` for pending tours (lines 1108-1118) with status `['booked', 'pending']` and completed tours (lines 1120-1130) with status `['completed', 'confirmed']`. Since tours are now in `tour_bookings`, these queries return empty.
+### 3. No DB or schema changes.
 
-**Fix**: Switch both queries to read from `tour_bookings` instead of `guest_tours`. Also adjust the logic so confirmed tours show immediately in the bill with their full amount:
-- Change `pendingTours` query to read from `tour_bookings` with status `['booked', 'pending', 'confirmed']` — this ensures confirmed tours appear immediately with a "Pending" badge
-- Change `completedTours` query to read from `tour_bookings` with status `['completed']`
-- Update the balance calculation: `activeToursTotal` now includes confirmed tours (already does since confirmed is in pendingTours)
-- Update realtime subscription from `guest_tours` table to `tour_bookings` table (line 1201)
+## Out of scope
+- No changes to tools, system prompt content, or guest session logic.
+- No new env vars required.
 
-### Files Modified
-- `src/pages/ExperiencesPage.tsx` — consolidate to `tour_bookings` only
-- `src/pages/GuestPortal.tsx` — switch bill queries from `guest_tours` to `tour_bookings`, include confirmed status
-
-### What Does NOT Change
-- Guest Portal tour booking flow (already writes to `tour_bookings`)
-- RoomsDashboard, RoomBillingTab, ReceptionPage
-- Payment flows, billing logic
-- No schema changes
-
+## Verification
+After deploy: open Guest Portal → chat → send "What's on the menu?" → expect a reply listing items pulled from `menu_items`. Check edge function logs if it still fails.
