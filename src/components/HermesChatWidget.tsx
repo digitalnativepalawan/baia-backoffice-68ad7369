@@ -130,8 +130,7 @@ export function HermesChatWidget({ guestSession }: HermesChatWidgetProps) {
               </AvatarFallback>
             </Avatar>
             <div className="flex-1">
-              <p className="font-display text-sm text-foreground">Hermes Assistant</p>
-              <p className="font-body text-xs text-muted-foreground">BAIA Resort — Here to help</p>
+              <p className="font-body text-sm text-muted-foreground">BAIA Resort — Here to help</p>
             </div>
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setOpen(false)}>
               <X className="w-4 h-4" />
