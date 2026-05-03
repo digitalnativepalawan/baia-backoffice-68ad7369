@@ -185,11 +185,11 @@ Deno.serve(async (req) => {
       { role: 'user', content: message }
     ];
 
-    // Call StepFun
-    const response = await fetch(STEPFUN_API_URL, {
+    // Call Lovable AI Gateway
+    const response = await fetch(AI_GATEWAY_URL, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${STEPFUN_API_KEY}`,
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
@@ -202,7 +202,17 @@ Deno.serve(async (req) => {
 
     if (!response.ok) {
       const err = await response.text();
-      throw new Error(`StepFun API ${response.status}: ${err}`);
+      if (response.status === 429) {
+        return new Response(JSON.stringify({ error: 'Rate limit exceeded. Please wait a moment and try again.' }), {
+          status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        });
+      }
+      if (response.status === 402) {
+        return new Response(JSON.stringify({ error: 'AI credits exhausted. Please contact the front desk.' }), {
+          status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        });
+      }
+      throw new Error(`AI gateway ${response.status}: ${err}`);
     }
 
     const result = await response.json();
