@@ -216,7 +216,6 @@ const CartDrawer = ({ open, onOpenChange, mode, orderType: initialOrderType, loc
     }
 
     setSubmitting(true);
-      console.log('📦 Order insert data:', { insertData, orderItems });
     try {
       const { data: existingTabs } = await supabase
         .from('tabs')
