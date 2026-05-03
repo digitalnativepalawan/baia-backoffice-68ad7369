@@ -14,9 +14,9 @@ function getSupabaseAdmin() {
   );
 }
 
-const STEPFUN_API_KEY = Deno.env.get('STEPFUN_API_KEY')!;
-const STEPFUN_API_URL = 'https://api.stepfun.com/v1/chat/completions';
-const HERMES_MODEL = Deno.env.get('HERMES_MODEL') || 'step-3.5-flash';
+const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY')!;
+const AI_GATEWAY_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions';
+const HERMES_MODEL = Deno.env.get('HERMES_MODEL') || 'google/gemini-2.5-flash';
 
 // Build system prompt with guest context
 function buildSystemPrompt(context: {
@@ -185,11 +185,11 @@ Deno.serve(async (req) => {
       { role: 'user', content: message }
     ];
 
-    // Call StepFun
-    const response = await fetch(STEPFUN_API_URL, {
+    // Call Lovable AI Gateway
+    const response = await fetch(AI_GATEWAY_URL, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${STEPFUN_API_KEY}`,
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
@@ -202,7 +202,17 @@ Deno.serve(async (req) => {
 
     if (!response.ok) {
       const err = await response.text();
-      throw new Error(`StepFun API ${response.status}: ${err}`);
+      if (response.status === 429) {
+        return new Response(JSON.stringify({ error: 'Rate limit exceeded. Please wait a moment and try again.' }), {
+          status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        });
+      }
+      if (response.status === 402) {
+        return new Response(JSON.stringify({ error: 'AI credits exhausted. Please contact the front desk.' }), {
+          status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        });
+      }
+      throw new Error(`AI gateway ${response.status}: ${err}`);
     }
 
     const result = await response.json();
@@ -236,10 +246,10 @@ Deno.serve(async (req) => {
       }
 
       // Second LLM call to get final answer
-      const followup = await fetch(STEPFUN_API_URL, {
+      const followup = await fetch(AI_GATEWAY_URL, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${STEPFUN_API_KEY}`,
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -249,7 +259,7 @@ Deno.serve(async (req) => {
       });
 
       if (!followup.ok) {
-        throw new Error(`StepFun follow-up error: ${followup.status}`);
+        throw new Error(`AI gateway follow-up error: ${followup.status}`);
       }
 
       const followupJson = await followup.json();

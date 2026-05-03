@@ -72,11 +72,12 @@ export function HermesChatWidget({ guestSession }: HermesChatWidgetProps) {
       });
 
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || 'Failed to get response');
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || err.error || 'Failed to get response');
       }
 
       const data = await res.json();
+      if (data.error) throw new Error(data.error);
       const reply = data.reply;
       if (reply) {
         setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
@@ -130,8 +131,7 @@ export function HermesChatWidget({ guestSession }: HermesChatWidgetProps) {
               </AvatarFallback>
             </Avatar>
             <div className="flex-1">
-              <p className="font-display text-sm text-foreground">Hermes Assistant</p>
-              <p className="font-body text-xs text-muted-foreground">BAIA Resort — Here to help</p>
+              <p className="font-body text-sm text-muted-foreground">BAIA Resort — Here to help</p>
             </div>
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setOpen(false)}>
               <X className="w-4 h-4" />
