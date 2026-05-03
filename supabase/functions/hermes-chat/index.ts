@@ -246,10 +246,10 @@ Deno.serve(async (req) => {
       }
 
       // Second LLM call to get final answer
-      const followup = await fetch(STEPFUN_API_URL, {
+      const followup = await fetch(AI_GATEWAY_URL, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${STEPFUN_API_KEY}`,
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -259,7 +259,7 @@ Deno.serve(async (req) => {
       });
 
       if (!followup.ok) {
-        throw new Error(`StepFun follow-up error: ${followup.status}`);
+        throw new Error(`AI gateway follow-up error: ${followup.status}`);
       }
 
       const followupJson = await followup.json();
