@@ -141,10 +141,6 @@ const DepartmentOrdersView = ({ department, embedded = false }: DepartmentOrders
         const dept = item.department || 'kitchen';
         return dept === department || dept === 'both';
       });
-      if (!hasDeptItem && allOrders.length > 0 && filtered.length === 0) {
-        // Debug: log first order's items to see why it's being filtered
-        console.log(`[${department}] Order ${order.id.substring(0,8)} excluded. Items:`, items.map(i => ({name: i.name, dept: i.department})));
-      }
       return hasDeptItem;
     });
     console.log(`[${department}] After dept filter: ${filtered.length} orders (from ${allOrders.length} raw)`);
