@@ -128,6 +128,27 @@ const Index = () => {
             <Shield className="w-4 h-4" />
             Admin
           </button>
+
+          <button
+            onClick={() => {
+              setStaffSession(
+                {
+                  name: 'Free Login',
+                  employeeId: 'free-login',
+                  isAdmin: true,
+                  permissions: ['admin'],
+                },
+                false,
+              );
+              localStorage.setItem('emp_id', 'free-login');
+              localStorage.setItem('emp_name', 'Free Login');
+              toast.success('Free Login (temporary)');
+              navigate('/admin');
+            }}
+            className="flex items-center justify-center gap-2 font-body text-xs tracking-wider py-2 text-amber-500/80 hover:text-amber-400 border border-dashed border-amber-500/30 rounded-lg transition-colors"
+          >
+            ⚡ Free Login (Temporary)
+          </button>
         </div>
       ) : (
         <div className="w-full max-w-xs space-y-3">
