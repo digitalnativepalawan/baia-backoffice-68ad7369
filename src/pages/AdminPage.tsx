@@ -87,7 +87,7 @@ const CONFIG: TabDef[] = [
   { value: 'reports', label: 'Reports', perm: 'reports' },
   { value: 'inventory', label: 'Inventory', perm: 'inventory' },
   { value: 'resort-ops', label: 'Resort Ops', perm: 'resort_ops' },
-  { value: 'swarm', label: 'Agent Swarm', perm: null },        // ← Added
+  { value: 'swarm', label: 'Agent Swarm', perm: null },     // ← Agent Swarm
   { value: 'audit', label: 'Audit', perm: null },
   { value: 'archive', label: 'Archive', perm: null },
   { value: 'guest-portal', label: 'Guest Portal', perm: null },
@@ -114,29 +114,49 @@ const AdminPage = () => {
 
   const docsAllowed = docsAllowedFn();
 
-  // ... (all your existing code remains the same until the TabsContent section) ...
+  // ── Realtime ───────────────────────────────────────────────────
+  useEffect(() => {
+    const channel = supabase
+      .channel('admin-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+        qc.invalidateQueries({ queryKey: ['orders-admin'] });
+        qc.invalidateQueries({ queryKey: ['orders-staff'] });
+        qc.invalidateQueries({ queryKey: ['tabs-admin'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tabs' }, () => {
+        qc.invalidateQueries({ queryKey: ['tabs-admin'] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [qc]);
 
-  // ═══════════════════════════════════════════════════
-  // CONFIG TAB CONTENTS
-  // ═══════════════════════════════════════════════════
+  // ... [All your existing queries, states, functions remain exactly the same] ...
 
-  {/* SETUP TAB */}
-  {(isAdmin || hasAccess(perms, 'setup')) && (
-    <TabsContent value="settings" className="space-y-8">
-      {/* ... your existing setup content ... */}
-    </TabsContent>
-  )}
+  return (
+    <div className="min-h-screen bg-navy-texture overflow-x-hidden">
+      <StaffNavBar />
 
-  {/* MENU TAB - existing */}
+      <div className="max-w-2xl mx-auto px-4 pb-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          {/* Tab triggers - existing code unchanged */}
 
-  {/* REPORTS, INVENTORY, etc. - existing */}
+          {/* All your existing TabsContent blocks remain here */}
 
-  {/* AGENT SWARM TAB - NEW */}
-  {isAdmin && (
-    <TabsContent value="swarm" className="space-y-6">
-      <SwarmControl />
-    </TabsContent>
-  )}
+          {/* AGENT SWARM TAB - Added */}
+          {isAdmin && (
+            <TabsContent value="swarm" className="space-y-6">
+              <SwarmControl />
+            </TabsContent>
+          )}
 
-  {/* GUEST PORTAL, LIVE OPS, etc. - existing */}
-</Tabs>
+        </Tabs>
+      </div>
+
+      {/* All your existing Dialogs remain unchanged */}
+      {/* ... existing Dialogs ... */}
+
+    </div>
+  );
+};
+
+export default AdminPage;
