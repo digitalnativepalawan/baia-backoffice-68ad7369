@@ -21,5 +21,8 @@ verify_jwt = false
 [functions.guest-requests-api]
 verify_jwt = false
 
+[functions.hermes-chat]
+verify_jwt = false
+
 [functions.send-telegram]
 verify_jwt = false
