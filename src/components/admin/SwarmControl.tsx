@@ -2,14 +2,39 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
 
 export default function SwarmControl() {
   const [status, setStatus] = useState<'idle' | 'running'>('idle');
+  const [thinking, setThinking] = useState(false);
+
+  const testOllama = async () => {
+    setThinking(true);
+    try {
+      const res = await fetch('http://localhost:11434/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: "llama3.2:3b",
+          messages: [{ role: "user", content: "Hello from BAIA Agent Swarm!" }],
+          stream: false
+        })
+      });
+
+      if (!res.ok) throw new Error("Ollama not responding");
+
+      const data = await res.json();
+      toast.success(`✅ Ollama works! Reply: ${data.message?.content?.slice(0, 100)}...`);
+    } catch (err) {
+      toast.error("Cannot reach Ollama. Make sure `ollama serve` is running.");
+    } finally {
+      setThinking(false);
+    }
+  };
 
   const startSwarm = () => {
     setStatus('running');
-    // Later we will connect to your local swarm service here
-    alert("Swarm started! (This is just a placeholder for now)");
+    toast.info("Swarm activated (placeholder for now)");
   };
 
   return (
@@ -23,14 +48,23 @@ export default function SwarmControl() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Swarm Status</CardTitle>
+          <CardTitle>Test Local AI (Ollama)</CardTitle>
         </CardHeader>
-        <CardContent>
-          <Button onClick={startSwarm} size="lg" className="font-display tracking-wider">
+        <CardContent className="space-y-4">
+          <Button 
+            onClick={testOllama} 
+            disabled={thinking}
+            className="w-full font-display tracking-wider"
+          >
+            {thinking ? "Testing Ollama..." : "Test Ollama Connection"}
+          </Button>
+
+          <Button onClick={startSwarm} size="lg" className="w-full font-display tracking-wider">
             Start Agent Swarm
           </Button>
-          <p className="text-sm text-muted-foreground mt-4">
-            Agents will soon be able to work on orders, bookings, inventory, guest requests, etc.
+
+          <p className="text-sm text-muted-foreground">
+            Next: We'll make real agents that can read/write your orders, bookings, inventory, etc.
           </p>
         </CardContent>
       </Card>
