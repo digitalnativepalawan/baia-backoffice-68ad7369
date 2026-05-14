@@ -49,6 +49,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { formatDistanceToNow } from 'date-fns';
 import { useResortProfile } from '@/hooks/useResortProfile';
 import { useDepartmentAlerts } from '@/hooks/useDepartmentAlerts';
+import { HermesAdminPanel } from '@/components/HermesAdminPanel';
 
 type DateFilter = 'today' | 'yesterday' | 'all';
 
@@ -1219,6 +1220,7 @@ const AdminPage = () => {
           )}
         </DialogContent>
       </Dialog>
+      <HermesAdminPanel />
     </div>
   );
 };
