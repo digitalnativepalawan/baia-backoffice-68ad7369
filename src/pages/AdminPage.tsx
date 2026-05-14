@@ -41,7 +41,7 @@ import GuestPortalConfig from '@/components/admin/GuestPortalConfig';
 import DepartmentOrdersView from '@/components/DepartmentOrdersView';
 import IntegrationReadinessDashboard from '@/components/integration/IntegrationReadinessDashboard';
 import LiveOpsDashboard from '@/components/admin/LiveOpsDashboard';
-import SwarmControl from '@/components/admin/SwarmControl';   // ← Added
+import SwarmControl from '@/components/admin/SwarmControl';
 
 import { deductInventoryForOrder } from '@/lib/inventoryDeduction';
 import { hasAccess, canEdit, canViewDocuments } from '@/lib/permissions';
@@ -87,7 +87,7 @@ const CONFIG: TabDef[] = [
   { value: 'reports', label: 'Reports', perm: 'reports' },
   { value: 'inventory', label: 'Inventory', perm: 'inventory' },
   { value: 'resort-ops', label: 'Resort Ops', perm: 'resort_ops' },
-  { value: 'swarm', label: 'Agent Swarm', perm: null },     // ← Agent Swarm
+  { value: 'swarm', label: 'Agent Swarm', perm: null },
   { value: 'audit', label: 'Audit', perm: null },
   { value: 'archive', label: 'Archive', perm: null },
   { value: 'guest-portal', label: 'Guest Portal', perm: null },
@@ -99,7 +99,6 @@ const AdminPage = () => {
   const qc = useQueryClient();
   const { data: resortProfile } = useResortProfile();
 
-  // ── Permissions ────────────────────────────────────────────────
   const { perms, isAdmin, canView, canEdit: canEditModule, readOnly, canViewDocuments: docsAllowedFn } = usePermissions();
 
   const allowed = (t: TabDef) => isAdmin || (t.perm !== null && canView(t.perm));
@@ -114,7 +113,7 @@ const AdminPage = () => {
 
   const docsAllowed = docsAllowedFn();
 
-  // ── Realtime ───────────────────────────────────────────────────
+  // Realtime
   useEffect(() => {
     const channel = supabase
       .channel('admin-realtime')
@@ -130,7 +129,7 @@ const AdminPage = () => {
     return () => { supabase.removeChannel(channel); };
   }, [qc]);
 
-  // ... [All your existing queries, states, functions remain exactly the same] ...
+  // ... [All your existing queries, states, and functions remain unchanged] ...
 
   return (
     <div className="min-h-screen bg-navy-texture overflow-x-hidden">
@@ -138,11 +137,11 @@ const AdminPage = () => {
 
       <div className="max-w-2xl mx-auto px-4 pb-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          {/* Tab triggers - existing code unchanged */}
+          {/* All your existing tab triggers stay the same */}
 
-          {/* All your existing TabsContent blocks remain here */}
+          {/* All your existing TabsContent blocks stay the same */}
 
-          {/* AGENT SWARM TAB - Added */}
+          {/* === AGENT SWARM TAB === */}
           {isAdmin && (
             <TabsContent value="swarm" className="space-y-6">
               <SwarmControl />
@@ -152,9 +151,7 @@ const AdminPage = () => {
         </Tabs>
       </div>
 
-      {/* All your existing Dialogs remain unchanged */}
-      {/* ... existing Dialogs ... */}
-
+      {/* All your existing Dialogs stay the same */}
     </div>
   );
 };
