@@ -110,10 +110,21 @@
     --sidebar-border: 220 15% 22%;
     --sidebar-ring: 40 30% 70%;
 
-    --navy-deep: 220 35% 8%;
-    --cream: 40 30% 88%;
-    --cream-dim: 40 15% 60%;
-    --gold: 38 60% 58%;
+    --navy-deep: 220 45% 5%;
+    --cream: 40 30% 92%;
+    --cream-dim: 40 15% 65%;
+    --gold: 38 60% 60%;
+    --champagne: 38 55% 70%;
+    --emerald: 158 50% 50%;
+    --teal: 185 55% 50%;
+
+    --gradient-ocean: linear-gradient(135deg, hsl(220 45% 8%) 0%, hsl(185 50% 18%) 100%);
+    --gradient-hero: radial-gradient(ellipse at top, hsl(220 40% 12%) 0%, hsl(220 45% 6%) 70%);
+    --gradient-gold: linear-gradient(135deg, hsl(38 65% 65%) 0%, hsl(38 55% 50%) 100%);
+    --shadow-luxury: 0 30px 80px -20px hsl(0 0% 0% / 0.55), 0 12px 30px -12px hsl(0 0% 0% / 0.4);
+    --shadow-glow-gold: 0 0 50px -8px hsl(38 60% 60% / 0.4);
+    --glass-bg: 220 32% 11% / 0.55;
+    --glass-border: 38 30% 55% / 0.18;
   }
 }
 
