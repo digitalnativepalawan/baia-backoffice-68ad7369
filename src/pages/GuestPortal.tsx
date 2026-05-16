@@ -410,6 +410,8 @@ const GuestPortal = () => {
         {view === 'orders' && <OrdersView session={session} />}
         {view === 'requests' && <RequestsTrackerView session={session} />}
         {view === 'bill' && <BillView session={session} />}
+        {view === 'hotel-info' && <HotelInfoView profile={profile} />}
+        {view === 'reservation' && <ReservationDetailsView session={session} booking={bookingDetails} onBill={() => setView('bill')} /> }
 
         {/* Hermes AI Assistant — available on all guest pages */}
         <HermesChatWidget guestSession={session} />
