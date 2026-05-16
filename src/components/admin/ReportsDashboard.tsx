@@ -12,6 +12,7 @@ import { DollarSign, ShoppingCart, TrendingUp, Lock, Download, Upload, CalendarI
 import { toast } from 'sonner';
 import AccountingExport from './AccountingExport';
 import { cn } from '@/lib/utils';
+import { LuxuryCard, LuxuryStatCard, LuxurySection } from '@/components/luxury';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 
@@ -387,17 +388,20 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1.5">
         {ranges.map(r => (
-          <Button
+          <button
             key={r.key}
-            size="sm"
-            variant={range === r.key ? 'default' : 'outline'}
             onClick={() => setRange(r.key)}
-            className="font-body text-xs flex-1 min-w-[60px]"
+            className={cn(
+              'flex-1 min-w-[68px] min-h-[40px] px-3 rounded-xl border font-display text-[11px] tracking-[0.18em] uppercase transition-all',
+              range === r.key
+                ? 'bg-gradient-gold text-background border-gold/60 luxury-glow-gold'
+                : 'border-border/60 bg-card/40 backdrop-blur-sm text-muted-foreground hover:border-gold/40 hover:text-foreground',
+            )}
           >
             {r.label}
-          </Button>
+          </button>
         ))}
       </div>
 
@@ -451,57 +455,42 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <Card className="bg-card/50 border-border">
-          <CardContent className="p-3 text-center">
-            <DollarSign className="w-4 h-4 text-gold mx-auto mb-1" />
-            <p className="font-display text-lg text-foreground">₱{stats.revenue.toLocaleString()}</p>
-            <p className="font-body text-xs text-cream-dim">Revenue</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card/50 border-border">
-          <CardContent className="p-3 text-center">
-            <ShoppingCart className="w-4 h-4 text-gold mx-auto mb-1" />
-            <p className="font-display text-lg text-foreground">₱{stats.totalFoodCost.toLocaleString()}</p>
-            <p className="font-body text-xs text-cream-dim">Food Cost</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card/50 border-border">
-          <CardContent className="p-3 text-center">
-            <PiggyBank className="w-4 h-4 text-gold mx-auto mb-1" />
-            <p className="font-display text-lg text-foreground">₱{stats.totalProfit.toLocaleString()}</p>
-            <p className="font-body text-xs text-cream-dim">Profit</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card/50 border-border">
-          <CardContent className="p-3 text-center">
-            <Percent className="w-4 h-4 text-gold mx-auto mb-1" />
-            <p className="font-display text-lg text-foreground">{stats.marginPct.toFixed(1)}%</p>
-            <p className="font-body text-xs text-cream-dim">Margin</p>
-          </CardContent>
-        </Card>
+        <LuxuryStatCard
+          icon={<DollarSign className="w-4 h-4" />}
+          tone="gold"
+          label="Revenue"
+          value={`₱${stats.revenue.toLocaleString()}`}
+        />
+        <LuxuryStatCard
+          icon={<ShoppingCart className="w-4 h-4" />}
+          tone="rose"
+          label="Food Cost"
+          value={`₱${stats.totalFoodCost.toLocaleString()}`}
+        />
+        <LuxuryStatCard
+          icon={<PiggyBank className="w-4 h-4" />}
+          tone="emerald"
+          label="Profit"
+          value={`₱${stats.totalProfit.toLocaleString()}`}
+        />
+        <LuxuryStatCard
+          icon={<Percent className="w-4 h-4" />}
+          tone="teal"
+          label="Margin"
+          value={`${stats.marginPct.toFixed(1)}%`}
+        />
       </div>
 
-      <Card className="bg-card/50 border-border">
-        <CardContent className="p-3 text-center">
-          <Receipt className="w-4 h-4 text-gold mx-auto mb-1" />
-          <p className="font-display text-lg text-foreground">₱{stats.totalServiceCharge.toLocaleString()}</p>
-          <p className="font-body text-xs text-cream-dim">Service Charge (Payroll)</p>
-        </CardContent>
-      </Card>
+      <LuxuryStatCard
+        icon={<Receipt className="w-4 h-4" />}
+        tone="gold"
+        label="Service Charge (Payroll)"
+        value={`₱${stats.totalServiceCharge.toLocaleString()}`}
+      />
 
       <div className="grid grid-cols-2 gap-3">
-        <Card className="bg-card/50 border-border">
-          <CardContent className="p-3 text-center">
-            <p className="font-display text-lg text-foreground">{stats.count}</p>
-            <p className="font-body text-xs text-cream-dim">Orders</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card/50 border-border">
-          <CardContent className="p-3 text-center">
-            <p className="font-display text-lg text-foreground">₱{stats.avg.toFixed(0)}</p>
-            <p className="font-body text-xs text-cream-dim">Avg Order</p>
-          </CardContent>
-        </Card>
+        <LuxuryStatCard tone="neutral" label="Orders" value={stats.count} />
+        <LuxuryStatCard tone="neutral" label="Avg Order" value={`₱${stats.avg.toFixed(0)}`} />
       </div>
 
       {Object.keys(stats.byType).length > 0 && (
