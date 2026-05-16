@@ -1467,7 +1467,7 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
       )}
 
       {readyUnits.length > 0 && (
-        <div className="mb-6 space-y-2">
+        <div id="walk-in-section" className="mb-6 space-y-2 scroll-mt-4">
           <div className="flex justify-between items-center">
             <h2 className="font-display text-xs tracking-wider text-foreground uppercase">Walk-In / Sell Room ({trulyAvailableUnits.length} available)</h2>
           </div>
