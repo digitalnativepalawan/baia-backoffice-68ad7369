@@ -1230,9 +1230,71 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
         </button>
       </div>
 
+      {/* ── Filtered Rooms (from stat-card tap) ── */}
+      <div id="filtered-rooms-section" className="scroll-mt-4">
+        {statusFilter && (() => {
+          const filtered =
+            statusFilter === 'occupied' ? occupiedUnits :
+            statusFilter === 'to_clean' ? toCleanUnits :
+            statusFilter === 'ready' ? readyUnits :
+            units;
+          const titleMap = { occupied: 'Occupied Rooms', to_clean: 'To Clean', ready: 'Ready Rooms', all: 'All Rooms' } as const;
+          const toneMap = { occupied: 'text-destructive', to_clean: 'text-gold', ready: 'text-emerald', all: 'text-teal' } as const;
+          return (
+            <LuxuryCard className="p-5 mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <p className="font-body text-[10px] tracking-[0.28em] uppercase text-muted-foreground">Filtered View</p>
+                  <h2 className={`font-serif-display text-xl ${toneMap[statusFilter]}`}>
+                    {titleMap[statusFilter]} <span className="text-muted-foreground tabular-nums">({filtered.length})</span>
+                  </h2>
+                </div>
+                <button type="button" onClick={() => setStatusFilter(null)}
+                  className="font-body text-xs text-muted-foreground hover:text-foreground underline-offset-4 hover:underline">
+                  Clear filter
+                </button>
+              </div>
+              {filtered.length === 0 ? (
+                <p className="font-body text-sm text-muted-foreground">No rooms in this category.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {filtered.map((unit: any) => {
+                    const s = getUnitStatus(unit);
+                    const booking = getActiveBooking(unit);
+                    const guest = (booking as any)?.resort_ops_guests;
+                    const tone =
+                      s === 'occupied' ? 'border-destructive/40 bg-destructive/5' :
+                      s === 'to_clean' ? 'border-gold/40 bg-gold/5' :
+                      'border-emerald/40 bg-emerald/5';
+                    const dot =
+                      s === 'occupied' ? 'bg-destructive' :
+                      s === 'to_clean' ? 'bg-gold' : 'bg-emerald';
+                    return (
+                      <button key={unit.id} type="button"
+                        onClick={() => { setDetailUnit(unit); setDetailSheetOpen(true); }}
+                        className={`text-left rounded-xl border p-3 hover:brightness-110 transition-all min-h-[72px] ${tone}`}>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-display text-sm text-foreground tracking-wider truncate">{unit.name}</p>
+                          <span className={`w-2 h-2 rounded-full ${dot} shrink-0`} />
+                        </div>
+                        <p className="font-body text-xs text-muted-foreground mt-1 truncate">
+                          {s === 'occupied' && (guest?.full_name || 'Guest')}
+                          {s === 'to_clean' && 'Awaiting cleaning'}
+                          {s === 'ready' && (getUpcomingBooking(unit)?.resort_ops_guests?.full_name ? `Next: ${getUpcomingBooking(unit)?.resort_ops_guests?.full_name}` : 'Available')}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </LuxuryCard>
+          );
+        })()}
+      </div>
+
       {/* ── Current Guests (all occupied rooms) ── */}
       {occupiedUnits.length > 0 && (
-        <div className="mb-6 space-y-2">
+        <div id="current-guests-section" className="mb-6 space-y-2 scroll-mt-4">
           <h2 className="font-display text-xs tracking-wider text-foreground uppercase">🏨 Current Guests ({occupiedUnits.length})</h2>
           {occupiedUnits.map((unit: any) => {
             const booking = getActiveBooking(unit);
