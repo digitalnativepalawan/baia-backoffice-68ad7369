@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { LogOut, UtensilsCrossed, MapPin, Car, Bike, MessageSquare, Star, Receipt, ArrowLeft, ChevronRight, ClipboardList, Calendar, Clock, Users, StickyNote, CheckCircle2, Utensils, Palmtree, Truck, CreditCard, FileText, Loader2, ConciergeBell, AlertTriangle } from 'lucide-react';
+import { LogOut, UtensilsCrossed, MapPin, Car, Bike, MessageSquare, Star, Receipt, ArrowLeft, ChevronRight, ClipboardList, Calendar, Clock, Users, StickyNote, CheckCircle2, Utensils, Palmtree, Truck, CreditCard, FileText, Loader2, ConciergeBell, AlertTriangle, Bell, Info, Phone, Mail, MapPinned, Moon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { setGuestSession } from '@/hooks/useGuestSession';
 import { HermesChatWidget } from '@/components/HermesChatWidget';
@@ -41,7 +41,7 @@ const GuestPortal = () => {
   const { data: profile } = useResortProfile();
   const qc = useQueryClient();
   const [session, setSession] = useState<GuestPortalSession | null>(getPortalSession);
-  const [view, setView] = useState<'dashboard' | 'menu-food' | 'menu-drinks' | 'experiences' | 'request' | 'message' | 'tours' | 'transport' | 'rentals' | 'review' | 'bill' | 'orders' | 'requests'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'menu-food' | 'menu-drinks' | 'experiences' | 'request' | 'message' | 'tours' | 'transport' | 'rentals' | 'review' | 'bill' | 'orders' | 'requests' | 'hotel-info' | 'reservation'>('dashboard');
 
   // Login state
   const [roomName, setRoomName] = useState('');
@@ -117,6 +117,38 @@ const GuestPortal = () => {
     setView('dashboard');
   };
 
+  // Booking details for Upcoming Stay card (adults, children, check_in)
+  const { data: bookingDetails } = useQuery({
+    queryKey: ['guest-portal-booking', session?.booking_id],
+    queryFn: async () => {
+      if (!session) return null;
+      const { data } = await supabase
+        .from('resort_ops_bookings')
+        .select('check_in, check_out, adults, children, platform')
+        .eq('id', session.booking_id)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!session,
+  });
+
+  // Notification badge: open requests + active orders for this booking
+  const { data: notifCount = 0 } = useQuery({
+    queryKey: ['guest-portal-notifs', session?.booking_id],
+    queryFn: async () => {
+      if (!session) return 0;
+      const [reqs, orders] = await Promise.all([
+        supabase.from('guest_requests').select('id', { count: 'exact', head: true })
+          .eq('booking_id', session.booking_id).in('status', ['pending', 'in_progress']),
+        supabase.from('orders').select('id', { count: 'exact', head: true })
+          .eq('room_id', session.room_id).in('status', ['New', 'Preparing', 'Ready']),
+      ]);
+      return (reqs.count || 0) + (orders.count || 0);
+    },
+    enabled: !!session,
+    refetchInterval: 15000,
+  });
+
   if (!session) {
     return (
       <div className="min-h-screen bg-navy-texture flex flex-col items-center justify-center px-6">
@@ -162,77 +194,193 @@ const GuestPortal = () => {
           </button>
         ) : (
           <>
-            {/* Welcome header — luxury glass */}
-            <div className="luxury-glass rounded-2xl p-6 mb-6 relative overflow-hidden">
-              <div className="absolute -top-12 -right-12 w-40 h-40 rounded-full bg-gold/10 blur-3xl pointer-events-none" />
-              <p className="font-body text-[10px] tracking-[0.3em] uppercase text-gold/80 mb-1">Welcome back</p>
-              <p className="font-serif-display text-3xl text-foreground">{session.guest_name.split(' ')[0]}</p>
-              <p className="font-body text-sm text-muted-foreground mt-2">{session.room_name} · Check-out {new Date(session.check_out).toLocaleDateString()}</p>
+            {/* ── Top header: greeting + bell + avatar ── */}
+            <header className="flex items-start justify-between gap-3 mb-5">
+              <div className="flex items-start gap-3 min-w-0">
+                {profile?.logo_url && (
+                  <img src={profile.logo_url} alt={profile?.resort_name || 'Logo'} className="w-12 h-12 object-contain shrink-0" />
+                )}
+                <div className="min-w-0">
+                  <h1 className="font-serif-display text-2xl text-foreground leading-tight truncate">
+                    Hello, {session.guest_name.split(' ')[0]}! <span>👋</span>
+                  </h1>
+                  <p className="font-body text-xs text-muted-foreground mt-0.5">
+                    Welcome to <span className="text-gold">{profile?.resort_name || 'BAIA Boutique'}</span>
+                  </p>
+                  <p className="font-body text-[11px] text-muted-foreground">
+                    We're here to make your stay exceptional.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setView('requests')}
+                  aria-label="Notifications"
+                  className="relative w-10 h-10 rounded-full luxury-glass flex items-center justify-center hover:border-gold/40 transition-colors"
+                >
+                  <Bell className="w-4 h-4 text-foreground" />
+                  {notifCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center">
+                      {notifCount > 9 ? '9+' : notifCount}
+                    </span>
+                  )}
+                </button>
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gold/40 to-teal/40 border border-gold/40 flex items-center justify-center">
+                  <span className="font-serif-display text-sm text-foreground">
+                    {session.guest_name.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()}
+                  </span>
+                </div>
+              </div>
+            </header>
+
+            {/* ── Upcoming Stay card ── */}
+            <div className="luxury-glass rounded-2xl overflow-hidden mb-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2">
+                {/* Hero image / gradient panel */}
+                <div className="relative h-44 sm:h-auto sm:min-h-[220px] overflow-hidden">
+                  <div
+                    aria-hidden
+                    className="absolute inset-0"
+                    style={{
+                      background:
+                        'linear-gradient(135deg, hsl(220 40% 8%) 0%, hsl(var(--teal) / 0.5) 50%, hsl(38 80% 45%) 100%)',
+                    }}
+                  />
+                  <svg aria-hidden viewBox="0 0 400 220" preserveAspectRatio="none" className="absolute inset-0 w-full h-full opacity-50">
+                    <circle cx="320" cy="60" r="32" fill="hsl(38 90% 65%)" opacity="0.7" />
+                    <path d="M0 170 Q 80 140 160 165 T 320 160 T 460 175 L 460 220 L 0 220 Z" fill="hsl(220 60% 10%)" />
+                    <path d="M0 195 Q 100 175 200 190 T 400 185 L 400 220 L 0 220 Z" fill="hsl(220 50% 6%)" />
+                  </svg>
+                  <div className="absolute inset-x-0 bottom-0 p-4">
+                    <Palmtree className="w-6 h-6 text-gold/70" />
+                  </div>
+                </div>
+                {/* Stay details */}
+                <div className="p-5">
+                  <p className="font-body text-[10px] tracking-[0.28em] uppercase text-gold/80 mb-1">Current Stay</p>
+                  <h2 className="font-serif-display text-2xl text-foreground leading-tight">{session.room_name}</h2>
+                  <p className="font-body text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                    <MapPin className="w-3 h-3" /> {bookingDetails?.platform || 'Ocean View'}
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-3 mt-4">
+                    <div>
+                      <p className="font-body text-[10px] tracking-[0.22em] uppercase text-muted-foreground flex items-center gap-1">
+                        <Calendar className="w-3 h-3" /> Check-In
+                      </p>
+                      <p className="font-serif-display text-base text-foreground mt-0.5">
+                        {bookingDetails?.check_in
+                          ? new Date(bookingDetails.check_in + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                          : '—'}
+                      </p>
+                      <p className="font-body text-[10px] text-muted-foreground">3:00 PM</p>
+                    </div>
+                    <div>
+                      <p className="font-body text-[10px] tracking-[0.22em] uppercase text-muted-foreground flex items-center gap-1">
+                        <Calendar className="w-3 h-3" /> Check-Out
+                      </p>
+                      <p className="font-serif-display text-base text-foreground mt-0.5">
+                        {new Date(session.check_out + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </p>
+                      <p className="font-body text-[10px] text-muted-foreground">11:00 AM</p>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-border/40 mt-4 pt-3 flex items-center gap-4 text-xs">
+                    <span className="font-body text-foreground/80 flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                      {bookingDetails?.adults ?? 1} Adult{(bookingDetails?.adults ?? 1) !== 1 ? 's' : ''}
+                      {bookingDetails?.children ? `, ${bookingDetails.children} Child${bookingDetails.children !== 1 ? 'ren' : ''}` : ''}
+                    </span>
+                    {bookingDetails?.check_in && (() => {
+                      const nights = Math.max(1, Math.round((new Date(session.check_out).getTime() - new Date(bookingDetails.check_in).getTime()) / 86400000));
+                      return (
+                        <span className="font-body text-foreground/80 flex items-center gap-1.5">
+                          <Moon className="w-3.5 h-3.5 text-muted-foreground" />
+                          {nights} Night{nights !== 1 ? 's' : ''}
+                        </span>
+                      );
+                    })()}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setView('reservation')}
+                    className="mt-4 w-full flex items-center justify-center gap-2 font-display text-xs tracking-[0.2em] uppercase text-gold border border-gold/40 rounded-xl py-2.5 hover:bg-gold/10 transition-colors min-h-[44px]"
+                  >
+                    View Reservation <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
             </div>
 
-            <p className="font-body text-[10px] tracking-[0.3em] uppercase text-gold/80 mb-3">How can we help today?</p>
-
-            {/* 5 large concierge tiles — stacked on mobile */}
-            <div className="flex flex-col gap-3 mb-6">
-              <GuestTile
-                icon={<UtensilsCrossed className="w-6 h-6" />}
-                label="Order Food"
-                subtitle="Browse our menu and order to your room"
-                onClick={() => {
-                  setGuestSession({ room_id: session.room_id, room_name: session.room_name, guest_name: session.guest_name, booking_id: session.booking_id });
-                  navigate('/menu?mode=guest-order&dept=kitchen');
-                }}
-              />
-              <GuestTile
-                icon={<span className="text-2xl">🍹</span>}
-                label="Order Drinks"
-                subtitle="Cocktails, coffee, fresh juices & more"
-                onClick={() => {
-                  setGuestSession({ room_id: session.room_id, room_name: session.room_name, guest_name: session.guest_name, booking_id: session.booking_id });
-                  navigate('/menu?mode=guest-order&dept=bar');
-                }}
-              />
-              <GuestTile
-                icon={<Palmtree className="w-6 h-6" />}
-                label="Book Experiences"
-                subtitle="Tours, transport & equipment rental"
-                onClick={() => setView('experiences')}
-              />
-              <GuestTile
-                icon={<MessageSquare className="w-6 h-6" />}
-                label="Request Service"
-                subtitle="Housekeeping, towels, or anything you need"
-                onClick={() => setView('request')}
-              />
-              <GuestTile
-                icon={<ConciergeBell className="w-6 h-6" />}
-                label="Message Reception"
-                subtitle="Send a note directly to our front desk"
-                onClick={() => setView('message')}
-              />
+            {/* ── How can we help you today? ── */}
+            <div className="luxury-glass rounded-2xl p-5 mb-5">
+              <h3 className="font-serif-display text-xl text-foreground mb-4">How can we help you today?</h3>
+              <div className="flex flex-col gap-3">
+                <GuestTile
+                  icon={<UtensilsCrossed className="w-6 h-6" />}
+                  label="Order Food"
+                  subtitle="Browse our menu and order to your room"
+                  onClick={() => {
+                    setGuestSession({ room_id: session.room_id, room_name: session.room_name, guest_name: session.guest_name, booking_id: session.booking_id });
+                    navigate('/menu?mode=guest-order&dept=kitchen');
+                  }}
+                />
+                <GuestTile
+                  icon={<span className="text-2xl">🍹</span>}
+                  label="Order Drinks"
+                  subtitle="Cocktails, coffee, fresh juices & more"
+                  onClick={() => {
+                    setGuestSession({ room_id: session.room_id, room_name: session.room_name, guest_name: session.guest_name, booking_id: session.booking_id });
+                    navigate('/menu?mode=guest-order&dept=bar');
+                  }}
+                />
+                <GuestTile
+                  icon={<Palmtree className="w-6 h-6" />}
+                  label="Book Experiences"
+                  subtitle="Tours, transport & equipment rental"
+                  onClick={() => setView('experiences')}
+                />
+                <GuestTile
+                  icon={<MessageSquare className="w-6 h-6" />}
+                  label="Request Service"
+                  subtitle="Housekeeping, towels, or anything you need"
+                  onClick={() => setView('request')}
+                />
+                <GuestTile
+                  icon={<ConciergeBell className="w-6 h-6" />}
+                  label="Message Reception"
+                  subtitle="Send a note directly to our front desk"
+                  onClick={() => setView('message')}
+                />
+              </div>
             </div>
 
-            {/* Activity links — smaller, below main tiles */}
-            <div className="grid grid-cols-4 gap-3 mb-6">
-              <button onClick={() => setView('orders')} className="bg-secondary/50 border border-border rounded-lg py-3 px-3 text-center hover:bg-secondary transition-colors">
-                <ClipboardList className="w-4 h-4 mx-auto text-muted-foreground mb-1" />
-                <span className="font-body text-xs text-muted-foreground">My Orders</span>
-              </button>
-              <button onClick={() => setView('requests')} className="bg-secondary/50 border border-border rounded-lg py-3 px-3 text-center hover:bg-secondary transition-colors">
-                <CheckCircle2 className="w-4 h-4 mx-auto text-muted-foreground mb-1" />
-                <span className="font-body text-xs text-muted-foreground">My Requests</span>
-              </button>
-              <button onClick={() => setView('bill')} className="bg-secondary/50 border border-border rounded-lg py-3 px-3 text-center hover:bg-secondary transition-colors">
-                <Receipt className="w-4 h-4 mx-auto text-muted-foreground mb-1" />
-                <span className="font-body text-xs text-muted-foreground">My Bill</span>
-              </button>
-              <button onClick={() => setView('review')} className="bg-secondary/50 border border-border rounded-lg py-3 px-3 text-center hover:bg-secondary transition-colors">
-                <Star className="w-4 h-4 mx-auto text-muted-foreground mb-1" />
-                <span className="font-body text-xs text-muted-foreground">Review</span>
-              </button>
+            {/* ── Quick access (5 tiles): Orders / Requests / Bill / Reviews / Hotel Info ── */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 mb-6">
+              {[
+                { icon: ClipboardList, label: 'My Orders', sub: 'Track your orders', onClick: () => setView('orders') },
+                { icon: CheckCircle2, label: 'My Requests', sub: 'View your requests', onClick: () => setView('requests') },
+                { icon: Receipt, label: 'My Bill', sub: 'Check your statement', onClick: () => setView('bill') },
+                { icon: Star, label: 'Reviews', sub: 'Share your experience', onClick: () => setView('review') },
+                { icon: Info, label: 'Hotel Info', sub: 'Explore hotel information', onClick: () => setView('hotel-info') },
+              ].map(({ icon: Icon, label, sub, onClick }) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={onClick}
+                  className="luxury-glass rounded-xl p-3 flex flex-col items-center gap-1.5 hover:border-gold/40 transition-colors min-h-[96px] focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/60"
+                >
+                  <Icon className="w-5 h-5 text-gold" />
+                  <span className="font-serif-display text-sm text-foreground text-center leading-tight">{label}</span>
+                  <span className="font-body text-[10px] text-muted-foreground text-center leading-tight">{sub}</span>
+                </button>
+              ))}
             </div>
 
-            <button onClick={logout} className="flex items-center justify-center gap-2 w-full font-body text-xs text-muted-foreground hover:text-foreground py-2">
+            <button onClick={logout} className="flex items-center justify-center gap-2 w-full font-body text-xs text-gold hover:text-foreground py-3">
               <LogOut className="w-3.5 h-3.5" /> Sign out
             </button>
           </>
@@ -262,6 +410,8 @@ const GuestPortal = () => {
         {view === 'orders' && <OrdersView session={session} />}
         {view === 'requests' && <RequestsTrackerView session={session} />}
         {view === 'bill' && <BillView session={session} />}
+        {view === 'hotel-info' && <HotelInfoView profile={profile} />}
+        {view === 'reservation' && <ReservationDetailsView session={session} booking={bookingDetails} onBill={() => setView('bill')} /> }
 
         {/* Hermes AI Assistant — available on all guest pages */}
         <HermesChatWidget guestSession={session} />
@@ -282,6 +432,109 @@ const GuestTile = ({ icon, label, subtitle, onClick }: { icon: React.ReactNode; 
     </div>
   </button>
 );
+
+/** Hotel info screen — shows resort profile contact + social links */
+const HotelInfoView = ({ profile }: { profile: any }) => (
+  <div className="space-y-4">
+    <h2 className="font-serif-display text-2xl text-foreground">Hotel Information</h2>
+    {profile?.logo_url && (
+      <div className="flex justify-center py-2">
+        <img src={profile.logo_url} alt={profile?.resort_name || 'Logo'} className="w-20 h-20 object-contain" />
+      </div>
+    )}
+    <div className="luxury-glass rounded-2xl p-5 space-y-4">
+      <div>
+        <p className="font-body text-[10px] tracking-[0.28em] uppercase text-gold/80 mb-1">Resort</p>
+        <p className="font-serif-display text-xl text-foreground">{profile?.resort_name || 'BAIA Boutique'}</p>
+        {profile?.tagline && <p className="font-body text-sm text-muted-foreground mt-1">{profile.tagline}</p>}
+      </div>
+      {profile?.address && (
+        <div className="flex items-start gap-3">
+          <MapPinned className="w-4 h-4 text-gold mt-0.5 shrink-0" />
+          <p className="font-body text-sm text-foreground">{profile.address}</p>
+        </div>
+      )}
+      {profile?.phone && (
+        <a href={`tel:${profile.phone}`} className="flex items-center gap-3 hover:text-gold transition-colors">
+          <Phone className="w-4 h-4 text-gold shrink-0" />
+          <span className="font-body text-sm text-foreground">{profile.phone}</span>
+        </a>
+      )}
+      {profile?.email && (
+        <a href={`mailto:${profile.email}`} className="flex items-center gap-3 hover:text-gold transition-colors">
+          <Mail className="w-4 h-4 text-gold shrink-0" />
+          <span className="font-body text-sm text-foreground">{profile.email}</span>
+        </a>
+      )}
+      {profile?.website_url && (
+        <a href={profile.website_url} target="_blank" rel="noreferrer" className="flex items-center gap-3 hover:text-gold transition-colors">
+          <Info className="w-4 h-4 text-gold shrink-0" />
+          <span className="font-body text-sm text-foreground">{profile.website_url}</span>
+        </a>
+      )}
+    </div>
+    {(profile?.facebook_url || profile?.instagram_url || profile?.tiktok_url) && (
+      <div className="flex justify-center gap-3">
+        {profile?.facebook_url && <a href={profile.facebook_url} target="_blank" rel="noreferrer" className="luxury-glass rounded-full px-4 py-2 font-body text-xs text-foreground hover:border-gold/40">Facebook</a>}
+        {profile?.instagram_url && <a href={profile.instagram_url} target="_blank" rel="noreferrer" className="luxury-glass rounded-full px-4 py-2 font-body text-xs text-foreground hover:border-gold/40">Instagram</a>}
+        {profile?.tiktok_url && <a href={profile.tiktok_url} target="_blank" rel="noreferrer" className="luxury-glass rounded-full px-4 py-2 font-body text-xs text-foreground hover:border-gold/40">TikTok</a>}
+      </div>
+    )}
+  </div>
+);
+
+/** Reservation details screen — summary of current stay */
+const ReservationDetailsView = ({ session, booking, onBill }: { session: GuestPortalSession; booking: any; onBill: () => void }) => {
+  const nights = booking?.check_in
+    ? Math.max(1, Math.round((new Date(session.check_out).getTime() - new Date(booking.check_in).getTime()) / 86400000))
+    : 0;
+  return (
+    <div className="space-y-4">
+      <h2 className="font-serif-display text-2xl text-foreground">Your Reservation</h2>
+      <div className="luxury-glass rounded-2xl p-5 space-y-4">
+        <div>
+          <p className="font-body text-[10px] tracking-[0.28em] uppercase text-gold/80 mb-1">Room</p>
+          <p className="font-serif-display text-xl text-foreground">{session.room_name}</p>
+          <p className="font-body text-xs text-muted-foreground">Guest · {session.guest_name}</p>
+        </div>
+        <div className="grid grid-cols-2 gap-4 border-t border-border/40 pt-4">
+          <div>
+            <p className="font-body text-[10px] tracking-[0.22em] uppercase text-muted-foreground">Check-In</p>
+            <p className="font-serif-display text-base text-foreground mt-1">
+              {booking?.check_in ? new Date(booking.check_in + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+            </p>
+            <p className="font-body text-[10px] text-muted-foreground">3:00 PM</p>
+          </div>
+          <div>
+            <p className="font-body text-[10px] tracking-[0.22em] uppercase text-muted-foreground">Check-Out</p>
+            <p className="font-serif-display text-base text-foreground mt-1">
+              {new Date(session.check_out + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            </p>
+            <p className="font-body text-[10px] text-muted-foreground">11:00 AM</p>
+          </div>
+        </div>
+        <div className="border-t border-border/40 pt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm">
+          <span className="font-body text-foreground flex items-center gap-1.5">
+            <Users className="w-3.5 h-3.5 text-muted-foreground" />
+            {booking?.adults ?? 1} Adult{(booking?.adults ?? 1) !== 1 ? 's' : ''}
+            {booking?.children ? `, ${booking.children} Child${booking.children !== 1 ? 'ren' : ''}` : ''}
+          </span>
+          {nights > 0 && (
+            <span className="font-body text-foreground flex items-center gap-1.5">
+              <Moon className="w-3.5 h-3.5 text-muted-foreground" /> {nights} Night{nights !== 1 ? 's' : ''}
+            </span>
+          )}
+          {booking?.platform && (
+            <span className="font-body text-muted-foreground">Booked via {booking.platform}</span>
+          )}
+        </div>
+      </div>
+      <button onClick={onBill} className="w-full luxury-glass rounded-xl py-3 font-display text-xs tracking-[0.2em] uppercase text-gold hover:border-gold/40 transition-colors min-h-[44px] flex items-center justify-center gap-2">
+        <Receipt className="w-4 h-4" /> View My Bill
+      </button>
+    </div>
+  );
+};
 
 /** Simple message-to-reception flow */
 const MessageReceptionView = ({ session, qc, onDone }: { session: GuestPortalSession; qc: any; onDone: () => void }) => {
