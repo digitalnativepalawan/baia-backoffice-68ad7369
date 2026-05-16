@@ -27,7 +27,7 @@ export const LuxuryShell = ({ children, className, ...rest }: HTMLAttributes<HTM
 );
 
 /* ─────────────── LuxurySection ─────────────── */
-interface LuxurySectionProps extends HTMLAttributes<HTMLElement> {
+interface LuxurySectionProps extends Omit<HTMLAttributes<HTMLElement>, 'title'> {
   eyebrow?: string;
   title?: ReactNode;
   subtitle?: ReactNode;
