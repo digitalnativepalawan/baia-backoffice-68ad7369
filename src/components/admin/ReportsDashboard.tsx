@@ -140,7 +140,7 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
   const { data: histRevenue = [], isLoading: histLoading } = useQuery({
     queryKey: ['historical-revenue', histDateFrom, histDateTo],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('historical_revenue')
         .select('*')
         .gte('date', histDateFrom)
@@ -149,9 +149,9 @@ const ReportsDashboard = ({ readOnly = false }: { readOnly?: boolean }) => {
         .limit(5000);
       if (error) {
         console.error('historical_revenue query error:', error);
-        return [];
+        return [] as any[];
       }
-      return data || [];
+      return (data || []) as any[];
     },
   });
 
