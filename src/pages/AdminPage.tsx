@@ -50,6 +50,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { useResortProfile } from '@/hooks/useResortProfile';
 import { useDepartmentAlerts } from '@/hooks/useDepartmentAlerts';
 import { HermesAdminPanel } from '@/components/HermesAdminPanel';
+import { LuxuryShell, LuxuryHeader } from '@/components/luxury';
 
 type DateFilter = 'today' | 'yesterday' | 'all';
 
@@ -497,11 +498,17 @@ const AdminPage = () => {
   );
 
   return (
-    <div className="min-h-screen bg-navy-texture overflow-x-hidden">
+    <LuxuryShell>
       {/* Global navigation bar */}
       <StaffNavBar />
 
       <div className="max-w-2xl mx-auto px-4 pb-6">
+        <LuxuryHeader
+          eyebrow="Control Tower"
+          greeting={resortProfile?.resort_name || 'Admin'}
+          meta="Operations · People · Configuration"
+          className="mb-5"
+        />
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           {/* ── Grouped tab triggers ─────────────────────────── */}
@@ -512,7 +519,7 @@ const AdminPage = () => {
                 <TabsList className="flex flex-wrap gap-1 mt-1 h-auto bg-transparent p-0">
                   {opsTabs.map(t => (
                     <TabsTrigger key={t.value} value={t.value}
-                      className={`font-display text-xs tracking-wider min-h-[44px] px-3 py-1.5 rounded-md border border-border data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary bg-secondary text-muted-foreground ${
+                      className={`font-display text-xs tracking-wider min-h-[44px] px-3 py-1.5 rounded-md border border-border/60 bg-card/40 backdrop-blur-sm text-muted-foreground data-[state=active]:bg-gradient-gold data-[state=active]:text-background data-[state=active]:border-gold/60 data-[state=active]:luxury-glow-gold ${
                         ALERT_KEY_MAP[t.value] && alerts[ALERT_KEY_MAP[t.value] as keyof typeof alerts] && activeTab !== t.value ? 'tab-pulse' : ''
                       }`}>
                       {t.label}
@@ -527,7 +534,7 @@ const AdminPage = () => {
                 <TabsList className="flex flex-wrap gap-1 mt-1 h-auto bg-transparent p-0">
                   {peopleTabs.map(t => (
                     <TabsTrigger key={t.value} value={t.value}
-                      className="font-display text-xs tracking-wider min-h-[44px] px-3 py-1.5 rounded-md border border-border data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary bg-secondary text-muted-foreground">
+                      className="font-display text-xs tracking-wider min-h-[44px] px-3 py-1.5 rounded-md border border-border/60 bg-card/40 backdrop-blur-sm text-muted-foreground data-[state=active]:bg-gradient-gold data-[state=active]:text-background data-[state=active]:border-gold/60 data-[state=active]:luxury-glow-gold">
                       {t.label}
                     </TabsTrigger>
                   ))}
@@ -540,7 +547,7 @@ const AdminPage = () => {
                 <TabsList className="flex flex-wrap gap-1 mt-1 h-auto bg-transparent p-0">
                   {cfgTabs.map(t => (
                     <TabsTrigger key={t.value} value={t.value}
-                      className="font-display text-xs tracking-wider min-h-[44px] px-3 py-1.5 rounded-md border border-border data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary bg-secondary text-muted-foreground">
+                      className="font-display text-xs tracking-wider min-h-[44px] px-3 py-1.5 rounded-md border border-border/60 bg-card/40 backdrop-blur-sm text-muted-foreground data-[state=active]:bg-gradient-gold data-[state=active]:text-background data-[state=active]:border-gold/60 data-[state=active]:luxury-glow-gold">
                       {t.label}
                     </TabsTrigger>
                   ))}
@@ -1221,7 +1228,7 @@ const AdminPage = () => {
         </DialogContent>
       </Dialog>
       <HermesAdminPanel />
-    </div>
+    </LuxuryShell>
   );
 };
 

@@ -132,7 +132,7 @@ const StaffNavBar = ({ activeDepartment }: StaffNavBarProps) => {
   );
 
   return (
-    <nav className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border mb-4">
+    <nav className="sticky top-0 z-40 luxury-glass border-b border-border/40 mb-4">
       <div className="max-w-2xl mx-auto px-4 py-2 flex items-center justify-between">
         {/* Desktop nav */}
         <div className="hidden sm:flex items-center gap-1">
