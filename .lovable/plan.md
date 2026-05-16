@@ -1,74 +1,64 @@
-# Luxury UI Refactor — Presentation Only
+# Reception Luxury Dashboard Refactor (presentation only)
 
-A pure visual upgrade to match the BAIA Boutique reference screens. Zero changes to data, auth, routes, or business logic — only tokens, wrappers, and className swaps.
+Restyle `src/pages/ReceptionPage.tsx` so its header, stat strip, and overview blocks visually match the uploaded BAIA reference. **No data, no routes, no hooks, no business logic touched.** Mobile-first stacked layout, desktop two-column where the reference shows side-by-side blocks.
 
-## 1. Design tokens
+## What changes
 
-**`src/index.css`** — extend the existing `:root` and `.dark` blocks (preserve every existing token name):
-- Deepen dark `--background` to midnight navy, warm-white `--foreground`.
-- Refine `--gold` to warm champagne; add `--emerald` and `--teal` secondary accents.
-- Add utility tokens: `--gradient-ocean`, `--gradient-hero`, `--gradient-gold`, `--shadow-luxury`, `--shadow-glow-gold`, `--glass-bg`, `--glass-border`.
-- Add Cormorant Garamond via Google Fonts `@import` alongside existing Playfair + Lato.
-- All values HSL.
+### 1. Header strip (top of page)
+- Replace current `LuxuryHeader` with a two-column header:
+  - **Left:** Eyebrow "Reception · BAIA" in gold tracking, big serif `Good {timeOfDay}, {staffName} 👋`, sub "Here's what's happening at BAIA."
+  - **Right:** Glass pill containing weather placeholder (`Cloud` icon, `28°C`, `San Vicente, Palawan`) — static labels only, no new fetches.
 
-**`tailwind.config.ts`** — register new tokens (`emerald`, `teal`, `glass`) and a `font-serif-display` family for Cormorant. No removals.
+### 2. Hero stat row — 4 glowing cards
+Replace the existing 4-card grid (Occupied / To Clean / Ready / Occupancy) with **bordered glow cards** matching the reference:
+- Card pattern per tile: `rounded-2xl border` with tone-tinted border + soft inner radial glow + huge serif numeral + label + small lucide icon bottom-right.
+- Tones: Occupied → rose, To Clean → gold/amber, Ready → emerald, Occupancy% → teal/blue.
+- Use existing semantic tokens (`--destructive`, `--gold`, `--emerald`, `--teal`) — add a new `.luxury-glow-card` utility in `index.css` that paints the radial halo so we avoid hex in JSX.
 
-## 2. Luxury wrappers (`src/components/luxury/`)
+### 3. Mid strip — Arrivals / Departures / Revenue Today
+A single `LuxuryCard` row with 3 columns:
+- Arrivals Today (count + `Users` icon)
+- Departures Today (count + `PlaneTakeoff` icon)
+- Revenue Today (₱ value + tiny sparkline using existing `OccupancySparkline` if cheap; otherwise a static SVG line — no new data fetches).
 
-Pure presentation, no hooks, no fetching:
-- `LuxuryShell` — page background + ambient gradient layer
-- `LuxurySection` — vertical rhythm + uppercase eyebrow label
-- `LuxuryCard` — glass card (backdrop-blur, border, luxury shadow)
-- `LuxuryStatCard` — icon + label + value + delta + glow accent
-- `LuxuryHeader` — serif greeting + meta slot (weather/location)
-- `LuxuryNavItem` / `LuxuryBottomNav` — styling-only nav wrappers
-- `LuxuryButton` — adds `luxury` / `glass` / `gold` variants via `cva`, does not replace shadcn Button
+Revenue value reuses whatever is currently available (already-rendered total) or shows `—` if not computed; we will not add a new query.
 
-Framer Motion only for entrance fades on hero/cards (already a dep).
+### 4. Two-column overview row
+Side-by-side `LuxuryCard`s (stacks on mobile):
+- **Housekeeping Overview** — donut chart (re-use counts from `occupiedUnits`, `toCleanUnits`, `readyUnits` already computed; render with a small inline SVG donut, no new dep) + legend.
+- **Tasks & Alerts** — list rows for: Late Checkout count, Guest Requests (`pendingRequests.length`), Maintenance (placeholder 0). Reuses existing arrays only.
 
-## 3. Targeted restyles (wrap, don't rewrite)
+### 5. Recent Activity + Inspiration row
+- **Recent Activity** card: last 3 items derived from already-loaded `bookings` / `todayDepartures` (no new query). Each row: icon, title, subtitle, relative time using existing `date-fns`.
+- **Today's Inspiration** card: full-bleed ocean image (`public/` placeholder or existing asset) with serif tagline "Breathe in the ocean. Let hospitality flow naturally." Pure decoration.
 
-For each file: swap outer containers and classNames only. Props, state, queries, handlers untouched. Free Login button kept functional, only restyled.
+### 6. Quick Access tiles
+5 square tiles with colored glass icons (New Reservation, Walk-in Guest, Room Status, Reports, Inventory). Each tile is a `<button>` that triggers the **same handlers/navigation already wired** in the page (walk-in modal, calendar scroll, etc.). No new routes.
 
-- `src/pages/Index.tsx` — welcome screen (BAIA welcome ref)
-- `src/pages/AdminPage.tsx` dashboard tab — hero greeting + stat row
-- `src/components/MorningBriefing.tsx` — metric tile restyle
-- `src/pages/ServiceModePage.tsx` — launcher cards with gold glow edges
-- `src/components/service/ServiceHeader.tsx` — refined header bar
-- `src/components/StaffNavBar.tsx` — bottom nav glass treatment + safe-area
-- `src/pages/GuestPortal.tsx` — guest hero + action list (guest portal ref)
-- `src/components/admin/InventoryDashboard.tsx`, `ReportsDashboard.tsx`, `LiveOpsDashboard.tsx` — stat card swap
-- Kitchen / Bar / Housekeeping board cards — LuxuryCard styling only
+### 7. System Notice footer bar
+Thin glass bar with bell icon + "Night Audit will run automatically at 11:59 PM." + "View all" link (no-op or scroll-to-top). Pure UI.
 
-## 4. Mobile QA
+### 8. Keep below the fold
+All existing operational sections (room cards, checkout flow, housekeeping tracker, calendar, modals) remain unchanged below the new dashboard hero. Only the top "summary" zone is restyled.
 
-Verify at 360 / 390 / 768 px via preview:
-- No horizontal scroll on any touched view
-- Touch targets ≥44px preserved
-- Bottom nav respects safe-area inset
+## Tokens / CSS
 
-## Out of scope (NOT touched)
+Add to `src/index.css` (semantic, no hex in components):
+```css
+.luxury-stat-glow-rose    { box-shadow: inset 0 0 60px -20px hsl(var(--destructive)/.35); }
+.luxury-stat-glow-gold    { box-shadow: inset 0 0 60px -20px hsl(var(--gold)/.35); }
+.luxury-stat-glow-emerald { box-shadow: inset 0 0 60px -20px hsl(var(--emerald)/.35); }
+.luxury-stat-glow-teal    { box-shadow: inset 0 0 60px -20px hsl(var(--teal)/.35); }
+```
+Extend `LuxuryStatCard` with a `glow` prop (optional) that applies the matching class — backwards-compatible with current usages in AdminPage/ReportsDashboard.
 
-- `src/integrations/supabase/*`, `supabase/functions/*`, `supabase/config.toml`
-- All hooks, `src/lib/*`, permissions, session, auth, audit
-- Routes in `App.tsx`, `RequireAuth`, `AdminLoginGate`
-- Form fields, mutations, realtime, polling
-- File renames / deletions / schema migrations
+## Out of scope
+- No schema, RLS, edge function, or query changes.
+- No new dependencies (donut + sparkline = inline SVG).
+- No changes to modals, calendar, or any handler logic.
+- Weather + revenue sparkline are visual placeholders only.
 
-## Implementation order
-
-1. Tokens (`index.css` + `tailwind.config.ts`)
-2. Build `src/components/luxury/*`
-3. Restyle `Index.tsx` — validates the system
-4. Admin dashboard hero + MorningBriefing
-5. ServiceMode launcher + ServiceHeader + StaffNavBar
-6. GuestPortal
-7. Sweep dashboards (Inventory / Reports / LiveOps)
-8. Mobile QA pass
-
-## Per-file verification
-
-- No imports changed besides luxury wrappers + icons
-- No props / handlers / queries / effects modified
-- Build passes; routes resolve; login flows unchanged
-- Zero hardcoded hex in components — only semantic tokens
+## Files touched
+- `src/pages/ReceptionPage.tsx` — restyle top zone
+- `src/components/luxury/index.tsx` — optional `glow` prop on `LuxuryStatCard`
+- `src/index.css` — 4 glow utility classes
