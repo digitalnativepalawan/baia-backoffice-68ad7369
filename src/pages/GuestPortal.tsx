@@ -198,14 +198,14 @@ const GuestPortal = () => {
             <header className="flex items-start justify-between gap-3 mb-5">
               <div className="flex items-start gap-3 min-w-0">
                 {profile?.logo_url && (
-                  <img src={profile.logo_url} alt={profile?.name || 'Logo'} className="w-12 h-12 object-contain shrink-0" />
+                  <img src={profile.logo_url} alt={profile?.resort_name || 'Logo'} className="w-12 h-12 object-contain shrink-0" />
                 )}
                 <div className="min-w-0">
                   <h1 className="font-serif-display text-2xl text-foreground leading-tight truncate">
                     Hello, {session.guest_name.split(' ')[0]}! <span>👋</span>
                   </h1>
                   <p className="font-body text-xs text-muted-foreground mt-0.5">
-                    Welcome to <span className="text-gold">{profile?.name || 'BAIA Boutique'}</span>
+                    Welcome to <span className="text-gold">{profile?.resort_name || 'BAIA Boutique'}</span>
                   </p>
                   <p className="font-body text-[11px] text-muted-foreground">
                     We're here to make your stay exceptional.
