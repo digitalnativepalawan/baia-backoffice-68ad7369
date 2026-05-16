@@ -142,8 +142,30 @@
   .font-display {
     font-family: 'Playfair Display', serif;
   }
+  .font-serif-display {
+    font-family: 'Cormorant Garamond', 'Playfair Display', serif;
+    letter-spacing: 0.005em;
+  }
   .font-body {
     font-family: 'Lato', sans-serif;
+  }
+  .luxury-glass {
+    background-color: hsl(var(--glass-bg));
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    border: 1px solid hsl(var(--glass-border));
+    box-shadow: var(--shadow-luxury);
+  }
+  .luxury-shadow { box-shadow: var(--shadow-luxury); }
+  .luxury-glow-gold { box-shadow: var(--shadow-glow-gold); }
+  .bg-gradient-ocean { background-image: var(--gradient-ocean); }
+  .bg-gradient-hero { background-image: var(--gradient-hero); }
+  .bg-gradient-gold { background-image: var(--gradient-gold); }
+  .text-gradient-gold {
+    background-image: var(--gradient-gold);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
   }
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
