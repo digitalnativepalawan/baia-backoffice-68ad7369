@@ -50,6 +50,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { useResortProfile } from '@/hooks/useResortProfile';
 import { useDepartmentAlerts } from '@/hooks/useDepartmentAlerts';
 import { HermesAdminPanel } from '@/components/HermesAdminPanel';
+import { LuxuryShell, LuxuryHeader } from '@/components/luxury';
 
 type DateFilter = 'today' | 'yesterday' | 'all';
 
