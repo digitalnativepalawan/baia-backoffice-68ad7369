@@ -957,35 +957,242 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
   const totalPayments = Math.abs(payments.reduce((s, t) => s + t.total_amount, 0));
   const balance = totalCharges - totalPayments;
 
+  const hour = getManilaHour();
+  const timeOfDay = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
+  const totalRooms = units.length || 1;
+  const occPct = Math.round((occupiedUnits.length / totalRooms) * 100);
+
+  // Donut geometry (SVG)
+  const donutR = 42;
+  const donutC = 2 * Math.PI * donutR;
+  const segOcc = (occupiedUnits.length / totalRooms) * donutC;
+  const segClean = (toCleanUnits.length / totalRooms) * donutC;
+  const segReady = (readyUnits.length / totalRooms) * donutC;
+
+  // Recent activity (derived from already-loaded data, no new query)
+  const recentActivity: { icon: any; title: string; subtitle: string; when: string }[] = [
+    ...todayDepartures.slice(0, 2).map(({ unit, booking }) => ({
+      icon: LogOut,
+      title: `${unit.name}`,
+      subtitle: `Departure · ${(booking as any)?.resort_ops_guests?.full_name || 'Guest'}`,
+      when: 'Today',
+    })),
+    ...todayArrivals.slice(0, 2).map((b: any) => ({
+      icon: LogIn,
+      title: `Reservation #${(b.id || '').slice(0, 4).toUpperCase()}`,
+      subtitle: `Arrival · ${b?.resort_ops_guests?.full_name || 'Guest'}`,
+      when: 'Today',
+    })),
+  ].slice(0, 3);
+
   const inner = (
     <>
       {!embedded && (
-        <LuxuryHeader
-          eyebrow="Front Desk"
-          greeting="Reception"
-          meta={manilaTime}
-          right={
-            <div className="text-right">
-              <p className="font-display text-sm text-gold tracking-wider">🇵🇭 Manila</p>
-              <p className="font-body text-[10px] text-muted-foreground">UTC+8</p>
+        <header className="flex items-start justify-between gap-4 mb-6">
+          <div className="min-w-0">
+            <p className="font-body text-[10px] tracking-[0.3em] uppercase text-gold/80 mb-1.5">
+              Reception · BAIA
+            </p>
+            <h1 className="font-serif-display text-3xl sm:text-4xl text-foreground leading-tight">
+              Good {timeOfDay}, {staffName} <span className="inline-block">👋</span>
+            </h1>
+            <p className="font-body text-sm text-muted-foreground mt-1.5">
+              Here's what's happening at BAIA · <span className="text-foreground/70">{manilaTime}</span>
+            </p>
+          </div>
+          <div className="shrink-0 luxury-glass rounded-2xl px-3 py-2 flex items-center gap-2.5">
+            <Cloud className="h-5 w-5 text-teal" />
+            <div className="text-right leading-tight">
+              <p className="font-serif-display text-lg text-foreground tabular-nums">28°C</p>
+              <p className="font-body text-[10px] text-muted-foreground">San Vicente, Palawan</p>
             </div>
-          }
-          className="mb-5"
-        />
+          </div>
+        </header>
       )}
 
-      {/* ── Occupancy summary ── */}
-      <div className="grid grid-cols-3 gap-2 mb-4">
-        <LuxuryStatCard tone="rose" label="Occupied" value={occupiedUnits.length} className="p-3" />
-        <LuxuryStatCard tone="gold" label="To Clean" value={toCleanUnits.length} className="p-3" />
-        <LuxuryStatCard tone="emerald" label="Ready" value={readyUnits.length} className="p-3" />
+      {/* ── Hero stat row — 4 glowing cards ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        <LuxuryStatCard glow tone="rose" icon={<BedDouble className="h-4 w-4" />}
+          label="Occupied" value={occupiedUnits.length} delta="Rooms" />
+        <LuxuryStatCard glow tone="gold" icon={<Sparkles className="h-4 w-4" />}
+          label="To Clean" value={toCleanUnits.length} delta="Rooms" />
+        <LuxuryStatCard glow tone="emerald" icon={<CheckCircle className="h-4 w-4" />}
+          label="Ready" value={readyUnits.length} delta="Rooms" />
+        <LuxuryStatCard glow tone="teal" icon={<BarChart3 className="h-4 w-4" />}
+          label="Occupancy" value={`${occPct}%`} delta="Today" />
       </div>
 
-      <div className="grid grid-cols-4 gap-2 mb-6">
-        <LuxuryStatCard tone="neutral" label="Arrivals" value={todayArrivals.length} className="p-3" />
-        <LuxuryStatCard tone="neutral" label="Departures" value={todayDepartures.length} className="p-3" />
-        <LuxuryStatCard tone="emerald" label="Available" value={trulyAvailableUnits.length} className="p-3" />
-        <LuxuryStatCard tone="teal" label="Week" value={weekArrivals.length} className="p-3" />
+      {/* ── Arrivals / Departures / Available strip ── */}
+      <LuxuryCard className="p-4 sm:p-5 mb-4">
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <p className="font-body text-[10px] tracking-[0.22em] uppercase text-muted-foreground">Arrivals</p>
+            <div className="flex items-end justify-between gap-2 mt-2">
+              <p className="font-serif-display text-3xl text-foreground tabular-nums leading-none">{todayArrivals.length}</p>
+              <Users className="h-5 w-5 text-muted-foreground/70" />
+            </div>
+            <p className="font-body text-[11px] text-muted-foreground mt-1">Today</p>
+          </div>
+          <div className="border-x border-border/40 px-4">
+            <p className="font-body text-[10px] tracking-[0.22em] uppercase text-muted-foreground">Departures</p>
+            <div className="flex items-end justify-between gap-2 mt-2">
+              <p className="font-serif-display text-3xl text-foreground tabular-nums leading-none">{todayDepartures.length}</p>
+              <PlaneTakeoff className="h-5 w-5 text-muted-foreground/70" />
+            </div>
+            <p className="font-body text-[11px] text-muted-foreground mt-1">Today</p>
+          </div>
+          <div>
+            <p className="font-body text-[10px] tracking-[0.22em] uppercase text-muted-foreground">Available</p>
+            <div className="flex items-end justify-between gap-2 mt-2">
+              <p className="font-serif-display text-3xl text-emerald tabular-nums leading-none">{trulyAvailableUnits.length}</p>
+              <CheckCircle className="h-5 w-5 text-emerald/70" />
+            </div>
+            <p className="font-body text-[11px] text-muted-foreground mt-1">{weekArrivals.length} week ahead</p>
+          </div>
+        </div>
+      </LuxuryCard>
+
+      {/* ── Housekeeping overview + Tasks & Alerts ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+        <LuxuryCard className="p-5">
+          <p className="font-body text-[10px] tracking-[0.28em] uppercase text-muted-foreground mb-4">Housekeeping Overview</p>
+          <div className="flex items-center gap-5">
+            <div className="relative shrink-0">
+              <svg width="120" height="120" viewBox="0 0 120 120" className="-rotate-90">
+                <circle cx="60" cy="60" r={donutR} fill="none" stroke="hsl(var(--border) / 0.4)" strokeWidth="10" />
+                <circle cx="60" cy="60" r={donutR} fill="none" stroke="hsl(var(--destructive))" strokeWidth="10"
+                  strokeDasharray={`${segOcc} ${donutC}`} strokeDashoffset="0" strokeLinecap="butt" />
+                <circle cx="60" cy="60" r={donutR} fill="none" stroke="hsl(var(--gold))" strokeWidth="10"
+                  strokeDasharray={`${segClean} ${donutC}`} strokeDashoffset={`-${segOcc}`} strokeLinecap="butt" />
+                <circle cx="60" cy="60" r={donutR} fill="none" stroke="hsl(var(--emerald))" strokeWidth="10"
+                  strokeDasharray={`${segReady} ${donutC}`} strokeDashoffset={`-${segOcc + segClean}`} strokeLinecap="butt" />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <p className="font-serif-display text-2xl text-foreground tabular-nums leading-none">{units.length}</p>
+                <p className="font-body text-[9px] tracking-[0.2em] uppercase text-muted-foreground mt-0.5">Total</p>
+              </div>
+            </div>
+            <ul className="space-y-2 text-sm">
+              <li className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-emerald" /><span className="font-body text-foreground tabular-nums w-5">{readyUnits.length}</span><span className="font-body text-muted-foreground">Ready</span></li>
+              <li className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-gold" /><span className="font-body text-foreground tabular-nums w-5">{toCleanUnits.length}</span><span className="font-body text-muted-foreground">To Clean</span></li>
+              <li className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-destructive" /><span className="font-body text-foreground tabular-nums w-5">{occupiedUnits.length}</span><span className="font-body text-muted-foreground">Occupied</span></li>
+            </ul>
+          </div>
+        </LuxuryCard>
+
+        <LuxuryCard className="p-5">
+          <p className="font-body text-[10px] tracking-[0.28em] uppercase text-muted-foreground mb-4">Tasks & Alerts</p>
+          <ul className="space-y-3">
+            <li className="flex items-center gap-3">
+              <span className="font-serif-display text-2xl text-destructive tabular-nums w-6">{todayDepartures.length}</span>
+              <span className="font-body text-sm text-foreground flex-1">Departures Today</span>
+              <AlertTriangle className="h-4 w-4 text-destructive/80" />
+            </li>
+            <li className="flex items-center gap-3">
+              <span className="font-serif-display text-2xl text-gold tabular-nums w-6">{pendingRequests.length}</span>
+              <span className="font-body text-sm text-foreground flex-1">Guest Requests</span>
+              <MessageSquare className="h-4 w-4 text-gold/80" />
+            </li>
+            <li className="flex items-center gap-3">
+              <span className="font-serif-display text-2xl text-emerald tabular-nums w-6">{pendingTourBookings.length}</span>
+              <span className="font-body text-sm text-foreground flex-1">Tour Bookings</span>
+              <CheckCircle className="h-4 w-4 text-emerald/80" />
+            </li>
+            <li className="flex items-center gap-3">
+              <span className="font-serif-display text-2xl text-teal tabular-nums w-6">{allDisputes.length}</span>
+              <span className="font-body text-sm text-foreground flex-1">Bill Disputes</span>
+              <ShieldCheck className="h-4 w-4 text-teal/80" />
+            </li>
+          </ul>
+        </LuxuryCard>
+      </div>
+
+      {/* ── Recent Activity + Inspiration ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+        <LuxuryCard className="p-5">
+          <p className="font-body text-[10px] tracking-[0.28em] uppercase text-muted-foreground mb-4">Recent Activity</p>
+          {recentActivity.length === 0 ? (
+            <p className="font-body text-sm text-muted-foreground">No activity yet today.</p>
+          ) : (
+            <ul className="space-y-3">
+              {recentActivity.map((a, i) => {
+                const Icon = a.icon;
+                return (
+                  <li key={i} className="flex items-start gap-3">
+                    <span className="shrink-0 w-9 h-9 rounded-lg border border-border/60 bg-card/60 flex items-center justify-center">
+                      <Icon className="h-4 w-4 text-gold" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-body text-sm text-foreground truncate">{a.title}</p>
+                      <p className="font-body text-xs text-muted-foreground truncate">{a.subtitle}</p>
+                    </div>
+                    <span className="font-body text-[10px] text-muted-foreground/80 shrink-0">{a.when}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </LuxuryCard>
+
+        <LuxuryCard className="p-0 overflow-hidden relative min-h-[180px]">
+          <div
+            aria-hidden
+            className="absolute inset-0"
+            style={{
+              background:
+                'linear-gradient(135deg, hsl(var(--teal) / 0.45) 0%, hsl(var(--emerald) / 0.35) 50%, hsl(220 40% 8%) 100%)',
+            }}
+          />
+          <svg aria-hidden viewBox="0 0 400 200" preserveAspectRatio="none"
+            className="absolute inset-0 w-full h-full opacity-40">
+            <path d="M0 140 Q 100 100 200 130 T 400 120 L 400 200 L 0 200 Z" fill="hsl(var(--teal))" />
+            <path d="M0 160 Q 120 130 240 155 T 400 150 L 400 200 L 0 200 Z" fill="hsl(220 40% 6%)" opacity="0.7" />
+          </svg>
+          <div className="relative p-5 h-full flex flex-col justify-end min-h-[180px]">
+            <p className="font-serif-display text-2xl text-foreground leading-tight">Today's Inspiration</p>
+            <p className="font-body text-sm text-foreground/80 mt-2">Breathe in the ocean.</p>
+            <p className="font-body text-sm text-foreground/80">Let hospitality flow naturally.</p>
+          </div>
+        </LuxuryCard>
+      </div>
+
+      {/* ── Quick Access ── */}
+      <LuxuryCard className="p-5 mb-4">
+        <p className="font-body text-[10px] tracking-[0.28em] uppercase text-muted-foreground mb-1">Quick Access</p>
+        <p className="font-body text-xs text-muted-foreground mb-4">Frequently used modules at your fingertips.</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {([
+            { icon: CalendarPlus, label: 'New Reservation', tone: 'gold' },
+            { icon: UserPlus, label: 'Walk-in Guest', tone: 'teal' },
+            { icon: BedDouble, label: 'Room Status', tone: 'emerald' },
+            { icon: Package, label: 'Inventory', tone: 'rose' },
+          ] as const).map(({ icon: Icon, label, tone }) => (
+            <button key={label} type="button"
+              className="group flex flex-col items-center gap-2 p-3 rounded-xl border border-border/50 bg-card/40 hover:border-gold/40 hover:bg-card/60 transition-colors">
+              <span className={
+                tone === 'gold' ? 'w-12 h-12 rounded-xl flex items-center justify-center border border-gold/40 bg-gold/10 text-gold' :
+                tone === 'teal' ? 'w-12 h-12 rounded-xl flex items-center justify-center border border-teal/40 bg-teal/10 text-teal' :
+                tone === 'emerald' ? 'w-12 h-12 rounded-xl flex items-center justify-center border border-emerald/40 bg-emerald/10 text-emerald' :
+                'w-12 h-12 rounded-xl flex items-center justify-center border border-destructive/40 bg-destructive/10 text-destructive'
+              }>
+                <Icon className="h-5 w-5" />
+              </span>
+              <span className="font-body text-xs text-foreground text-center">{label}</span>
+            </button>
+          ))}
+        </div>
+      </LuxuryCard>
+
+      {/* ── System Notice ── */}
+      <div className="luxury-glass rounded-xl px-4 py-3 mb-6 flex items-center gap-3">
+        <Bell className="h-4 w-4 text-gold shrink-0" />
+        <p className="font-body text-xs text-foreground flex-1">
+          <span className="text-gold">System Notice · </span>
+          Night Audit will run automatically at 11:59 PM.
+        </p>
+        <button type="button" className="font-body text-xs text-gold hover:underline flex items-center gap-1 shrink-0">
+          View all <ChevronRight className="h-3 w-3" />
+        </button>
       </div>
 
       {/* ── Current Guests (all occupied rooms) ── */}
