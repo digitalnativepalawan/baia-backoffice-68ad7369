@@ -1033,16 +1033,27 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
         </header>
       )}
 
-      {/* ── Hero stat row — 4 glowing cards ── */}
+      {/* ── Hero stat row — 4 glowing cards (clickable filters) ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-        <LuxuryStatCard glow tone="rose" icon={<BedDouble className="h-4 w-4" />}
-          label="Occupied" value={occupiedUnits.length} delta="Rooms" />
-        <LuxuryStatCard glow tone="gold" icon={<Sparkles className="h-4 w-4" />}
-          label="To Clean" value={toCleanUnits.length} delta="Rooms" />
-        <LuxuryStatCard glow tone="emerald" icon={<CheckCircle className="h-4 w-4" />}
-          label="Ready" value={readyUnits.length} delta="Rooms" />
-        <LuxuryStatCard glow tone="teal" icon={<BarChart3 className="h-4 w-4" />}
-          label="Occupancy" value={`${occPct}%`} delta="Today" />
+        {([
+          { key: 'occupied' as const, tone: 'rose' as const, icon: <BedDouble className="h-4 w-4" />, label: 'Occupied', value: occupiedUnits.length, delta: 'Tap to filter' },
+          { key: 'to_clean' as const, tone: 'gold' as const, icon: <Sparkles className="h-4 w-4" />, label: 'To Clean', value: toCleanUnits.length, delta: 'Tap to filter' },
+          { key: 'ready' as const, tone: 'emerald' as const, icon: <CheckCircle className="h-4 w-4" />, label: 'Ready', value: readyUnits.length, delta: 'Tap to filter' },
+          { key: 'all' as const, tone: 'teal' as const, icon: <BarChart3 className="h-4 w-4" />, label: 'Occupancy', value: `${occPct}%`, delta: 'View all rooms' },
+        ]).map((s) => {
+          const active = statusFilter === s.key;
+          return (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() => handleStatFilter(s.key)}
+              aria-pressed={active}
+              className={`text-left rounded-2xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/60 ${active ? 'ring-2 ring-gold/70 ring-offset-2 ring-offset-background' : ''}`}
+            >
+              <LuxuryStatCard glow tone={s.tone} icon={s.icon} label={s.label} value={s.value} delta={s.delta} />
+            </button>
+          );
+        })}
       </div>
 
       {/* ── Arrivals / Departures / Available strip ── */}
