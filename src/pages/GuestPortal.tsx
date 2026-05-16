@@ -433,6 +433,109 @@ const GuestTile = ({ icon, label, subtitle, onClick }: { icon: React.ReactNode; 
   </button>
 );
 
+/** Hotel info screen — shows resort profile contact + social links */
+const HotelInfoView = ({ profile }: { profile: any }) => (
+  <div className="space-y-4">
+    <h2 className="font-serif-display text-2xl text-foreground">Hotel Information</h2>
+    {profile?.logo_url && (
+      <div className="flex justify-center py-2">
+        <img src={profile.logo_url} alt={profile?.resort_name || 'Logo'} className="w-20 h-20 object-contain" />
+      </div>
+    )}
+    <div className="luxury-glass rounded-2xl p-5 space-y-4">
+      <div>
+        <p className="font-body text-[10px] tracking-[0.28em] uppercase text-gold/80 mb-1">Resort</p>
+        <p className="font-serif-display text-xl text-foreground">{profile?.resort_name || 'BAIA Boutique'}</p>
+        {profile?.tagline && <p className="font-body text-sm text-muted-foreground mt-1">{profile.tagline}</p>}
+      </div>
+      {profile?.address && (
+        <div className="flex items-start gap-3">
+          <MapPinned className="w-4 h-4 text-gold mt-0.5 shrink-0" />
+          <p className="font-body text-sm text-foreground">{profile.address}</p>
+        </div>
+      )}
+      {profile?.phone && (
+        <a href={`tel:${profile.phone}`} className="flex items-center gap-3 hover:text-gold transition-colors">
+          <Phone className="w-4 h-4 text-gold shrink-0" />
+          <span className="font-body text-sm text-foreground">{profile.phone}</span>
+        </a>
+      )}
+      {profile?.email && (
+        <a href={`mailto:${profile.email}`} className="flex items-center gap-3 hover:text-gold transition-colors">
+          <Mail className="w-4 h-4 text-gold shrink-0" />
+          <span className="font-body text-sm text-foreground">{profile.email}</span>
+        </a>
+      )}
+      {profile?.website_url && (
+        <a href={profile.website_url} target="_blank" rel="noreferrer" className="flex items-center gap-3 hover:text-gold transition-colors">
+          <Info className="w-4 h-4 text-gold shrink-0" />
+          <span className="font-body text-sm text-foreground">{profile.website_url}</span>
+        </a>
+      )}
+    </div>
+    {(profile?.facebook_url || profile?.instagram_url || profile?.tiktok_url) && (
+      <div className="flex justify-center gap-3">
+        {profile?.facebook_url && <a href={profile.facebook_url} target="_blank" rel="noreferrer" className="luxury-glass rounded-full px-4 py-2 font-body text-xs text-foreground hover:border-gold/40">Facebook</a>}
+        {profile?.instagram_url && <a href={profile.instagram_url} target="_blank" rel="noreferrer" className="luxury-glass rounded-full px-4 py-2 font-body text-xs text-foreground hover:border-gold/40">Instagram</a>}
+        {profile?.tiktok_url && <a href={profile.tiktok_url} target="_blank" rel="noreferrer" className="luxury-glass rounded-full px-4 py-2 font-body text-xs text-foreground hover:border-gold/40">TikTok</a>}
+      </div>
+    )}
+  </div>
+);
+
+/** Reservation details screen — summary of current stay */
+const ReservationDetailsView = ({ session, booking, onBill }: { session: GuestPortalSession; booking: any; onBill: () => void }) => {
+  const nights = booking?.check_in
+    ? Math.max(1, Math.round((new Date(session.check_out).getTime() - new Date(booking.check_in).getTime()) / 86400000))
+    : 0;
+  return (
+    <div className="space-y-4">
+      <h2 className="font-serif-display text-2xl text-foreground">Your Reservation</h2>
+      <div className="luxury-glass rounded-2xl p-5 space-y-4">
+        <div>
+          <p className="font-body text-[10px] tracking-[0.28em] uppercase text-gold/80 mb-1">Room</p>
+          <p className="font-serif-display text-xl text-foreground">{session.room_name}</p>
+          <p className="font-body text-xs text-muted-foreground">Guest · {session.guest_name}</p>
+        </div>
+        <div className="grid grid-cols-2 gap-4 border-t border-border/40 pt-4">
+          <div>
+            <p className="font-body text-[10px] tracking-[0.22em] uppercase text-muted-foreground">Check-In</p>
+            <p className="font-serif-display text-base text-foreground mt-1">
+              {booking?.check_in ? new Date(booking.check_in + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+            </p>
+            <p className="font-body text-[10px] text-muted-foreground">3:00 PM</p>
+          </div>
+          <div>
+            <p className="font-body text-[10px] tracking-[0.22em] uppercase text-muted-foreground">Check-Out</p>
+            <p className="font-serif-display text-base text-foreground mt-1">
+              {new Date(session.check_out + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            </p>
+            <p className="font-body text-[10px] text-muted-foreground">11:00 AM</p>
+          </div>
+        </div>
+        <div className="border-t border-border/40 pt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm">
+          <span className="font-body text-foreground flex items-center gap-1.5">
+            <Users className="w-3.5 h-3.5 text-muted-foreground" />
+            {booking?.adults ?? 1} Adult{(booking?.adults ?? 1) !== 1 ? 's' : ''}
+            {booking?.children ? `, ${booking.children} Child${booking.children !== 1 ? 'ren' : ''}` : ''}
+          </span>
+          {nights > 0 && (
+            <span className="font-body text-foreground flex items-center gap-1.5">
+              <Moon className="w-3.5 h-3.5 text-muted-foreground" /> {nights} Night{nights !== 1 ? 's' : ''}
+            </span>
+          )}
+          {booking?.platform && (
+            <span className="font-body text-muted-foreground">Booked via {booking.platform}</span>
+          )}
+        </div>
+      </div>
+      <button onClick={onBill} className="w-full luxury-glass rounded-xl py-3 font-display text-xs tracking-[0.2em] uppercase text-gold hover:border-gold/40 transition-colors min-h-[44px] flex items-center justify-center gap-2">
+        <Receipt className="w-4 h-4" /> View My Bill
+      </button>
+    </div>
+  );
+};
+
 /** Simple message-to-reception flow */
 const MessageReceptionView = ({ session, qc, onDone }: { session: GuestPortalSession; qc: any; onDone: () => void }) => {
   const [message, setMessage] = useState('');
