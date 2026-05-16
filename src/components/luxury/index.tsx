@@ -87,6 +87,7 @@ interface StatProps {
   value: ReactNode;
   delta?: string;
   tone?: 'gold' | 'emerald' | 'teal' | 'rose' | 'neutral';
+  glow?: boolean;
   className?: string;
 }
 const toneMap: Record<NonNullable<StatProps['tone']>, string> = {
@@ -96,10 +97,24 @@ const toneMap: Record<NonNullable<StatProps['tone']>, string> = {
   rose:    'text-destructive border-destructive/30 bg-destructive/5',
   neutral: 'text-foreground border-border/60 bg-card/60',
 };
+const glowMap: Record<NonNullable<StatProps['tone']>, string> = {
+  gold:    'luxury-stat-glow-gold border-gold/50',
+  emerald: 'luxury-stat-glow-emerald border-emerald/50',
+  teal:    'luxury-stat-glow-teal border-teal/50',
+  rose:    'luxury-stat-glow-rose border-destructive/50',
+  neutral: '',
+};
+const valueToneMap: Record<NonNullable<StatProps['tone']>, string> = {
+  gold:    'text-gold',
+  emerald: 'text-emerald',
+  teal:    'text-teal',
+  rose:    'text-destructive',
+  neutral: 'text-foreground',
+};
 export const LuxuryStatCard = ({
-  icon, label, value, delta, tone = 'neutral', className,
+  icon, label, value, delta, tone = 'neutral', glow = false, className,
 }: StatProps) => (
-  <LuxuryCard className={cn('p-4 sm:p-5 overflow-hidden', className)}>
+  <LuxuryCard className={cn('p-4 sm:p-5 overflow-hidden', glow && glowMap[tone], className)}>
     <div className="flex items-start justify-between gap-3 mb-3">
       <p className="font-body text-[10px] tracking-[0.22em] uppercase text-muted-foreground">
         {label}
@@ -113,7 +128,10 @@ export const LuxuryStatCard = ({
         </span>
       )}
     </div>
-    <p className="font-serif-display text-3xl sm:text-4xl text-foreground leading-none tabular-nums">
+    <p className={cn(
+      'font-serif-display text-3xl sm:text-4xl leading-none tabular-nums',
+      glow ? valueToneMap[tone] : 'text-foreground',
+    )}>
       {value}
     </p>
     {delta && (
