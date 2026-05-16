@@ -124,15 +124,29 @@ const ServiceModePage = () => {
   }, [orders]);
 
   return (
-    <div className="min-h-screen bg-navy-texture flex flex-col">
-      <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl border-b border-border/50">
+    <div className="min-h-screen bg-background flex flex-col relative">
+      {/* Ambient gradient */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 -z-10"
+        style={{
+          background:
+            'radial-gradient(ellipse 90% 50% at 50% -10%, hsl(var(--gold) / 0.10), transparent 60%),' +
+            'radial-gradient(ellipse 70% 50% at 100% 100%, hsl(var(--teal) / 0.08), transparent 70%),' +
+            'linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--navy-deep)) 100%)',
+        }}
+      />
+      <header className="sticky top-0 z-30 luxury-glass border-b border-border/40">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => { const s = getStaffSession(); navigate(s?.isAdmin ? '/admin' : getHomeRoute(s?.permissions || [])); }} className="w-10 h-10 text-muted-foreground hover:text-foreground">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div className="flex items-center gap-2.5 flex-1">
             <LayoutGrid className="w-5 h-5 text-gold" />
-            <h1 className="font-display text-lg tracking-[0.12em] text-foreground">Service Mode</h1>
+            <div>
+              <p className="font-body text-[9px] tracking-[0.3em] uppercase text-gold/80 leading-none mb-0.5">Choose</p>
+              <h1 className="font-serif-display text-xl text-foreground leading-tight">Service Mode</h1>
+            </div>
           </div>
           {staffName && (
             <span className="font-body text-xs text-muted-foreground truncate max-w-[120px]">{staffName}</span>
@@ -142,8 +156,8 @@ const ServiceModePage = () => {
 
       <div className="flex-1 flex items-center justify-center px-4 py-8">
         <div className="w-full max-w-lg space-y-4">
-          <p className="font-body text-sm text-muted-foreground text-center mb-2">
-            Select a department to open its live board
+          <p className="font-body text-[10px] tracking-[0.3em] uppercase text-muted-foreground text-center mb-2">
+            Focus on what matters right now
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {visibleDepartments.map(dept => {
