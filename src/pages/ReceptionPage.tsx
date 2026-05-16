@@ -1196,13 +1196,14 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
         <p className="font-body text-xs text-muted-foreground mb-4">Frequently used modules at your fingertips.</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {([
-            { icon: CalendarPlus, label: 'New Reservation', tone: 'gold' },
-            { icon: UserPlus, label: 'Walk-in Guest', tone: 'teal' },
-            { icon: BedDouble, label: 'Room Status', tone: 'emerald' },
-            { icon: Package, label: 'Inventory', tone: 'rose' },
-          ] as const).map(({ icon: Icon, label, tone }) => (
+            { icon: CalendarPlus, label: 'New Reservation', tone: 'gold', action: 'reservation' as const },
+            { icon: UserPlus, label: 'Walk-in Guest', tone: 'teal', action: 'walkin' as const },
+            { icon: BedDouble, label: 'Room Status', tone: 'emerald', action: 'rooms' as const },
+            { icon: Package, label: 'Inventory', tone: 'rose', action: 'inventory' as const },
+          ] as const).map(({ icon: Icon, label, tone, action }) => (
             <button key={label} type="button"
-              className="group flex flex-col items-center gap-2 p-3 rounded-xl border border-border/50 bg-card/40 hover:border-gold/40 hover:bg-card/60 transition-colors">
+              onClick={() => handleQuickAccess(action)}
+              className="group flex flex-col items-center gap-2 p-3 rounded-xl border border-border/50 bg-card/40 hover:border-gold/40 hover:bg-card/60 transition-colors min-h-[88px] focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/60">
               <span className={
                 tone === 'gold' ? 'w-12 h-12 rounded-xl flex items-center justify-center border border-gold/40 bg-gold/10 text-gold' :
                 tone === 'teal' ? 'w-12 h-12 rounded-xl flex items-center justify-center border border-teal/40 bg-teal/10 text-teal' :
