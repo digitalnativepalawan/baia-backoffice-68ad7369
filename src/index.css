@@ -69,37 +69,37 @@
 
   /* ── Dark mode ── */
   .dark {
-    --background: 220 30% 12%;
-    --foreground: 40 30% 88%;
+    --background: 220 40% 7%;
+    --foreground: 40 30% 92%;
 
-    --card: 220 28% 16%;
-    --card-foreground: 40 30% 88%;
+    --card: 220 32% 11%;
+    --card-foreground: 40 30% 92%;
 
-    --popover: 220 28% 14%;
-    --popover-foreground: 40 30% 88%;
+    --popover: 220 35% 9%;
+    --popover-foreground: 40 30% 92%;
 
-    --primary: 40 30% 82%;
-    --primary-foreground: 220 30% 12%;
+    --primary: 38 55% 70%;
+    --primary-foreground: 220 40% 8%;
 
-    --secondary: 220 20% 22%;
-    --secondary-foreground: 40 30% 88%;
+    --secondary: 220 25% 17%;
+    --secondary-foreground: 40 30% 92%;
 
-    --muted: 220 20% 20%;
-    --muted-foreground: 40 15% 60%;
+    --muted: 220 22% 15%;
+    --muted-foreground: 40 15% 65%;
 
-    --accent: 35 40% 70%;
-    --accent-foreground: 220 30% 12%;
+    --accent: 38 55% 65%;
+    --accent-foreground: 220 40% 8%;
 
     --destructive: 0 62.8% 50%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 220 30% 12%;
-    --success: 142 71% 45%;
-    --success-foreground: 220 30% 12%;
+    --warning: 38 92% 55%;
+    --warning-foreground: 220 40% 8%;
+    --success: 158 50% 45%;
+    --success-foreground: 220 40% 8%;
     --destructive-foreground: 40 30% 95%;
 
-    --border: 220 15% 25%;
-    --input: 220 15% 25%;
-    --ring: 40 30% 70%;
+    --border: 220 20% 20%;
+    --input: 220 20% 20%;
+    --ring: 38 55% 65%;
 
     --sidebar-background: 220 30% 10%;
     --sidebar-foreground: 40 30% 88%;
