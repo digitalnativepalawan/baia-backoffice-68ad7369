@@ -27,6 +27,7 @@ import { canEdit, canManage, hasAccess } from '@/lib/permissions';
 import { resolveOperationalUnitWorkflow } from '@/lib/receptionOccupancy';
 import ReceptionCalendar from '@/components/reception/ReceptionCalendar';
 import RoomBillingTab from '@/components/rooms/RoomBillingTab';
+import { LuxuryShell, LuxuryHeader, LuxuryStatCard, LuxuryCard } from '@/components/luxury';
 import type { BookingWithGuest, ResortUnit } from '@/components/reception/calendarUtils';
 
 /** Get current Manila date string (YYYY-MM-DD) */
@@ -956,57 +957,35 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
   const totalPayments = Math.abs(payments.reduce((s, t) => s + t.total_amount, 0));
   const balance = totalCharges - totalPayments;
 
-  return (
-    <div className={embedded ? 'space-y-4' : 'min-h-screen bg-navy-texture p-4 max-w-2xl mx-auto'}>
+  const inner = (
+    <>
       {!embedded && (
-        <div className="flex items-center gap-3 mb-6">
-          <Button size="sm" variant="ghost" onClick={() => navigate('/')}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <div className="flex-1">
-            <h1 className="font-display text-xl tracking-wider text-foreground">Reception</h1>
-            <p className="font-body text-xs text-muted-foreground">{manilaTime}</p>
-          </div>
-          <div className="text-right">
-            <p className="font-display text-sm text-foreground tracking-wider">🇵🇭 Manila</p>
-            <p className="font-body text-[10px] text-muted-foreground">UTC+8</p>
-          </div>
-        </div>
+        <LuxuryHeader
+          eyebrow="Front Desk"
+          greeting="Reception"
+          meta={manilaTime}
+          right={
+            <div className="text-right">
+              <p className="font-display text-sm text-gold tracking-wider">🇵🇭 Manila</p>
+              <p className="font-body text-[10px] text-muted-foreground">UTC+8</p>
+            </div>
+          }
+          className="mb-5"
+        />
       )}
 
-      {/* ── Summary ── */}
+      {/* ── Occupancy summary ── */}
       <div className="grid grid-cols-3 gap-2 mb-4">
-        <div className="border border-red-500/30 bg-red-500/10 rounded-lg p-3 text-center">
-          <p className="font-display text-2xl text-red-400">{occupiedUnits.length}</p>
-          <p className="font-body text-xs text-red-400/70">Occupied</p>
-        </div>
-        <div className="border border-amber-500/30 bg-amber-500/10 rounded-lg p-3 text-center">
-          <p className="font-display text-2xl text-amber-400">{toCleanUnits.length}</p>
-          <p className="font-body text-xs text-amber-400/70">To Clean</p>
-        </div>
-        <div className="border border-emerald-500/30 bg-emerald-500/10 rounded-lg p-3 text-center">
-          <p className="font-display text-2xl text-emerald-400">{readyUnits.length}</p>
-          <p className="font-body text-xs text-emerald-400/70">Ready</p>
-        </div>
+        <LuxuryStatCard tone="rose" label="Occupied" value={occupiedUnits.length} className="p-3" />
+        <LuxuryStatCard tone="gold" label="To Clean" value={toCleanUnits.length} className="p-3" />
+        <LuxuryStatCard tone="emerald" label="Ready" value={readyUnits.length} className="p-3" />
       </div>
 
       <div className="grid grid-cols-4 gap-2 mb-6">
-        <div className="border border-border rounded-lg p-3 text-center">
-          <p className="font-display text-2xl text-foreground">{todayArrivals.length}</p>
-          <p className="font-body text-xs text-muted-foreground">Arrivals</p>
-        </div>
-        <div className="border border-border rounded-lg p-3 text-center">
-          <p className="font-display text-2xl text-foreground">{todayDepartures.length}</p>
-          <p className="font-body text-xs text-muted-foreground">Departures</p>
-        </div>
-        <div className="border border-emerald-500/30 bg-emerald-500/10 rounded-lg p-3 text-center">
-          <p className="font-display text-2xl text-emerald-400">{trulyAvailableUnits.length}</p>
-          <p className="font-body text-xs text-emerald-400/70">Available</p>
-        </div>
-        <div className="border border-blue-500/30 bg-blue-500/10 rounded-lg p-3 text-center">
-          <p className="font-display text-2xl text-blue-400">{weekArrivals.length}</p>
-          <p className="font-body text-xs text-blue-400/70">Week</p>
-        </div>
+        <LuxuryStatCard tone="neutral" label="Arrivals" value={todayArrivals.length} className="p-3" />
+        <LuxuryStatCard tone="neutral" label="Departures" value={todayDepartures.length} className="p-3" />
+        <LuxuryStatCard tone="emerald" label="Available" value={trulyAvailableUnits.length} className="p-3" />
+        <LuxuryStatCard tone="teal" label="Week" value={weekArrivals.length} className="p-3" />
       </div>
 
       {/* ── Current Guests (all occupied rooms) ── */}
