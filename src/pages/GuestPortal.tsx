@@ -143,7 +143,18 @@ const GuestPortal = () => {
   }
 
   return (
-    <div className="min-h-screen bg-navy-texture">
+    <div className="min-h-screen bg-background relative">
+      {/* Ambient gradient layer */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 -z-10"
+        style={{
+          background:
+            'radial-gradient(ellipse 90% 55% at 50% -10%, hsl(var(--gold) / 0.12), transparent 60%),' +
+            'radial-gradient(ellipse 70% 50% at 100% 100%, hsl(var(--teal) / 0.10), transparent 70%),' +
+            'linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--navy-deep)) 100%)',
+        }}
+      />
       <div className="max-w-lg mx-auto px-4 py-6">
         {view !== 'dashboard' ? (
           <button onClick={() => setView('dashboard')} className="flex items-center gap-1 text-muted-foreground hover:text-foreground font-body text-sm mb-4">
@@ -151,13 +162,15 @@ const GuestPortal = () => {
           </button>
         ) : (
           <>
-            {/* Welcome header */}
-            <div className="bg-card border border-border rounded-lg p-5 mb-6">
-              <p className="font-display text-xl text-foreground">Welcome, {session.guest_name.split(' ')[0]}!</p>
-              <p className="font-body text-sm text-muted-foreground mt-1">{session.room_name} · Check-out: {new Date(session.check_out).toLocaleDateString()}</p>
+            {/* Welcome header — luxury glass */}
+            <div className="luxury-glass rounded-2xl p-6 mb-6 relative overflow-hidden">
+              <div className="absolute -top-12 -right-12 w-40 h-40 rounded-full bg-gold/10 blur-3xl pointer-events-none" />
+              <p className="font-body text-[10px] tracking-[0.3em] uppercase text-gold/80 mb-1">Welcome back</p>
+              <p className="font-serif-display text-3xl text-foreground">{session.guest_name.split(' ')[0]}</p>
+              <p className="font-body text-sm text-muted-foreground mt-2">{session.room_name} · Check-out {new Date(session.check_out).toLocaleDateString()}</p>
             </div>
 
-            <p className="font-display text-sm tracking-wider text-muted-foreground mb-4">What can we help with?</p>
+            <p className="font-body text-[10px] tracking-[0.3em] uppercase text-gold/80 mb-3">How can we help today?</p>
 
             {/* 5 large concierge tiles — stacked on mobile */}
             <div className="flex flex-col gap-3 mb-6">
