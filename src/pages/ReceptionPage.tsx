@@ -2012,7 +2012,7 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
 
   return (
     <LuxuryShell>
-      <div className="p-4 max-w-2xl mx-auto">{inner}</div>
+      <div className="p-4 max-w-2xl md:max-w-5xl mx-auto">{inner}</div>
     </LuxuryShell>
   );
 };
