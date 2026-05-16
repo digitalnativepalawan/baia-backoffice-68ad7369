@@ -2093,13 +2093,15 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
 
       {/* ─── BOOKING CALENDAR ─── */}
       <Separator className="my-6" />
-      <ReceptionCalendar
-        bookings={bookings as BookingWithGuest[]}
-        rooms={resortUnits as ResortUnit[]}
-        units={units as any[]}
-        canEdit={canDoEdit}
-        canManage={canDoManage}
-      />
+      <div id="reception-calendar" className="scroll-mt-4">
+        <ReceptionCalendar
+          bookings={bookings as BookingWithGuest[]}
+          rooms={resortUnits as ResortUnit[]}
+          units={units as any[]}
+          canEdit={canDoEdit}
+          canManage={canDoManage}
+        />
+      </div>
     </>
   );
 
