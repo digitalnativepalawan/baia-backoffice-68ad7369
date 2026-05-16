@@ -1227,7 +1227,7 @@ const AdminPage = () => {
         </DialogContent>
       </Dialog>
       <HermesAdminPanel />
-    </div>
+    </LuxuryShell>
   );
 };
 
