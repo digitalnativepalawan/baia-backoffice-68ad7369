@@ -1796,7 +1796,17 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
         canEdit={canDoEdit}
         canManage={canDoManage}
       />
-    </div>
+    </>
+  );
+
+  if (embedded) {
+    return <div className="space-y-4">{inner}</div>;
+  }
+
+  return (
+    <LuxuryShell>
+      <div className="p-4 max-w-2xl mx-auto">{inner}</div>
+    </LuxuryShell>
   );
 };
 
