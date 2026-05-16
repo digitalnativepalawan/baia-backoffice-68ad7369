@@ -136,6 +136,29 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
   // Room detail sheet state
   const [detailUnit, setDetailUnit] = useState<any>(null);
   const [detailSheetOpen, setDetailSheetOpen] = useState(false);
+
+  // Hero stat-card → room filter
+  const [statusFilter, setStatusFilter] = useState<null | 'occupied' | 'to_clean' | 'ready' | 'all'>(null);
+
+  const scrollToId = (id: string) => {
+    requestAnimationFrame(() => {
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+  const handleQuickAccess = (action: 'reservation' | 'walkin' | 'rooms' | 'inventory') => {
+    if (action === 'reservation') return scrollToId('reception-calendar');
+    if (action === 'walkin') return scrollToId('walk-in-section');
+    if (action === 'rooms') return scrollToId('current-guests-section');
+    if (action === 'inventory') {
+      if (isAdmin) navigate('/admin');
+      else toast.info('Inventory is available to admins.');
+    }
+  };
+  const handleStatFilter = (key: 'occupied' | 'to_clean' | 'ready' | 'all') => {
+    setStatusFilter((prev) => (prev === key ? null : key));
+    scrollToId('filtered-rooms-section');
+  };
   const hasDocAccess = isAdmin || hasAccess(perms, 'documents');
   const { data: paymentMethods = [] } = usePaymentMethods();
 
@@ -1010,16 +1033,27 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
         </header>
       )}
 
-      {/* ── Hero stat row — 4 glowing cards ── */}
+      {/* ── Hero stat row — 4 glowing cards (clickable filters) ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-        <LuxuryStatCard glow tone="rose" icon={<BedDouble className="h-4 w-4" />}
-          label="Occupied" value={occupiedUnits.length} delta="Rooms" />
-        <LuxuryStatCard glow tone="gold" icon={<Sparkles className="h-4 w-4" />}
-          label="To Clean" value={toCleanUnits.length} delta="Rooms" />
-        <LuxuryStatCard glow tone="emerald" icon={<CheckCircle className="h-4 w-4" />}
-          label="Ready" value={readyUnits.length} delta="Rooms" />
-        <LuxuryStatCard glow tone="teal" icon={<BarChart3 className="h-4 w-4" />}
-          label="Occupancy" value={`${occPct}%`} delta="Today" />
+        {([
+          { key: 'occupied' as const, tone: 'rose' as const, icon: <BedDouble className="h-4 w-4" />, label: 'Occupied', value: occupiedUnits.length, delta: 'Tap to filter' },
+          { key: 'to_clean' as const, tone: 'gold' as const, icon: <Sparkles className="h-4 w-4" />, label: 'To Clean', value: toCleanUnits.length, delta: 'Tap to filter' },
+          { key: 'ready' as const, tone: 'emerald' as const, icon: <CheckCircle className="h-4 w-4" />, label: 'Ready', value: readyUnits.length, delta: 'Tap to filter' },
+          { key: 'all' as const, tone: 'teal' as const, icon: <BarChart3 className="h-4 w-4" />, label: 'Occupancy', value: `${occPct}%`, delta: 'View all rooms' },
+        ]).map((s) => {
+          const active = statusFilter === s.key;
+          return (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() => handleStatFilter(s.key)}
+              aria-pressed={active}
+              className={`text-left rounded-2xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/60 ${active ? 'ring-2 ring-gold/70 ring-offset-2 ring-offset-background' : ''}`}
+            >
+              <LuxuryStatCard glow tone={s.tone} icon={s.icon} label={s.label} value={s.value} delta={s.delta} />
+            </button>
+          );
+        })}
       </div>
 
       {/* ── Arrivals / Departures / Available strip ── */}
@@ -1162,13 +1196,14 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
         <p className="font-body text-xs text-muted-foreground mb-4">Frequently used modules at your fingertips.</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {([
-            { icon: CalendarPlus, label: 'New Reservation', tone: 'gold' },
-            { icon: UserPlus, label: 'Walk-in Guest', tone: 'teal' },
-            { icon: BedDouble, label: 'Room Status', tone: 'emerald' },
-            { icon: Package, label: 'Inventory', tone: 'rose' },
-          ] as const).map(({ icon: Icon, label, tone }) => (
+            { icon: CalendarPlus, label: 'New Reservation', tone: 'gold', action: 'reservation' as const },
+            { icon: UserPlus, label: 'Walk-in Guest', tone: 'teal', action: 'walkin' as const },
+            { icon: BedDouble, label: 'Room Status', tone: 'emerald', action: 'rooms' as const },
+            { icon: Package, label: 'Inventory', tone: 'rose', action: 'inventory' as const },
+          ] as const).map(({ icon: Icon, label, tone, action }) => (
             <button key={label} type="button"
-              className="group flex flex-col items-center gap-2 p-3 rounded-xl border border-border/50 bg-card/40 hover:border-gold/40 hover:bg-card/60 transition-colors">
+              onClick={() => handleQuickAccess(action)}
+              className="group flex flex-col items-center gap-2 p-3 rounded-xl border border-border/50 bg-card/40 hover:border-gold/40 hover:bg-card/60 transition-colors min-h-[88px] focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/60">
               <span className={
                 tone === 'gold' ? 'w-12 h-12 rounded-xl flex items-center justify-center border border-gold/40 bg-gold/10 text-gold' :
                 tone === 'teal' ? 'w-12 h-12 rounded-xl flex items-center justify-center border border-teal/40 bg-teal/10 text-teal' :
@@ -1195,9 +1230,71 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
         </button>
       </div>
 
+      {/* ── Filtered Rooms (from stat-card tap) ── */}
+      <div id="filtered-rooms-section" className="scroll-mt-4">
+        {statusFilter && (() => {
+          const filtered =
+            statusFilter === 'occupied' ? occupiedUnits :
+            statusFilter === 'to_clean' ? toCleanUnits :
+            statusFilter === 'ready' ? readyUnits :
+            units;
+          const titleMap = { occupied: 'Occupied Rooms', to_clean: 'To Clean', ready: 'Ready Rooms', all: 'All Rooms' } as const;
+          const toneMap = { occupied: 'text-destructive', to_clean: 'text-gold', ready: 'text-emerald', all: 'text-teal' } as const;
+          return (
+            <LuxuryCard className="p-5 mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <p className="font-body text-[10px] tracking-[0.28em] uppercase text-muted-foreground">Filtered View</p>
+                  <h2 className={`font-serif-display text-xl ${toneMap[statusFilter]}`}>
+                    {titleMap[statusFilter]} <span className="text-muted-foreground tabular-nums">({filtered.length})</span>
+                  </h2>
+                </div>
+                <button type="button" onClick={() => setStatusFilter(null)}
+                  className="font-body text-xs text-muted-foreground hover:text-foreground underline-offset-4 hover:underline">
+                  Clear filter
+                </button>
+              </div>
+              {filtered.length === 0 ? (
+                <p className="font-body text-sm text-muted-foreground">No rooms in this category.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {filtered.map((unit: any) => {
+                    const s = getUnitStatus(unit);
+                    const booking = getActiveBooking(unit);
+                    const guest = (booking as any)?.resort_ops_guests;
+                    const tone =
+                      s === 'occupied' ? 'border-destructive/40 bg-destructive/5' :
+                      s === 'to_clean' ? 'border-gold/40 bg-gold/5' :
+                      'border-emerald/40 bg-emerald/5';
+                    const dot =
+                      s === 'occupied' ? 'bg-destructive' :
+                      s === 'to_clean' ? 'bg-gold' : 'bg-emerald';
+                    return (
+                      <button key={unit.id} type="button"
+                        onClick={() => { setDetailUnit(unit); setDetailSheetOpen(true); }}
+                        className={`text-left rounded-xl border p-3 hover:brightness-110 transition-all min-h-[72px] ${tone}`}>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-display text-sm text-foreground tracking-wider truncate">{unit.name}</p>
+                          <span className={`w-2 h-2 rounded-full ${dot} shrink-0`} />
+                        </div>
+                        <p className="font-body text-xs text-muted-foreground mt-1 truncate">
+                          {s === 'occupied' && (guest?.full_name || 'Guest')}
+                          {s === 'to_clean' && 'Awaiting cleaning'}
+                          {s === 'ready' && (getUpcomingBooking(unit)?.resort_ops_guests?.full_name ? `Next: ${getUpcomingBooking(unit)?.resort_ops_guests?.full_name}` : 'Available')}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </LuxuryCard>
+          );
+        })()}
+      </div>
+
       {/* ── Current Guests (all occupied rooms) ── */}
       {occupiedUnits.length > 0 && (
-        <div className="mb-6 space-y-2">
+        <div id="current-guests-section" className="mb-6 space-y-2 scroll-mt-4">
           <h2 className="font-display text-xs tracking-wider text-foreground uppercase">🏨 Current Guests ({occupiedUnits.length})</h2>
           {occupiedUnits.map((unit: any) => {
             const booking = getActiveBooking(unit);
@@ -1370,7 +1467,7 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
       )}
 
       {readyUnits.length > 0 && (
-        <div className="mb-6 space-y-2">
+        <div id="walk-in-section" className="mb-6 space-y-2 scroll-mt-4">
           <div className="flex justify-between items-center">
             <h2 className="font-display text-xs tracking-wider text-foreground uppercase">Walk-In / Sell Room ({trulyAvailableUnits.length} available)</h2>
           </div>
@@ -1996,13 +2093,15 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
 
       {/* ─── BOOKING CALENDAR ─── */}
       <Separator className="my-6" />
-      <ReceptionCalendar
-        bookings={bookings as BookingWithGuest[]}
-        rooms={resortUnits as ResortUnit[]}
-        units={units as any[]}
-        canEdit={canDoEdit}
-        canManage={canDoManage}
-      />
+      <div id="reception-calendar" className="scroll-mt-4">
+        <ReceptionCalendar
+          bookings={bookings as BookingWithGuest[]}
+          rooms={resortUnits as ResortUnit[]}
+          units={units as any[]}
+          canEdit={canDoEdit}
+          canManage={canDoManage}
+        />
+      </div>
     </>
   );
 
