@@ -136,6 +136,29 @@ const ReceptionPage = ({ embedded = false }: { embedded?: boolean }) => {
   // Room detail sheet state
   const [detailUnit, setDetailUnit] = useState<any>(null);
   const [detailSheetOpen, setDetailSheetOpen] = useState(false);
+
+  // Hero stat-card → room filter
+  const [statusFilter, setStatusFilter] = useState<null | 'occupied' | 'to_clean' | 'ready' | 'all'>(null);
+
+  const scrollToId = (id: string) => {
+    requestAnimationFrame(() => {
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+  const handleQuickAccess = (action: 'reservation' | 'walkin' | 'rooms' | 'inventory') => {
+    if (action === 'reservation') return scrollToId('reception-calendar');
+    if (action === 'walkin') return scrollToId('walk-in-section');
+    if (action === 'rooms') return scrollToId('current-guests-section');
+    if (action === 'inventory') {
+      if (isAdmin) navigate('/admin');
+      else toast.info('Inventory is available to admins.');
+    }
+  };
+  const handleStatFilter = (key: 'occupied' | 'to_clean' | 'ready' | 'all') => {
+    setStatusFilter((prev) => (prev === key ? null : key));
+    scrollToId('filtered-rooms-section');
+  };
   const hasDocAccess = isAdmin || hasAccess(perms, 'documents');
   const { data: paymentMethods = [] } = usePaymentMethods();
 
