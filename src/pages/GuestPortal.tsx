@@ -117,6 +117,38 @@ const GuestPortal = () => {
     setView('dashboard');
   };
 
+  // Booking details for Upcoming Stay card (adults, children, check_in)
+  const { data: bookingDetails } = useQuery({
+    queryKey: ['guest-portal-booking', session?.booking_id],
+    queryFn: async () => {
+      if (!session) return null;
+      const { data } = await supabase
+        .from('resort_ops_bookings')
+        .select('check_in, check_out, adults, children, platform')
+        .eq('id', session.booking_id)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!session,
+  });
+
+  // Notification badge: open requests + active orders for this booking
+  const { data: notifCount = 0 } = useQuery({
+    queryKey: ['guest-portal-notifs', session?.booking_id],
+    queryFn: async () => {
+      if (!session) return 0;
+      const [reqs, orders] = await Promise.all([
+        supabase.from('guest_requests').select('id', { count: 'exact', head: true })
+          .eq('booking_id', session.booking_id).in('status', ['pending', 'in_progress']),
+        supabase.from('orders').select('id', { count: 'exact', head: true })
+          .eq('room_id', session.room_id).in('status', ['New', 'Preparing', 'Ready']),
+      ]);
+      return (reqs.count || 0) + (orders.count || 0);
+    },
+    enabled: !!session,
+    refetchInterval: 15000,
+  });
+
   if (!session) {
     return (
       <div className="min-h-screen bg-navy-texture flex flex-col items-center justify-center px-6">
