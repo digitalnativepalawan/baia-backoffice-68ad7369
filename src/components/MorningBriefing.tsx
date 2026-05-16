@@ -258,35 +258,39 @@ const MorningBriefing = () => {
     : {};
 
   return (
-    <Card className="border-primary/20 bg-primary/5 mb-4">
-      <CardContent className="p-4">
+    <Card className="border-gold/20 bg-card/60 backdrop-blur-xl mb-4 luxury-shadow overflow-hidden relative">
+      <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-gold/10 blur-3xl pointer-events-none" />
+      <CardContent className="p-5">
         {/* Header */}
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Sun className="h-5 w-5 text-primary" />
-            <h2 className="font-display text-sm font-semibold tracking-wide text-foreground">
-              Morning Briefing
-            </h2>
+            <Sun className="h-5 w-5 text-gold" />
+            <div>
+              <p className="font-body text-[10px] tracking-[0.28em] uppercase text-gold/80">Today</p>
+              <h2 className="font-serif-display text-xl text-foreground leading-tight">
+                Morning Briefing
+              </h2>
+            </div>
           </div>
-          <span className="text-[11px] text-muted-foreground">
-            Updated: {getManilaTimeStr()}
+          <span className="text-[10px] tracking-widest uppercase text-muted-foreground">
+            {getManilaTimeStr()}
           </span>
         </div>
 
-        {/* Stats grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+        {/* Stats grid — luxury tiles */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
           {statsDef.map((s) => (
             <div
               key={s.key}
-              className="flex items-center gap-2 rounded-md bg-background/60 border border-border/50 px-3 py-2"
+              className="relative rounded-xl bg-background/40 border border-border/50 px-3 py-3 hover:border-gold/30 transition-colors"
             >
-              <s.icon className="h-4 w-4 shrink-0 text-muted-foreground" />
-              <div className="min-w-0">
-                <p className="text-[11px] text-muted-foreground truncate">{s.label}</p>
-                <p className="text-sm font-semibold text-foreground">
-                  {isLoading ? '…' : values[s.key] ?? '–'}
-                </p>
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-[9px] tracking-[0.18em] uppercase text-muted-foreground truncate">{s.label}</p>
+                <s.icon className="h-3.5 w-3.5 shrink-0 text-gold/60" />
               </div>
+              <p className="font-serif-display text-2xl text-foreground leading-none tabular-nums">
+                {isLoading ? '…' : values[s.key] ?? '–'}
+              </p>
             </div>
           ))}
         </div>

@@ -15,6 +15,7 @@ export default {
     extend: {
       fontFamily: {
         display: ['"Playfair Display"', 'serif'],
+        serif: ['"Cormorant Garamond"', '"Playfair Display"', 'serif'],
         body: ['"Lato"', 'sans-serif'],
       },
       colors: {
@@ -59,6 +60,9 @@ export default {
           dim: "hsl(var(--cream-dim))",
         },
         gold: "hsl(var(--gold))",
+        champagne: "hsl(var(--champagne))",
+        emerald: "hsl(var(--emerald))",
+        teal: "hsl(var(--teal))",
         warning: {
           DEFAULT: "hsl(var(--warning))",
           foreground: "hsl(var(--warning-foreground))",

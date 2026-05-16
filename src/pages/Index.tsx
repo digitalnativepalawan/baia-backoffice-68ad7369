@@ -78,55 +78,106 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-navy-texture flex flex-col items-center justify-center px-6 relative">
+    <div className="min-h-screen relative overflow-hidden flex flex-col items-center justify-center px-6 py-10 bg-background">
+      {/* Ambient layered gradient backdrop */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10"
+        style={{
+          background:
+            'radial-gradient(ellipse 90% 60% at 50% -10%, hsl(var(--gold) / 0.18), transparent 60%),' +
+            'radial-gradient(ellipse 70% 60% at 80% 110%, hsl(var(--teal) / 0.18), transparent 60%),' +
+            'radial-gradient(ellipse 60% 50% at 0% 60%, hsl(var(--emerald) / 0.10), transparent 70%),' +
+            'linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--navy-deep)) 100%)',
+        }}
+      />
+      {/* Subtle starlight texture */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10 opacity-[0.04]"
+        style={{
+          backgroundImage:
+            'radial-gradient(circle at 20% 30%, white 1px, transparent 1px), radial-gradient(circle at 70% 80%, white 1px, transparent 1px), radial-gradient(circle at 40% 70%, white 1px, transparent 1px)',
+          backgroundSize: '180px 180px, 240px 240px, 300px 300px',
+        }}
+      />
+
       <div className="absolute top-4 right-4">
         <ThemeToggle />
       </div>
+
       {profile?.logo_url && (
-        <div className="mb-6" style={{ width: logoSize, height: logoSize }}>
+        <div className="mb-6 animate-fade-in" style={{ width: logoSize, height: logoSize }}>
           <img
             src={profile.logo_url}
             alt={profile.resort_name || 'Resort logo'}
-            className="w-full h-full object-contain"
+            className="w-full h-full object-contain drop-shadow-[0_0_24px_hsl(var(--gold)/0.25)]"
           />
         </div>
       )}
 
       {profile?.resort_name && (
-        <h1 className="font-display text-4xl md:text-5xl tracking-[0.2em] text-foreground text-center mb-2">
+        <h1 className="font-serif-display text-5xl md:text-6xl tracking-[0.18em] text-foreground text-center mb-3 animate-fade-in">
           {profile.resort_name}
         </h1>
       )}
 
       {profile?.tagline && (
-        <p className="font-body text-sm text-muted-foreground tracking-wider mb-1">{profile.tagline}</p>
+        <p className="font-body text-xs uppercase tracking-[0.4em] text-gold/80 mb-2">
+          {profile.tagline}
+        </p>
       )}
-      <div className="mb-12" />
+      <div className="mb-10" />
 
       {!mode ? (
-        <div className="flex flex-col gap-4 w-full max-w-xs">
+        <div className="flex flex-col gap-3 w-full max-w-sm animate-fade-in">
+          <p className="font-serif-display italic text-2xl text-foreground text-center mb-1">
+            Welcome
+          </p>
+          <p className="font-body text-xs text-muted-foreground tracking-wider text-center mb-4">
+            Please select how you'd like to continue
+          </p>
+
           <button
             onClick={() => navigate('/guest-portal')}
-            className="flex items-center justify-center gap-3 font-display text-lg tracking-wider py-6 border border-accent/30 text-accent hover:bg-accent/5 transition-colors rounded-lg"
+            className="group relative flex items-center gap-4 luxury-glass rounded-2xl px-5 py-5 text-left hover:border-gold/40 transition-all duration-300 hover:translate-y-[-1px]"
           >
-            <DoorOpen className="w-5 h-5" />
-            I'm a Guest
+            <span className="inline-flex w-12 h-12 items-center justify-center rounded-xl bg-gold/10 border border-gold/30 text-gold group-hover:bg-gold/15 transition-colors">
+              <DoorOpen className="w-5 h-5" />
+            </span>
+            <span className="flex-1 min-w-0">
+              <span className="block font-serif-display text-xl text-foreground">I'm a Guest</span>
+              <span className="block font-body text-xs text-muted-foreground mt-0.5">Explore our resort</span>
+            </span>
+            <span className="text-gold/60 group-hover:text-gold transition-colors">›</span>
           </button>
 
           <button
             onClick={() => setMode('staff')}
-            className="flex items-center justify-center gap-3 font-display text-lg tracking-wider py-6 border border-foreground/20 text-foreground hover:bg-foreground/5 transition-colors rounded-lg"
+            className="group relative flex items-center gap-4 luxury-glass rounded-2xl px-5 py-5 text-left hover:border-gold/40 transition-all duration-300 hover:translate-y-[-1px]"
           >
-            <Users className="w-5 h-5" />
-            Staff
+            <span className="inline-flex w-12 h-12 items-center justify-center rounded-xl bg-teal/10 border border-teal/30 text-teal group-hover:bg-teal/15 transition-colors">
+              <Users className="w-5 h-5" />
+            </span>
+            <span className="flex-1 min-w-0">
+              <span className="block font-serif-display text-xl text-foreground">Staff</span>
+              <span className="block font-body text-xs text-muted-foreground mt-0.5">Access staff systems</span>
+            </span>
+            <span className="text-gold/60 group-hover:text-gold transition-colors">›</span>
           </button>
 
           <button
             onClick={() => setMode('admin')}
-            className="flex items-center justify-center gap-2 font-body text-sm tracking-wider py-3 text-muted-foreground hover:text-foreground transition-colors"
+            className="group relative flex items-center gap-4 luxury-glass rounded-2xl px-5 py-5 text-left hover:border-gold/40 transition-all duration-300 hover:translate-y-[-1px]"
           >
-            <Shield className="w-4 h-4" />
-            Admin
+            <span className="inline-flex w-12 h-12 items-center justify-center rounded-xl bg-emerald/10 border border-emerald/30 text-emerald group-hover:bg-emerald/15 transition-colors">
+              <Shield className="w-5 h-5" />
+            </span>
+            <span className="flex-1 min-w-0">
+              <span className="block font-serif-display text-xl text-foreground">Admin</span>
+              <span className="block font-body text-xs text-muted-foreground mt-0.5">Administrative access</span>
+            </span>
+            <span className="text-gold/60 group-hover:text-gold transition-colors">›</span>
           </button>
 
           <button
@@ -145,10 +196,14 @@ const Index = () => {
               toast.success('Free Login (temporary)');
               navigate('/admin');
             }}
-            className="flex items-center justify-center gap-2 font-body text-xs tracking-wider py-2 text-amber-500/80 hover:text-amber-400 border border-dashed border-amber-500/30 rounded-lg transition-colors"
+            className="mt-1 flex items-center justify-center gap-2 font-body text-[11px] tracking-[0.25em] uppercase py-2.5 text-amber-400/80 hover:text-amber-300 border border-dashed border-amber-500/30 rounded-xl transition-colors"
           >
-            ⚡ Free Login (Temporary)
+            ⚡ Free Login · Temporary
           </button>
+
+          <p className="font-body text-[10px] tracking-[0.35em] uppercase text-gold/70 text-center mt-6">
+            {profile?.resort_name ? `${profile.resort_name.split(' ')[0]} · Where Nature Welcomes You Home` : 'Where Nature Welcomes You Home'}
+          </p>
         </div>
       ) : (
         <div className="w-full max-w-xs space-y-3">
