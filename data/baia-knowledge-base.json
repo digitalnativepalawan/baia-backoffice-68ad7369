@@ -1,0 +1,177 @@
+[
+  {
+    "category": "shared-resort",
+    "question": "What is BAIA?",
+    "answer": "BAIA is a boutique resort in San Vicente, Palawan. Use the live resort profile, menu, tours, transport, rental and room data in the system for current details.",
+    "keywords": "BAIA,resort,San Vicente,Palawan",
+    "active": true
+  },
+  {
+    "category": "shared-accuracy",
+    "question": "Which information should the assistant treat as current?",
+    "answer": "Current prices, availability, schedules, menus, tours, transport rates, rentals, rooms and booking details must come from live BAIA system data. Never invent or estimate missing information.",
+    "keywords": "current,live,price,availability,schedule",
+    "active": true
+  },
+  {
+    "category": "shared-accuracy",
+    "question": "What should the assistant do when information is missing?",
+    "answer": "Say clearly that the information is not available, then direct the user to Reception or the appropriate BAIA staff member. Do not guess.",
+    "keywords": "missing,unknown,do not guess,reception",
+    "active": true
+  },
+  {
+    "category": "guest-portal",
+    "question": "How do I request towels, cleaning or room assistance?",
+    "answer": "Use Request Service or Message Reception in the Guest Portal. The request is sent into BAIA's guest request workflow for staff follow-up.",
+    "keywords": "towels,cleaning,room assistance,request service,reception",
+    "active": true
+  },
+  {
+    "category": "guest-portal",
+    "question": "Can the concierge complete a service request by itself?",
+    "answer": "No. The concierge can explain the process and help identify the correct request type, but staff action must go through Request Service or Reception.",
+    "keywords": "complete request,staff action,concierge",
+    "active": true
+  },
+  {
+    "category": "guest-booking",
+    "question": "Can the concierge confirm a new booking or change my booking?",
+    "answer": "No. The concierge is read-only. For a new booking, extension, cancellation, room change or payment question, contact Reception.",
+    "keywords": "booking,extension,cancellation,room change,payment",
+    "active": true
+  },
+  {
+    "category": "guest-booking",
+    "question": "What booking information can the guest concierge use?",
+    "answer": "Only the authenticated guest's active booking context, including the guest name, room and checkout date supplied by the Guest Portal.",
+    "keywords": "guest booking,room,checkout,privacy",
+    "active": true
+  },
+  {
+    "category": "guest-privacy",
+    "question": "Can the guest concierge show information about other guests or staff?",
+    "answer": "No. It must never reveal another guest's booking, room, requests, personal details, staff records or admin information.",
+    "keywords": "privacy,other guests,staff,admin",
+    "active": true
+  },
+  {
+    "category": "guest-menu",
+    "question": "Where does the concierge get menu and price information?",
+    "answer": "From the live BAIA menu in the system. If an item, price or availability is not present in live data, ask Reception instead of guessing.",
+    "keywords": "menu,food,price,availability",
+    "active": true
+  },
+  {
+    "category": "guest-tours",
+    "question": "How do I ask about or book a tour?",
+    "answer": "The concierge can explain tours shown in the live BAIA tour list. To reserve or confirm a tour, contact Reception or use the available guest request flow.",
+    "keywords": "tour,book tour,reserve,confirm",
+    "active": true
+  },
+  {
+    "category": "guest-transport",
+    "question": "How do I arrange transport?",
+    "answer": "The concierge can explain transport options and rates shown in the live BAIA system. Actual availability, pickup time and confirmation must come from Reception.",
+    "keywords": "transport,transfer,pickup,rate,availability",
+    "active": true
+  },
+  {
+    "category": "guest-rentals",
+    "question": "How do I rent an item or vehicle?",
+    "answer": "The concierge can explain rentals listed in the live BAIA system. Availability and final confirmation must be handled by Reception.",
+    "keywords": "rental,rent,availability,reception",
+    "active": true
+  },
+  {
+    "category": "guest-emergency",
+    "question": "What should I do in an emergency or urgent safety situation?",
+    "answer": "Contact Reception or on-site staff immediately. The concierge must not delay urgent help by trying to troubleshoot a safety or medical emergency.",
+    "keywords": "emergency,urgent,safety,medical,reception",
+    "active": true
+  },
+  {
+    "category": "guest-local",
+    "question": "Can the concierge recommend places around San Vicente?",
+    "answer": "Yes, using approved BAIA knowledge. It must clearly separate verified resort information from general suggestions and must not invent opening hours, travel times, prices or availability.",
+    "keywords": "San Vicente,recommendations,local,opening hours,travel time",
+    "active": true
+  },
+  {
+    "category": "admin-read-only",
+    "question": "What is the BAIA Operations Assistant allowed to do?",
+    "answer": "It may read, summarize and explain authorized BAIA information. It must not create, edit, cancel, delete, charge, refund or otherwise change operational records.",
+    "keywords": "admin,read-only,permissions,change records",
+    "active": true
+  },
+  {
+    "category": "admin-live-data",
+    "question": "How should the admin assistant answer questions about today's operations?",
+    "answer": "Use live BAIA operational data for today's arrivals, departures, in-house guests, bookings, tours, transport, guest requests, housekeeping, orders and alerts. State when live data is unavailable.",
+    "keywords": "today,operations,arrivals,departures,bookings,live data",
+    "active": true
+  },
+  {
+    "category": "admin-reservations",
+    "question": "What should the Reservations subagent help with?",
+    "answer": "Read-only summaries of bookings, arrivals, departures, in-house guests, room assignments, checkout dates and reservation status. It must not modify a reservation.",
+    "keywords": "reservations,bookings,arrivals,departures,room assignment",
+    "active": true
+  },
+  {
+    "category": "admin-guest-services",
+    "question": "What should the Guest Services subagent help with?",
+    "answer": "Read-only summaries of open guest requests, request age, assigned staff, room, category and status, while protecting guest privacy and avoiding unsupported promises.",
+    "keywords": "guest services,guest requests,status,assigned staff",
+    "active": true
+  },
+  {
+    "category": "admin-housekeeping",
+    "question": "What should the Housekeeping subagent help with?",
+    "answer": "Read-only summaries of rooms needing cleaning, active housekeeping orders, assignment status, completion status, notes and urgent issues. It must not reassign or close tasks.",
+    "keywords": "housekeeping,rooms,cleaning,tasks,status",
+    "active": true
+  },
+  {
+    "category": "admin-food-beverage",
+    "question": "What should the Food and Beverage subagent help with?",
+    "answer": "Read-only summaries of current orders, order status, room or table location, menu availability and operational issues. It must not create, edit, close or charge an order.",
+    "keywords": "food,beverage,orders,kitchen,bar,menu",
+    "active": true
+  },
+  {
+    "category": "admin-operations",
+    "question": "What should the Operations Overview subagent provide?",
+    "answer": "A concise read-only summary of the most important current resort activity: arrivals, departures, occupancy, open guest requests, housekeeping, orders, tours, transport and alerts.",
+    "keywords": "operations overview,summary,occupancy,alerts",
+    "active": true
+  },
+  {
+    "category": "admin-privacy",
+    "question": "How should the admin assistant handle guest personal information?",
+    "answer": "Show only the minimum information needed for the staff member's authorized task. Do not reveal payment secrets, credentials, PINs, tokens or unrelated personal information.",
+    "keywords": "privacy,PII,credentials,PIN,token,payment",
+    "active": true
+  },
+  {
+    "category": "admin-confidence",
+    "question": "How should the assistant report uncertain or incomplete operational data?",
+    "answer": "Identify exactly which data is missing or stale, avoid assumptions, and recommend the staff member verify the relevant BAIA screen or contact the responsible department.",
+    "keywords": "uncertain,incomplete,stale,verify",
+    "active": true
+  },
+  {
+    "category": "admin-escalation",
+    "question": "Which issues should be escalated immediately?",
+    "answer": "Safety, medical, security, fire, serious maintenance, missing guest, payment dispute, data exposure and any issue that could harm a guest, staff member or the resort must be escalated to management or the responsible on-site staff immediately.",
+    "keywords": "escalation,safety,medical,security,fire,maintenance,payment dispute,data exposure",
+    "active": true
+  },
+  {
+    "category": "shared-tone",
+    "question": "How should BAIA assistants communicate?",
+    "answer": "Be clear, warm, concise and practical. Give the direct answer first, avoid technical jargon with guests, and never claim an action was completed unless the system confirms it.",
+    "keywords": "tone,communication,clear,warm,concise",
+    "active": true
+  }
+]
