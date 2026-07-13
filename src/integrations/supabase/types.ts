@@ -21,6 +21,7 @@ export type Database = {
           fallback_base_url: string | null
           fallback_model: string | null
           id: string
+          ollama_base_url: string | null
           openrouter_api_key: string | null
           primary_model: string
           updated_at: string
@@ -32,6 +33,7 @@ export type Database = {
           fallback_base_url?: string | null
           fallback_model?: string | null
           id?: string
+          ollama_base_url?: string | null
           openrouter_api_key?: string | null
           primary_model?: string
           updated_at?: string
@@ -43,6 +45,7 @@ export type Database = {
           fallback_base_url?: string | null
           fallback_model?: string | null
           id?: string
+          ollama_base_url?: string | null
           openrouter_api_key?: string | null
           primary_model?: string
           updated_at?: string

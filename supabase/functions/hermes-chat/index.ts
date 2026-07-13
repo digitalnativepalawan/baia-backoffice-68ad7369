@@ -190,6 +190,23 @@ async function callLLM(cfg: any, mode: string, systemPrompt: string, messages: A
     apiKey = cfg?.fallback_api_key || undefined;
     model = cfg?.fallback_model || 'gpt-3.5-turbo';
     if (!baseUrl) throw new Error('Custom provider selected but no base URL configured');
+  } else if (provider === 'ollama') {
+    const bridge = (cfg?.ollama_base_url || Deno.env.get('OLLAMA_BRIDGE_URL') || '').replace(/\/$/, '');
+    if (!bridge) throw new Error('Ollama provider selected but no bridge URL configured');
+    // Forward to the local Ollama bridge (chat API). No API key needed.
+    const response = await fetch(`${bridge}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: cfg?.primary_model || 'qwen2.5:3b',
+        messages: [{ role: 'system', content: systemPrompt }, ...messages],
+      }),
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(data?.error || `Ollama bridge failed (${response.status})`);
+    const reply = (data?.reply || '').trim();
+    if (!reply) throw new Error('Ollama returned an empty response');
+    return { reply, model: data.model || cfg?.primary_model, provider: 'ollama', maxTokens: undefined };
   } else {
     baseUrl = 'https://openrouter.ai/api/v1';
     apiKey = cfg?.openrouter_api_key

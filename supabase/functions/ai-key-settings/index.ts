@@ -83,6 +83,8 @@ Deno.serve(async req => {
         fallback_last4: cfg?.fallback_api_key ? last4(cfg.fallback_api_key) : null,
         fallback_base_url: cfg?.fallback_base_url || null,
         fallback_model: cfg?.fallback_model || null,
+        ollama_configured: Boolean(cfg?.ollama_base_url),
+        ollama_base_url: cfg?.ollama_base_url || null,
         env_secret_configured: envConfigured,
         updated_by: cfg?.updated_by || null,
         updated_at: cfg?.updated_at || null,
@@ -102,6 +104,7 @@ Deno.serve(async req => {
       if (typeof p.fallback_api_key === 'string' && p.fallback_api_key.trim()) patch.fallback_api_key = p.fallback_api_key.trim();
       if (typeof p.fallback_base_url === 'string') patch.fallback_base_url = p.fallback_base_url.trim() || null;
       if (typeof p.fallback_model === 'string') patch.fallback_model = p.fallback_model.trim() || null;
+      if (typeof p.ollama_base_url === 'string') patch.ollama_base_url = p.ollama_base_url.trim() || null;
       const { error } = await supabase.from('ai_assistant_config').upsert(patch);
       if (error) return fail(500, 'SAVE_FAILED', error.message);
       return respond({ ok: true });

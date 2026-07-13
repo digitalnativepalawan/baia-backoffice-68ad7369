@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Download, Upload, Trash2, Plus } from 'lucide-react';
+import { fetchModelCatalog, type ModelOption } from '@/lib/modelCatalog';
 
 interface Status {
-  active_provider: 'openrouter' | 'custom';
+  active_provider: 'openrouter' | 'ollama' | 'custom';
   primary_model: string;
   admin_max_tokens: number;
   guest_max_tokens: number;
@@ -18,6 +19,7 @@ interface Status {
   fallback_last4: string | null;
   fallback_base_url: string | null;
   fallback_model: string | null;
+  ollama_base_url: string | null;
   env_secret_configured: boolean;
   updated_by: string | null;
   updated_at: string | null;
@@ -94,14 +96,17 @@ export default function AiAssistantSettingsForm() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const [provider, setProvider] = useState<'openrouter' | 'custom'>('openrouter');
-  const [primaryModel, setPrimaryModel] = useState('tencent/hy3:free');
+  const [provider, setProvider] = useState<'openrouter' | 'ollama'>('openrouter');
+  const [primaryModel, setPrimaryModel] = useState('');
   const [adminMaxTokens, setAdminMaxTokens] = useState(1500);
   const [guestMaxTokens, setGuestMaxTokens] = useState(500);
   const [openrouterKey, setOpenrouterKey] = useState('');
   const [fallbackKey, setFallbackKey] = useState('');
   const [fallbackBaseUrl, setFallbackBaseUrl] = useState('');
   const [fallbackModel, setFallbackModel] = useState('');
+  const [ollamaBaseUrl, setOllamaBaseUrl] = useState('');
+  const [catalog, setCatalog] = useState<ModelOption[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
 
   const [kb, setKb] = useState<KbEntry[]>([]);
   const [kbLoading, setKbLoading] = useState(false);
@@ -123,16 +128,29 @@ export default function AiAssistantSettingsForm() {
     try {
       const s: Status = await call('status');
       setStatus(s);
-      setProvider(s.active_provider);
-      setPrimaryModel(s.primary_model || 'tencent/hy3:free');
+      setProvider(s.active_provider === 'custom' ? 'openrouter' : s.active_provider);
+      setPrimaryModel(s.primary_model || '');
       setAdminMaxTokens(s.admin_max_tokens || 1500);
       setGuestMaxTokens(s.guest_max_tokens || 500);
       setFallbackBaseUrl(s.fallback_base_url || '');
       setFallbackModel(s.fallback_model || '');
+      setOllamaBaseUrl(s.ollama_base_url || '');
     } catch {
       toast.error('Could not load assistant status');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadCatalog = async () => {
+    setCatalogLoading(true);
+    try {
+      const models = await fetchModelCatalog();
+      setCatalog(models);
+    } catch {
+      setCatalog([]);
+    } finally {
+      setCatalogLoading(false);
     }
   };
 
@@ -149,7 +167,7 @@ export default function AiAssistantSettingsForm() {
     }
   };
 
-  useEffect(() => { loadStatus(); loadKb(); /* eslint-disable-next-line */ }, []);
+  useEffect(() => { loadStatus(); loadKb(); loadCatalog(); /* eslint-disable-next-line */ }, []);
 
   const saveConfig = async () => {
     setSaving(true);
@@ -161,6 +179,7 @@ export default function AiAssistantSettingsForm() {
         guest_max_tokens: guestMaxTokens,
         fallback_base_url: fallbackBaseUrl,
         fallback_model: fallbackModel,
+        ollama_base_url: ollamaBaseUrl.trim() || null,
       };
       if (openrouterKey.trim()) config.openrouter_api_key = openrouterKey.trim();
       if (fallbackKey.trim()) config.fallback_api_key = fallbackKey.trim();
@@ -255,15 +274,42 @@ export default function AiAssistantSettingsForm() {
             <Select value={provider} onValueChange={v => setProvider(v as any)}>
               <SelectTrigger className="bg-secondary border-border text-foreground font-body mt-1"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="openrouter">OpenRouter</SelectItem>
-                <SelectItem value="custom">Custom / open-source (OpenAI-compatible)</SelectItem>
+                <SelectItem value="openrouter">OpenRouter (cloud)</SelectItem>
+                <SelectItem value="ollama">Ollama (local)</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div>
-            <label className="font-body text-xs text-muted-foreground">Primary model (OpenRouter)</label>
-            <Input value={primaryModel} onChange={e => setPrimaryModel(e.target.value)}
-              placeholder="tencent/hy3:free" className="bg-secondary border-border text-foreground font-body mt-1" />
+            <label className="font-body text-xs text-muted-foreground">
+              Model {catalogLoading && '(loading…)'}
+            </label>
+            <Select value={primaryModel} onValueChange={setPrimaryModel}>
+              <SelectTrigger className="bg-secondary border-border text-foreground font-body mt-1">
+                <SelectValue placeholder="Select a model…" />
+              </SelectTrigger>
+              <SelectContent>
+                {catalog.length === 0 && (
+                  <SelectItem value={primaryModel || 'none'} disabled>
+                    {primaryModel ? primaryModel : 'No models found'}
+                  </SelectItem>
+                )}
+                {(['Local (Ollama)', 'OpenRouter · Free', 'OpenRouter · Paid'] as const).map(group => {
+                  const items = catalog.filter(m => m.group === group);
+                  if (!items.length) return null;
+                  return (
+                    <div key={group}>
+                      <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">{group}</div>
+                      {items.map(m => (
+                        <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
+                      ))}
+                    </div>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+            {provider === 'ollama' && (
+              <p className="font-body text-[10px] text-muted-foreground mt-1">Runs on this machine — needs the local Ollama bridge running.</p>
+            )}
           </div>
         </div>
 
@@ -284,31 +330,19 @@ export default function AiAssistantSettingsForm() {
           </div>
         </div>
 
-        <div>
-          <label className="font-body text-xs text-muted-foreground">OpenRouter API key {status?.openrouter_configured ? `(set: ${status.openrouter_last4})` : ''}</label>
-          <Input type="password" value={openrouterKey} onChange={e => setOpenrouterKey(e.target.value)}
-            placeholder="sk-or-… (leave blank to keep current)" className="bg-secondary border-border text-foreground font-body mt-1" />
-        </div>
+        {provider === 'openrouter' && (
+          <div>
+            <label className="font-body text-xs text-muted-foreground">OpenRouter API key {status?.openrouter_configured ? `(set: ${status.openrouter_last4})` : ''}</label>
+            <Input type="password" value={openrouterKey} onChange={e => setOpenrouterKey(e.target.value)}
+              placeholder="sk-or-… (leave blank to keep current)" className="bg-secondary border-border text-foreground font-body mt-1" />
+          </div>
+        )}
 
-        {provider === 'custom' && (
-          <div className="space-y-3 border-l-2 border-border pl-3">
-            <div>
-              <label className="font-body text-xs text-muted-foreground">Fallback base URL (OpenAI-compatible)</label>
-              <Input value={fallbackBaseUrl} onChange={e => setFallbackBaseUrl(e.target.value)}
-                placeholder="https://my-host/v1" className="bg-secondary border-border text-foreground font-body mt-1" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="font-body text-xs text-muted-foreground">Fallback model</label>
-                <Input value={fallbackModel} onChange={e => setFallbackModel(e.target.value)}
-                  placeholder="qwen2.5:3b / llama3.1" className="bg-secondary border-border text-foreground font-body mt-1" />
-              </div>
-              <div>
-                <label className="font-body text-xs text-muted-foreground">Fallback API key {status?.fallback_configured ? `(set: ${status.fallback_last4})` : ''}</label>
-                <Input type="password" value={fallbackKey} onChange={e => setFallbackKey(e.target.value)}
-                  placeholder="leave blank to keep / if none needed" className="bg-secondary border-border text-foreground font-body mt-1" />
-              </div>
-            </div>
+        {provider === 'ollama' && (
+          <div>
+            <label className="font-body text-xs text-muted-foreground">Ollama base URL (bridge)</label>
+            <Input value={ollamaBaseUrl} onChange={e => setOllamaBaseUrl(e.target.value)}
+              placeholder="http://localhost:3001/api/ollama (leave blank for dev proxy)" className="bg-secondary border-border text-foreground font-body mt-1" />
           </div>
         )}
 

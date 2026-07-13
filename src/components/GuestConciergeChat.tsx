@@ -28,6 +28,7 @@ export default function GuestConciergeChat({ session, onOpenReception }: {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [replyMeta, setReplyMeta] = useState<{ model?: string; provider?: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -67,6 +68,7 @@ export default function GuestConciergeChat({ session, onOpenReception }: {
       if (data?.error) throw new Error(data.error.message || 'Hermes request failed');
       if (!data?.reply) throw new Error('Hermes returned no response');
 
+      setReplyMeta({ model: data.model, provider: data.provider });
       setMessages(current => [...current, {
         role: 'assistant',
         content: data.reply,
@@ -102,7 +104,7 @@ export default function GuestConciergeChat({ session, onOpenReception }: {
           <DialogHeader className="px-4 py-3 border-b border-border flex flex-row items-center justify-between">
             <div>
               <DialogTitle className="font-display text-sm tracking-wider text-foreground">BAIA Guest Concierge</DialogTitle>
-              <p className="font-body text-[11px] text-muted-foreground mt-1">Hermes · qwen2.5:3b</p>
+              <p className="font-body text-[11px] text-muted-foreground mt-1">Concierge · {replyMeta?.model ? `${replyMeta.model} (${replyMeta.provider})` : 'AI assistant'}</p>
             </div>
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setOpen(false)}>
               <X className="w-4 h-4" />

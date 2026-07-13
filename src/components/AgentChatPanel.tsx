@@ -28,6 +28,7 @@ export default function AgentChatPanel() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [subagent, setSubagent] = useState('operations-overview');
+  const [replyMeta, setReplyMeta] = useState<{ model?: string; provider?: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -75,6 +76,7 @@ export default function AgentChatPanel() {
       if (data?.error) throw new Error(data.error.message || 'Hermes request failed');
       if (!data?.reply) throw new Error('Hermes returned no response');
 
+      setReplyMeta({ model: data.model, provider: data.provider });
       setMessages(current => [...current, {
         role: 'assistant',
         content: data.reply,
@@ -112,7 +114,7 @@ export default function AgentChatPanel() {
               <DialogTitle className="font-display text-sm tracking-wider text-foreground">
                 BAIA Operations Assistant
               </DialogTitle>
-              <p className="font-body text-[11px] text-muted-foreground mt-1">Read-only assistance through OpenRouter · anthropic/claude-3.5-haiku</p>
+              <p className="font-body text-[11px] text-muted-foreground mt-1">Read-only assistance · {replyMeta?.model ? `${replyMeta.model} (${replyMeta.provider})` : 'AI assistant'}</p>
             </div>
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setOpen(false)}>
               <X className="w-4 h-4" />
