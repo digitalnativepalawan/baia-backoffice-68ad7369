@@ -37,6 +37,7 @@ export type Database = {
           ollama_base_url?: string | null
           openrouter_api_key?: string | null
           primary_model?: string
+          temperature?: number
           updated_at?: string
           updated_by?: string | null
         }
@@ -49,6 +50,7 @@ export type Database = {
           ollama_base_url?: string | null
           openrouter_api_key?: string | null
           primary_model?: string
+          temperature?: number
           updated_at?: string
           updated_by?: string | null
         }
