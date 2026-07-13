@@ -43,6 +43,7 @@ import IntegrationReadinessDashboard from '@/components/integration/IntegrationR
 import LiveOpsDashboard from '@/components/admin/LiveOpsDashboard';
 import AgentChatPanel from '@/components/AgentChatPanel';
 import AiAssistantSettingsForm from '@/components/admin/AiAssistantSettingsForm';
+import AgentSettings from '@/components/admin/AgentSettings';
 
 import { deductInventoryForOrder } from '@/lib/inventoryDeduction';
 import { hasAccess, canEdit, canViewDocuments } from '@/lib/permissions';
@@ -822,7 +823,7 @@ const AdminPage = () => {
 
                 <div className="mt-8"><InvoiceSettingsForm /></div>
                 <div className="mt-8"><BillingConfigForm /></div>
-                {isAdmin && <div className="mt-8"><AiAssistantSettingsForm /></div>}
+                {isAdmin && <div className="mt-8"><AgentSettings /></div>}
 
                 <section className="mt-8">
                   <h3 className="font-display text-sm tracking-wider text-foreground mb-4">Units / Rooms</h3>

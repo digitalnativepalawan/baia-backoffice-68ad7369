@@ -11,6 +11,7 @@ import { fetchModelCatalog, type ModelOption } from '@/lib/modelCatalog';
 interface Status {
   active_provider: 'openrouter' | 'ollama' | 'custom';
   primary_model: string;
+  temperature: number;
   admin_max_tokens: number;
   guest_max_tokens: number;
   openrouter_configured: boolean;

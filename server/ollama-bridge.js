@@ -59,8 +59,9 @@ function handleChat(req, res) {
     if (err) return json(res, 400, { error: 'bad_request' });
     const model = body.model || '';
     const messages = Array.isArray(body.messages) ? body.messages : [];
+    const temperature = typeof body.temperature === 'number' ? Math.min(1, Math.max(0, body.temperature)) : 0.4;
     if (!model || !messages.length) return json(res, 400, { error: 'model and messages required' });
-    ollamaFetch('/api/chat', { model, messages, stream: false, options: { temperature: 0.4 } }, (e, status, raw) => {
+    ollamaFetch('/api/chat', { model, messages, stream: false, options: { temperature } }, (e, status, raw) => {
       if (e) return json(res, 502, { error: 'ollama_unreachable' });
       try {
         const data = JSON.parse(raw || '{}');

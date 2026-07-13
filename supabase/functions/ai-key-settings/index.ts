@@ -77,6 +77,7 @@ Deno.serve(async req => {
         primary_model: cfg?.primary_model || 'tencent/hy3:free',
         admin_max_tokens: clampInteger(cfg?.admin_max_tokens, 100, 4000, 1500),
         guest_max_tokens: clampInteger(cfg?.guest_max_tokens, 100, 1500, 500),
+        temperature: typeof cfg?.temperature === 'number' ? cfg.temperature : 0.2,
         openrouter_configured: Boolean(cfg?.openrouter_api_key),
         openrouter_last4: cfg?.openrouter_api_key ? last4(cfg.openrouter_api_key) : null,
         fallback_configured: Boolean(cfg?.fallback_api_key),
@@ -98,6 +99,7 @@ Deno.serve(async req => {
       const patch: Record<string, unknown> = { id: 'default', updated_at: new Date().toISOString(), updated_by: staffName };
       if (typeof p.active_provider === 'string') patch.active_provider = p.active_provider;
       if (typeof p.primary_model === 'string') patch.primary_model = p.primary_model;
+      if (typeof p.temperature === 'number') patch.temperature = Math.min(1, Math.max(0, p.temperature));
       if (p.admin_max_tokens !== undefined) patch.admin_max_tokens = clampInteger(p.admin_max_tokens, 100, 4000, 1500);
       if (p.guest_max_tokens !== undefined) patch.guest_max_tokens = clampInteger(p.guest_max_tokens, 100, 1500, 500);
       if (typeof p.openrouter_api_key === 'string' && p.openrouter_api_key.trim()) patch.openrouter_api_key = p.openrouter_api_key.trim();

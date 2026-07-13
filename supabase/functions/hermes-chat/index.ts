@@ -199,6 +199,7 @@ async function callLLM(cfg: any, mode: string, systemPrompt: string, messages: A
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: cfg?.primary_model || 'qwen2.5:3b',
+        temperature,
         messages: [{ role: 'system', content: systemPrompt }, ...messages],
       }),
     });
@@ -221,6 +222,8 @@ async function callLLM(cfg: any, mode: string, systemPrompt: string, messages: A
     ? clampInteger(cfg?.guest_max_tokens, 100, 1500, 500)
     : clampInteger(cfg?.admin_max_tokens, 100, 4000, 1500);
 
+  const temperature = typeof cfg?.temperature === 'number' ? Math.min(1, Math.max(0, cfg.temperature)) : 0.4;
+
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
   if (provider === 'openrouter') headers['HTTP-Referer'] = 'https://baia-backoffice-68ad7369.vercel.app';
@@ -232,7 +235,7 @@ async function callLLM(cfg: any, mode: string, systemPrompt: string, messages: A
       model,
       messages: [{ role: 'system', content: systemPrompt }, ...messages],
       max_tokens: maxTokens,
-      temperature: 0.4,
+      temperature,
     }),
   });
 
